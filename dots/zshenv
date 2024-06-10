@@ -81,3 +81,4 @@ fi
 
 # XDebug
 export XDEBUG_CONFIG="idekey=VSCODE"
+. "$HOME/.cargo/env"
