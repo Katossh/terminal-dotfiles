@@ -31,25 +31,25 @@ export XAUTHORITY="$XDG_RUNTIME_DIR/Xauthority"
 export JUPYTER_CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/jupyter
 export MPLCONFIGDIR=${XDG_CONFIG_HOME:-$HOME/.config}/matplotlib
 
-export NPM_CONFIG_USERCONFIG=$XDG_CONFIG_HOME/npm/config
-export NPM_CONFIG_CACHE=$XDG_CACHE_HOME/npm
-export npm_config_devdir=$XDG_CONFIG_HOME/node-gyp
+# export NPM_CONFIG_USERCONFIG=$XDG_CONFIG_HOME/npm/config
+# export NPM_CONFIG_CACHE=$XDG_CACHE_HOME/npm
+# export npm_config_devdir=$XDG_CONFIG_HOME/node-gyp
 
 export NODE_REPL_HISTORY="$XDG_DATA_HOME/node_repl_history"
 
-export XINITRC="$XDG_CONFIG_HOME/X11/xinitrc"
+# export XINITRC="$XDG_CONFIG_HOME/X11/xinitrc"
 
 # Z
 export ZSHZ_DATA="$XDG_DATA_HOME/z/z"
 
 # Android
-export ANDROID_SDK_ROOT="$XDG_CONFIG_HOME/android"
-export ANDROID_SDK_HOME="$XDG_CONFIG_HOME/android"
-export ANDROID_EMULATOR_HOME="$XDG_DATA_HOME/android/"
-export ANDROID_AVD_HOME="$XDG_DATA_HOME/android/avd/"
-export ADB_VENDOR_KEY="$XDG_CONFIG_HOME/android"
+# export ANDROID_SDK_ROOT="$XDG_CONFIG_HOME/android"
+# export ANDROID_SDK_HOME="$XDG_CONFIG_HOME/android"
+# export ANDROID_EMULATOR_HOME="$XDG_DATA_HOME/android/"
+# export ANDROID_AVD_HOME="$XDG_DATA_HOME/android/avd/"
+# export ADB_VENDOR_KEY="$XDG_CONFIG_HOME/android"
 
-export GRADLE_USER_HOME="$XDG_DATA_HOME/gradle"
+# export GRADLE_USER_HOME="$XDG_DATA_HOME/gradle"
 
 # Docker
 export DOCKER_CONFIG="$XDG_CONFIG_HOME"/docker
@@ -69,16 +69,16 @@ export FZF_DEFAULT_OPTS="
 "
 
 # Java
-if [[ -d "/Applications/Android Studio.app/Contents/jre/jdk/Contents/Home" ]]; then
-    export JAVA_HOME="/Applications/Android Studio.app/Contents/jre/jdk/Contents/Home"
-fi
+# if [[ -d "/Applications/Android Studio.app/Contents/jre/jdk/Contents/Home" ]]; then
+#    export JAVA_HOME="/Applications/Android Studio.app/Contents/jre/jdk/Contents/Home"
+# fi
 
 # Android
-if [[ -d "$HOME/Library/Android/sdk" ]]; then
-    export ANDROID_SDK_ROOT=$HOME/Library/Android/sdk
-    export ANDROID_HOME=$HOME/Library/Android/sdk
-fi
+# if [[ -d "$HOME/Library/Android/sdk" ]]; then
+#    export ANDROID_SDK_ROOT=$HOME/Library/Android/sdk
+#    export ANDROID_HOME=$HOME/Library/Android/sdk
+# fi
 
 # XDebug
-export XDEBUG_CONFIG="idekey=VSCODE"
-. "$HOME/.cargo/env"
+# export XDEBUG_CONFIG="idekey=VSCODE"
+# . "$HOME/.cargo/env"
