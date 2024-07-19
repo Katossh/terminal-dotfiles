@@ -16,8 +16,8 @@ export GPG_TTY=$TTY
 # Applications
 export BROWSER='open'
 export TERMINAL='kitty'
-export EDITOR='nvim'
-export VISUAL='nvim'
+export EDITOR='vim'
+export VISUAL='vim'
 export PAGER='less'
 
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"
