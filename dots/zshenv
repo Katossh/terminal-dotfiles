@@ -82,3 +82,4 @@ export FZF_DEFAULT_OPTS="
 # XDebug
 # export XDEBUG_CONFIG="idekey=VSCODE"
 # . "$HOME/.cargo/env"
+export GITHUB_TOKEN=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
