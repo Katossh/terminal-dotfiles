@@ -22,5 +22,7 @@
     xdg-utils
     btop
     fastfetch
+    eza
+    lazygit
   ];
 }
