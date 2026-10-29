@@ -1,79 +1,64 @@
-# My dotfiles
+# Dotfiles
 
-![Main](https://github.com/JoosepAlviste/dotfiles/assets/9450943/01d33a36-c8d5-44a2-815d-450100733da1)
+Personal configuration for the command line, terminal tools, and a Linux desktop. The repository is a collection of settings rather than a universal installer: some files are portable, while others were written for a specific desktop or operating system.
 
-Some of the configuration includes:
+## Repository map
 
-* Editor - [neovim](https://neovim.io)
-    * Configured in Lua
-    * See [`config/nvim/lua/j/plugins.lua`](./config/nvim/lua/j/plugins.lua) for 
-      the used plugins
-    * [Palenightfall color 
-      scheme](https://github.com/JoosepAlviste/palenightfall.nvim)
-    * Neovim's built-in LSP client
-    * [`nvim-treesitter`](https://github.com/nvim-treesitter/nvim-treesitter/) 
-      for highlighting
-    * [`telescope.nvim`](https://github.com/nvim-telescope/telescope.nvim) for 
-      navigation
-* Terminal emulator - [Kitty](https://sw.kovidgoyal.net/kitty)
-* Shell - [Zsh](https://www.zsh.org) (custom configuration)
-* [Wallpaper](https://www.reddit.com/r/wallpaper/comments/pc8uq4/samurai_doge_3840x2160/)
+### Shell and terminal workflow
+- `dots/zshenv` — shared environment variables and XDG paths; loaded before Zsh reads its interactive configuration.
+- `config/zsh/` — Zsh startup, aliases, completion, prompt, and command-not-found handler.
+- `config/starship.toml` — Starship prompt configuration.
+- `config/.tmux/` — tmux configuration based on [gpakosz/.tmux](https://github.com/gpakosz/.tmux) and local overrides.
+- `config/kitty/` — Kitty terminal settings, key bindings, and color themes.
+- `config/wezterm/wezterm.lua` — WezTerm settings, themes, pane navigation, and keyboard shortcuts.
 
+### Command-line tools
+- `config/git/` — Git colors, aliases, diff tools, and global ignore rules.
+- `config/bat/` — bat output styling and themes.
+- `config/fd/` and `config/ripgrep/` — ignore rules for file discovery and text search.
+- `bin/` — small helper scripts for extraction, FZF previews, project selection, process selection, and Docker containers.
+- `resources/packages_list.md` — an old package checklist; currently it describes Homebrew on macOS.
 
-## Installation
+### Desktop configuration
+The remaining folders under `config/` include Linux desktop applications and Hyprland-related configuration, such as `hypr/`, `waybar/`, `rofi/`, `swaync/`, `wallust/`, and `wlogout/`. These belong to a graphical Linux desktop and are not required for a headless WSL shell.
+
+## Platform notes
+
+| Component | Status |
+|---|---|
+| Zsh, Starship, Git, bat, fd, ripgrep, helper scripts | Mostly portable; check optional tools and local paths |
+| tmux | Linux-friendly; requires tmux and its configured plugins |
+| Kitty | Configuration for the Kitty emulator; not a Windows Terminal profile |
+| WezTerm | Cross-platform emulator, but current key bindings and some options were written with macOS in mind |
+| Hyprland, Waybar, rofi, swaync | Linux desktop configuration; not a WSL shell setup |
+| Package list | Historical macOS/Homebrew notes, not a Fedora installation script |
+
+The shell configuration expects several tools (for example, `fzf`, `rg`, `bat`, `nvim`, `starship`, `git`, and optionally `tmux`). Install the tools you actually use with your distribution's package manager.
+
+## Install
+
+Clone the repository, including its submodules:
 
 ```sh
-git clone --recurse-submodules git@github.com:JoosepAlviste/dotfiles.git
-
-cd dotfiles
-chmod +x bin/makesymlinks
-./bin/makesymlinks
+git clone --recurse-submodules https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
+cd "$HOME/dotfiles"
+bash bin/makesymlinks
 ```
 
-This will symlink all of the files and folders inside `dots/` into your home 
-folder prefixed by `.` and everything from `config/` to your `~/.config/` 
-folder.
+The installer creates symlinks from `dots/` into the home directory and from `config/` into `~/.config/`. Before replacing an existing configuration, it backs it up under `~/.dotfiles_old/`. Review the script before running it on a machine with valuable local configuration.
 
-The next time you start `vim`, it will automatically install `lazy.nvim` and Vim 
-plugins. You should run `:MasonInstallAll` in order to install the required 
-external programs. Also, check out 
-[`packages_list.md`](./resources/packages_list.md) for extra programs to 
-install.
+After installing, open a new shell and check for missing commands. Plugins are checked into `config/zsh/.packages/` as Git submodules; clone with `--recurse-submodules` so those plugin paths are populated.
 
-The utility scripts in `bin/` are automatically added to the Zsh path, so you 
-can run `makesymlinks` anywhere.
+## Local overrides
 
+Use local, untracked files for machine-specific settings. For example, `config/zsh/zprofile.local` is ignored by Git and can hold local environment customizations. Do not commit API tokens, passwords, private keys, or other credentials. Authenticate with tools such as `gh auth login`, or provide secrets through a local secret manager or an untracked file with restrictive permissions.
 
-## Update
+## Security
 
-```bash
-git pull
-```
+- Never put credentials in tracked shell startup files.
+- If a token has ever been committed, revoke/rotate it; deleting the current line does not remove it from Git history.
+- Check the repository history before publishing it or making it public.
 
-Maybe run `./bin/makesymlinks` again.
+## Layout direction
 
-
-## Neovim configuration structure
-
-The Neovim configuration is split into many files and is located in 
-[`config/nvim/`](./config/nvim).
-
-* [`autoload/`](./config/nvim/autoload): functions that are used in other files 
-  and can be autoloaded. I still have a few functions here that I haven't 
-  converted to Lua.
-* [`ftplugin/`](./config/nvim/ftplugin): configuration for specific file types
-* [`lua/j/`](./config/nvim/lua/j): Lua files for settings, mappings, and my own 
-  modules
-* [`lua/j/plugins/`](./config/nvim/lua/j/plugins): configuration of plugins
-* [`lua/j/plugins/lsp/`](./config/nvim/lua/j/plugins/lsp): configuration for 
-  Neovim's built-in LSP
-* [`init.lua`](./config/nvim/init.lua): basic settings and requiring other files
-
-
-## More screenshots
-
-![Busy](https://github.com/JoosepAlviste/dotfiles/assets/9450943/4037709d-1637-4b7f-9598-6a3b6697f734)
-
-![Finder](https://github.com/JoosepAlviste/dotfiles/assets/9450943/211e152f-24ef-45ec-9bed-36ee61b95fd5)
-
-![Completion](https://github.com/JoosepAlviste/dotfiles/assets/9450943/f2b877e1-dd52-4935-832b-7b6c4896328c)
+Terminal and shell configuration and the Hyprland desktop configuration are different concerns. For reuse across machines, keep the command-line setup minimal and portable, and keep desktop-specific settings separate. The current repository still contains both groups; splitting them into separate GitHub repositories requires creating the destination repositories and migrating only the relevant files, rather than copying the complete history with its machine-specific content.
