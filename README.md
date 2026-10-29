@@ -20,7 +20,7 @@ Personal configuration for the command line, terminal tools, and a Linux desktop
 - `resources/packages_list.md` — an old package checklist; currently it describes Homebrew on macOS.
 
 ### Desktop configuration
-The remaining folders under `config/` include Linux desktop applications and Hyprland-related configuration, such as `hypr/`, `waybar/`, `rofi/`, `swaync/`, `wallust/`, and `wlogout/`. These belong to a graphical Linux desktop and are not required for a headless WSL shell.
+The main Hyprland configuration is maintained in [`Katossh/NixOS-Configuration/.config/hypr`](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr). The remaining folders under `config/` include related desktop applications such as `waybar/`, `rofi/`, `swaync/`, `wallust/`, and `wlogout/`. These require a graphical Linux desktop and are not needed for a headless WSL shell.
 
 ## Platform notes
 
@@ -30,7 +30,8 @@ The remaining folders under `config/` include Linux desktop applications and Hyp
 | tmux | Linux-friendly; requires tmux and its configured plugins |
 | Kitty | Configuration for the Kitty emulator; not a Windows Terminal profile |
 | WezTerm | Cross-platform emulator, but current key bindings and some options were written with macOS in mind |
-| Hyprland, Waybar, rofi, swaync | Linux desktop configuration; not a WSL shell setup |
+| Hyprland | Maintained separately in [NixOS-Configuration](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr); Linux desktop only |
+| Waybar, rofi, swaync | Linux desktop configuration; not a WSL shell setup |
 | Package list | Historical macOS/Homebrew notes, not a Fedora installation script |
 
 The shell configuration expects several tools (for example, `fzf`, `rg`, `bat`, `nvim`, `starship`, `git`, and optionally `tmux`). Install the tools you actually use with your distribution's package manager.
@@ -61,4 +62,4 @@ Use local, untracked files for machine-specific settings. For example, `config/z
 
 ## Layout direction
 
-Terminal and shell configuration and the Hyprland desktop configuration are different concerns. For reuse across machines, keep the command-line setup minimal and portable, and keep desktop-specific settings separate. The current repository still contains both groups. The folder-level READMEs now document the intended boundaries, but the files have not yet been moved into separate repositories.
+Terminal and shell configuration and the Hyprland desktop configuration are different concerns. The main Hyprland configuration has been moved to the existing `NixOS-Configuration` repository, which already maintained a separate copy. This repository still includes some related desktop-application settings, documented separately from the terminal setup.
