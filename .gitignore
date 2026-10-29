@@ -41,3 +41,6 @@ secrets/
 *.token
 *.secret
 *.credentials
+
+# JavaScript dependency trees are not part of this shell-only repository.
+/node_modules/
