@@ -29,7 +29,7 @@ The installer also installs curl, unzip, zip, and xdg-utils. It adds optional CL
 
 The dotfiles include configurations for Waybar, Rofi, SwayNC, Cava, Qt themes, Kvantum, and other desktop tools. These are not installed automatically because the required programs vary between desktop environments and are not needed for a headless shell or WSL.
 
-Use ./install.sh --desktop to link these settings after installing the applications you actually use.
+Use ./install.sh --desktop --no-packages to link these settings without installing CLI packages. The installer does not install GUI applications automatically.
 
 ## Historical note
 
