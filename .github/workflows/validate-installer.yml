@@ -9,7 +9,12 @@ permissions:
 
 jobs:
   installer:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,3 +33,14 @@ jobs:
           HOME="$test_home" ./install.sh --dry-run --no-packages --yes
           test ! -e "$test_home/.zshenv"
           test ! -e "$test_home/.config"
+
+      - name: Smoke-test linking and idempotence
+        shell: bash
+        run: |
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/first.log"
+          test -L "$test_home/.zshenv"
+          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/second.log"
+          grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
+          test ! -e "$test_home/.dotfiles-backup"
