@@ -1,14 +1,37 @@
-#!/usr/bin/env sh
+#!/usr/bin/env zsh
 
-# Run with `source` to change directory
-function project() {
-    local folder="$(ls -d $HOME/*/ $HOME/Code/@modashio/*/ $HOME/Code/Projects/*/ "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Notes" | sed "s@$HOME/@@" | fzf | sed "s/'//g")"
-    local absolute_folder="$HOME/$folder"
-    if [ -z "$folder" ]; then
+# Source this file from Zsh to define and run the project picker.
+# It lists directories directly under $HOME plus common development roots.
+project() {
+    emulate -L zsh
+    setopt local_options null_glob
+
+    local -a dirs
+    local root selected
+    typeset -U dirs
+
+    dirs=("$HOME"/*(/N))
+
+    for root in \
+        "$HOME/src" \
+        "$HOME/projects" \
+        "$HOME/Code" \
+        "$HOME/workspaces" \
+        "$HOME/docker" \
+        "$HOME/notes" \
+        "$HOME/Notes"; do
+        [[ -d "$root" ]] && dirs+=("$root"/*(/N))
+    done
+
+    if (( ${#dirs[@]} == 0 )); then
+        print -u2 "project: no directories found"
         return 1
     fi
 
-    cd "$absolute_folder"
+    selected="$(printf '%s\n' "${dirs[@]}" | fzf --prompt='Project> ' --height=40% --layout=reverse)" || return 130
+    [[ -n "$selected" ]] || return 1
+
+    cd -- "$selected"
 }
 
 project
