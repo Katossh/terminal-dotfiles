@@ -16,7 +16,7 @@ Personal configuration for the command line, terminal tools, and a Linux desktop
 - `config/git/` — Git colors, aliases, diff tools, and global ignore rules.
 - `config/bat/` — bat output styling and themes.
 - `config/fd/` and `config/ripgrep/` — ignore rules for file discovery and text search.
-- `bin/` — small helper scripts for extraction, FZF previews, project selection, process selection, and Docker containers.
+- `bin/` — documented helper scripts for clipboard/branch copying, extraction, FZF previews, project selection, process selection, and Docker containers (`bin/README.md`).
 - `resources/packages_list.md` — an old package checklist; currently it describes Homebrew on macOS.
 
 ### Desktop configuration
@@ -61,4 +61,4 @@ Use local, untracked files for machine-specific settings. For example, `config/z
 
 ## Layout direction
 
-Terminal and shell configuration and the Hyprland desktop configuration are different concerns. For reuse across machines, keep the command-line setup minimal and portable, and keep desktop-specific settings separate. The current repository still contains both groups; splitting them into separate GitHub repositories requires creating the destination repositories and migrating only the relevant files, rather than copying the complete history with its machine-specific content.
+Terminal and shell configuration and the Hyprland desktop configuration are different concerns. For reuse across machines, keep the command-line setup minimal and portable, and keep desktop-specific settings separate. The current repository still contains both groups. The folder-level READMEs now document the intended boundaries, but the files have not yet been moved into separate repositories.
