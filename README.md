@@ -1,65 +1,63 @@
 # Dotfiles
 
-Personal configuration for the command line, terminal tools, and a Linux desktop. The repository is a collection of settings rather than a universal installer: some files are portable, while others were written for a specific desktop or operating system.
-
-## Repository map
-
-### Shell and terminal workflow
-- `dots/zshenv` — shared environment variables and XDG paths; loaded before Zsh reads its interactive configuration.
-- `config/zsh/` — Zsh startup, aliases, completion, prompt, and command-not-found handler.
-- `config/starship.toml` — Starship prompt configuration.
-- `config/.tmux/` — tmux configuration based on [gpakosz/.tmux](https://github.com/gpakosz/.tmux) and local overrides.
-- `config/kitty/` — Kitty terminal settings, key bindings, and color themes.
-- `config/wezterm/wezterm.lua` — WezTerm settings, themes, pane navigation, and keyboard shortcuts.
-
-### Command-line tools
-- `config/git/` — Git colors, aliases, diff tools, and global ignore rules.
-- `config/bat/` — bat output styling and themes.
-- `config/fd/` and `config/ripgrep/` — ignore rules for file discovery and text search.
-- `bin/` — documented helper scripts for clipboard/branch copying, extraction, FZF previews, project selection, process selection, and Docker containers (`bin/README.md`).
-- `resources/packages_list.md` — an old package checklist; currently it describes Homebrew on macOS.
-
-### Desktop configuration
-The main Hyprland configuration is maintained in [`Katossh/NixOS-Configuration/.config/hypr`](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr). The remaining folders under `config/` include related desktop applications such as `waybar/`, `rofi/`, `swaync/`, `wallust/`, and `wlogout/`. These require a graphical Linux desktop and are not needed for a headless WSL shell.
-
-## Platform notes
-
-| Component | Status |
-|---|---|
-| Zsh, Starship, Git, bat, fd, ripgrep, helper scripts | Mostly portable; check optional tools and local paths |
-| tmux | Linux-friendly; requires tmux and its configured plugins |
-| Kitty | Configuration for the Kitty emulator; not a Windows Terminal profile |
-| WezTerm | Cross-platform emulator, but current key bindings and some options were written with macOS in mind |
-| Hyprland | Maintained separately in [NixOS-Configuration](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr); Linux desktop only |
-| Waybar, rofi, swaync | Linux desktop configuration; not a WSL shell setup |
-| Package list | Historical macOS/Homebrew notes, not a Fedora installation script |
-
-The shell configuration expects several tools (for example, `fzf`, `rg`, `bat`, `nvim`, `starship`, `git`, and optionally `tmux`). Install the tools you actually use with your distribution's package manager.
+Personal configuration for the shell, terminal tools, and optional Linux desktop applications. The installer supports Debian/Ubuntu and Fedora-family systems. NixOS is supported for linking configurations and uses a separate declarative Nix module for packages.
 
 ## Install
 
-Clone the repository, including its submodules:
+Clone the repository and run the installer:
 
-```sh
-git clone --recurse-submodules https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
-cd "$HOME/dotfiles"
-bash bin/makesymlinks
-```
+    git clone https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
+    cd "$HOME/dotfiles"
+    ./install.sh
 
-The installer creates symlinks from `dots/` into the home directory and from most of `config/` into `~/.config/`. The tmux files are placed at `~/.tmux.conf` and `~/.tmux.conf.local`, which are the locations expected by the upstream-style configuration. Before replacing an existing configuration, the installer backs it up under `~/.dotfiles_old/`. Review the script before running it on a machine with valuable local configuration.
+On an interactive terminal, the installer asks whether to install common CLI packages (default yes) and whether to link optional desktop-app configs (default no). Existing files are moved to a timestamped backup under ~/.dotfiles-backup/ before symlinks are created.
 
-After installing, open a new shell and check for missing commands. The plugin sources under `config/zsh/.packages/` are currently vendored as ordinary tracked files, not Git submodules. Their upstream URLs are documented in [`resources/upstream-sources.md`](./resources/upstream-sources.md); a normal clone is sufficient.
+Useful modes:
 
-## Local overrides
+    ./install.sh --dry-run --no-packages  # preview config links without changing anything
+    ./install.sh --no-packages            # link configs only
+    ./install.sh --packages               # install CLI prerequisites with apt or dnf
+    ./install.sh --desktop                # include optional GUI/desktop application configs
+    ./install.sh --all                    # packages + core + desktop config
+    ./install.sh --default-shell          # optionally make Zsh the default login shell
 
-Use local, untracked files for machine-specific settings. For example, `config/zsh/zprofile.local` is ignored by Git and can hold local environment customizations. Do not commit API tokens, passwords, private keys, or other credentials. Authenticate with tools such as `gh auth login`, or provide secrets through a local secret manager or an untracked file with restrictive permissions.
+The script does not change the default shell unless explicitly asked. On NixOS, it does not edit /etc/nixos or run a rebuild: review nix/packages.nix, import it into your NixOS configuration, and run sudo nixos-rebuild switch yourself. Configure a user's login shell declaratively with users.users.<name>.shell = pkgs.zsh if desired.
+
+## What gets installed
+
+### Core shell and terminal tools
+
+- dots/zshenv → ~/.zshenv, including XDG paths and automatic discovery of the repository location.
+- config/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
+- config/starship.toml, config/git/, config/bat/, config/fd/, config/ripgrep/.
+- config/.tmux/ → ~/.tmux.conf and ~/.tmux.conf.local.
+- config/kitty/, config/wezterm/, config/btop/, config/fastfetch/, and config/htop/.
+- Executable helpers from bin/ → ~/.local/bin/.
+
+### Optional desktop configs
+
+Use --desktop to link configs for Kvantum, Thunar, AGS, Cava, GTK, MPV, PulseAudio, Qt settings, Rofi, Swappy, SwayNC, Wallust, Waybar, and Wlogout. This group targets a graphical Linux desktop and is not necessary for a headless WSL shell. Old Kvantum snapshots and version-specific Ghidra preferences/logs are intentionally excluded.
+
+Hyprland itself is maintained separately in [Katossh/NixOS-Configuration](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr).
+
+## Package handling
+
+For Debian/Ubuntu, the installer uses apt-get; for Fedora-family systems it uses dnf. It installs core shell tools and adds optional packages only when they are available in configured repositories. Debian's batcat and fdfind command names are mapped to bat and fd in ~/.local/bin/ when necessary.
+
+NixOS package installation stays declarative. The optional module at nix/packages.nix enables Zsh and installs common terminal utilities. Import it into your NixOS configuration and rebuild after reviewing it; the script never edits system configuration or executes nixos-rebuild automatically.
+
+## Dependencies and local behavior
+
+The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under config/zsh/.packages/. Starship initialization is conditional, so the shell can still start before it is installed. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout.
+
+The bin/ directory includes helpers for copying the current Git branch, extracting archives, previewing files with FZF, selecting Docker containers, selecting processes, and choosing projects. See [bin/README.md](./bin/README.md).
 
 ## Security
 
-- Never put credentials in tracked shell startup files.
-- If a token has ever been committed, revoke/rotate it; deleting the current line does not remove it from Git history.
-- Check the repository history before publishing it or making it public.
+- Never commit API tokens, passwords, private keys, or machine-specific credentials.
+- If a token has ever been committed, revoke/rotate it. Removing a current line does not remove it from Git history.
+- Local-only values can go in the ignored config/zsh/zprofile.local file or be handled by a secret manager.
 
-## Layout direction
+## Upstream sources
 
-Terminal and shell configuration and the Hyprland desktop configuration are different concerns. The main Hyprland configuration has been moved to the existing `NixOS-Configuration` repository, which already maintained a separate copy. This repository still includes some related desktop-application settings, documented separately from the terminal setup.
+Third-party projects vendored under config/ are documented in [resources/upstream-sources.md](./resources/upstream-sources.md). They are tracked as regular files, not Git submodules.
