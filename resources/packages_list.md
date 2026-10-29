@@ -38,7 +38,7 @@ The config-linking step is independent of package installation. If package insta
 | Syntax-highlighted cat | bat (if available) | bat (if available) | bat |
 | Fast file search | fd-find (binary is often `fdfind`) | fd-find (binary is often `fd`) | fd |
 
-The installer also installs curl, unzip, zip, and (on Linux) xdg-utils. It adds optional tools such as btop, fastfetch, htop, eza, and lazygit when they are available in configured repositories.
+The core set also includes curl, unzip, and zip. On Linux, xdg-utils is treated as optional because only some desktop integrations need it. Other optional tools include btop, fastfetch, htop, eza, and lazygit; these are installed only when available in configured repositories.
 
 ## Optional desktop applications
 
