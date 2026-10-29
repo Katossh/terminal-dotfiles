@@ -56,3 +56,14 @@ jobs:
           HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/second.log"
           grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
           test ! -e "$test_home/.dotfiles-backup"
+
+      - name: Test Zsh repository path discovery
+        shell: bash
+        run: |
+          if command -v zsh >/dev/null 2>&1; then
+            test_home="$(mktemp -d)"
+            trap 'rm -rf "$test_home"' EXIT
+            HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/install.log"
+            actual="$(HOME="$test_home" zsh -c 'unset DOTFILES_DIR; print -r -- "$DOTFILES_DIR"')"
+            test "$actual" = "$GITHUB_WORKSPACE"
+          fi
