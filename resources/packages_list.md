@@ -23,7 +23,7 @@ It detects Debian/Ubuntu and Fedora-family distributions, installs the core term
 | Syntax-highlighted cat | bat (if available) | bat (if available) | bat |
 | Fast file search | fd-find (if available; binary is often fdfind) | fd-find (if available; binary is fd) | fd |
 
-The installer also installs curl, unzip, zip, and xdg-utils. It adds optional command-line monitoring tools such as btop, fastfetch, and htop when they are available in the configured repositories.
+The installer also installs curl, unzip, zip, and xdg-utils. It adds optional CLI tools such as btop, fastfetch, htop, eza, and lazygit when they are available in the configured repositories.
 
 ## Optional desktop applications
 
