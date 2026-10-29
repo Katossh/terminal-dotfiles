@@ -1,73 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Create home-directory symlinks for this repository.
-# Existing targets are moved to a timestamped backup before being replaced.
-
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-repo_dir="$(cd -- "$script_dir/.." >/dev/null 2>&1 && pwd)"
-backup_dir="$HOME/.dotfiles_old/$(date +%Y%m%d-%H%M%S)"
-
-backup_and_link() {
-    local source="$1"
-    local target="$2"
-    local resolved_target=""
-
-    mkdir -p -- "$(dirname -- "$target")"
-
-    # Idempotent: do nothing if the target already points to this source.
-    if [[ -L "$target" ]]; then
-        resolved_target="$(readlink -f -- "$target" 2>/dev/null || true)"
-        if [[ "$resolved_target" == "$source" ]]; then
-            printf 'Already linked: %s -> %s\n' "$target" "$source"
-            return 0
-        fi
-    fi
-
-    if [[ -e "$target" || -L "$target" ]]; then
-        mkdir -p -- "$backup_dir"
-        local backup_target="$backup_dir/$(basename -- "$target")"
-        if [[ -e "$backup_target" || -L "$backup_target" ]]; then
-            backup_target="$backup_dir/$(basename -- "$target").$(date +%s%N)"
-        fi
-        printf 'Backing up %s -> %s\n' "$target" "$backup_target"
-        mv -- "$target" "$backup_target"
-    fi
-
-    printf 'Linking %s -> %s\n' "$target" "$source"
-    ln -s -- "$source" "$target"
-}
-
-shopt -s nullglob
-
-# Files in dots/ become hidden files in the home directory.
-for source in "$repo_dir"/dots/*; do
-    [[ -e "$source" ]] || continue
-    name="$(basename -- "$source")"
-    backup_and_link "$source" "$HOME/.$name"
-done
-
-# Most config entries map directly to ~/.config/<name>.
-mkdir -p -- "$HOME/.config"
-for source in "$repo_dir"/config/* "$repo_dir"/config/.[!.]*; do
-    [[ -e "$source" ]] || continue
-    name="$(basename -- "$source")"
-
-    # gpakosz/.tmux expects these files in the home directory, not in
-    # ~/.config/.tmux. Link the canonical filenames explicitly.
-    if [[ "$name" == ".tmux" && -d "$source" ]]; then
-        [[ -f "$source/.tmux.conf" ]] &&
-            backup_and_link "$source/.tmux.conf" "$HOME/.tmux.conf"
-        [[ -f "$source/.tmux.conf.local" ]] &&
-            backup_and_link "$source/.tmux.conf.local" "$HOME/.tmux.conf.local"
-        continue
-    fi
-
-    backup_and_link "$source" "$HOME/.config/$name"
-done
-
-if [[ -d "$backup_dir" ]]; then
-    printf '\nBackup location: %s\n' "$backup_dir"
-else
-    printf '\nNo existing files needed backing up.\n'
-fi
+# Backwards-compatible entry point; the main installer owns all linking logic.
+script_path="$(readlink -f -- "${BASH_SOURCE[0]}")"
+repo_dir="$(cd -- "$(dirname -- "$script_path")/.." >/dev/null 2>&1 && pwd)"
+exec "$repo_dir/install.sh" "$@"
