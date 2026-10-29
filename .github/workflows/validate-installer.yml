@@ -22,6 +22,18 @@ jobs:
       - name: Check Bash syntax
         run: bash -n install.sh
 
+      - name: Install ShellCheck
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          fi
+
+      - name: Lint installer
+        if: runner.os == 'Linux'
+        run: shellcheck --severity=warning install.sh
+
       - name: Check help output
         run: ./install.sh --help
 
