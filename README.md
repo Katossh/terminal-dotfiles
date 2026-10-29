@@ -45,9 +45,9 @@ cd "$HOME/dotfiles"
 bash bin/makesymlinks
 ```
 
-The installer creates symlinks from `dots/` into the home directory and from `config/` into `~/.config/`. Before replacing an existing configuration, it backs it up under `~/.dotfiles_old/`. Review the script before running it on a machine with valuable local configuration.
+The installer creates symlinks from `dots/` into the home directory and from most of `config/` into `~/.config/`. The tmux files are placed at `~/.tmux.conf` and `~/.tmux.conf.local`, which are the locations expected by the upstream-style configuration. Before replacing an existing configuration, the installer backs it up under `~/.dotfiles_old/`. Review the script before running it on a machine with valuable local configuration.
 
-After installing, open a new shell and check for missing commands. Plugins are checked into `config/zsh/.packages/` as Git submodules; clone with `--recurse-submodules` so those plugin paths are populated.
+After installing, open a new shell and check for missing commands. The plugin sources under `config/zsh/.packages/` are currently vendored as ordinary tracked files, not Git submodules. Their upstream URLs are documented in [`resources/upstream-sources.md`](./resources/upstream-sources.md); a normal clone is sufficient.
 
 ## Local overrides
 
