@@ -6,12 +6,24 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# WSL may not provide XDG_RUNTIME_DIR. Prefer the standard per-user path when
-# available; otherwise use /tmp as a compatibility fallback.
-if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -w "$XDG_RUNTIME_DIR" ]]; then
+# Some systems (notably macOS and WSL) do not provide XDG_RUNTIME_DIR.
+# Never fall back to shared /tmp directly: create a private per-user directory.
+if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ]]; then
     XDG_RUNTIME_DIR="/run/user/$UID"
     if [[ ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ]]; then
-        XDG_RUNTIME_DIR="/tmp"
+        _xdg_runtime_root="${TMPDIR:-/tmp}"
+        XDG_RUNTIME_DIR="${_xdg_runtime_root%/}/dotfiles-runtime-$UID"
+        if [[ ! -e "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" ]]; then
+            (umask 077 && mkdir "$XDG_RUNTIME_DIR") 2>/dev/null || true
+        fi
+        if [[ -d "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" && -O "$XDG_RUNTIME_DIR" && -w "$XDG_RUNTIME_DIR" ]]; then
+            chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+        else
+            XDG_RUNTIME_DIR="$XDG_CACHE_HOME/runtime"
+            mkdir -p "$XDG_RUNTIME_DIR"
+            chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+        fi
+        unset _xdg_runtime_root
     fi
 fi
 export XDG_RUNTIME_DIR
