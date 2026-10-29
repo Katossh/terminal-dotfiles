@@ -1,4 +1,5 @@
 tmux*.log
+config/btop/btop.log
 
 config/nvim/spell/*.spl
 config/nvim/lua/packer_compiled.lua
