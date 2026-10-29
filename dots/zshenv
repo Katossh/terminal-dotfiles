@@ -1,51 +1,62 @@
-# Environment variables shared by interactive and non-interactive shells.
-# Keep this file portable: do not put credentials, machine-specific secrets, or
-# GUI-only assumptions here.
+# Shared environment variables loaded by every Zsh process.
+# Keep credentials and machine-specific secrets out of this tracked file.
 
 # XDG base directories
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# In WSL, XDG_RUNTIME_DIR is not always provided by systemd. Prefer the standard
-# per-user runtime directory when it exists and is writable; otherwise use /tmp.
-if [[ -z ${XDG_RUNTIME_DIR:-} || ! -w "$XDG_RUNTIME_DIR" ]]; then
-    XDG_RUNTIME_DIR="/tmp"
+# WSL may not provide XDG_RUNTIME_DIR. Prefer the standard per-user path when
+# available; otherwise use /tmp as a compatibility fallback.
+if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -w "$XDG_RUNTIME_DIR" ]]; then
+    XDG_RUNTIME_DIR="/run/user/$UID"
+    if [[ ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ]]; then
+        XDG_RUNTIME_DIR="/tmp"
+    fi
 fi
 export XDG_RUNTIME_DIR
 
-# Zsh keeps its configuration under XDG_CONFIG_HOME.
+# Keep Zsh configuration under XDG_CONFIG_HOME.
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
-# Terminal/session integration
-export GPG_TTY="${TTY:-$(tty 2>/dev/null)}"
+# Resolve the repository path from the linked Zsh config. This allows the repo
+# to live somewhere other than ~/dotfiles without breaking helper scripts.
+_zsh_config_real="$(readlink -f -- "$ZDOTDIR" 2>/dev/null || true)"
+case "$_zsh_config_real" in
+    */config/zsh)
+        export DOTFILES_DIR="${DOTFILES_DIR:-${_zsh_config_real%/config/zsh}}"
+        ;;
+esac
+unset _zsh_config_real
+export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+
+# Application defaults; override these in a local shell profile if needed.
+export GPG_TTY="${TTY:-$(tty 2>/dev/null || true)}"
+export BROWSER="${BROWSER:-xdg-open}"
 export TERMINAL="${TERMINAL:-kitty}"
 export EDITOR="${EDITOR:-nvim}"
 export VISUAL="${VISUAL:-$EDITOR}"
 export PAGER="${PAGER:-less}"
-export BROWSER="${BROWSER:-xdg-open}"
 
-# Plugin and tool settings
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=8"
 export NODE_REPL_HISTORY="$XDG_DATA_HOME/node_repl_history"
 export ZSHZ_DATA="$XDG_DATA_HOME/z/z"
 export DOCKER_CONFIG="$XDG_CONFIG_HOME/docker"
 export LESSHISTFILE="-"
 
-# Optional personal paths. Uncomment and set these on the machine that uses them.
+# Optional personal paths. Configure these locally instead of committing them.
 # export ZK_NOTEBOOK_DIR="$HOME/Dropbox/notes"
-# export JUPYTER_CONFIG_DIR="$XDG_CONFIG_HOME/jupyter"
-# export MPLCONFIGDIR="$XDG_CONFIG_HOME/matplotlib"
 # export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
 # export GRADLE_USER_HOME="$XDG_DATA_HOME/gradle"
-# export XDEBUG_CONFIG="idekey=VSCODE"
+# export JUPYTER_CONFIG_DIR="$XDG_CONFIG_HOME/jupyter"
+# export MPLCONFIGDIR="$XDG_CONFIG_HOME/matplotlib"
 
-# FZF: use ripgrep for file discovery; fall back gracefully if rg is unavailable.
+# Use ripgrep to populate FZF's default file list when it is installed.
 if command -v rg >/dev/null 2>&1; then
     export FZF_DEFAULT_COMMAND='rg --files --hidden --no-ignore-vcs --ignore-file "$XDG_CONFIG_HOME/ripgrep/ignore"'
 fi
 
-# Kanagawa-inspired FZF colors. Keep key bindings in shell config, not here.
+# Kanagawa-inspired FZF colors
 export FZF_DEFAULT_OPTS="
 --inline-info
 --color=bg+:#16161D,spinner:#957FB8,hl:#7E9CD8
@@ -53,6 +64,5 @@ export FZF_DEFAULT_OPTS="
 --color=marker:#E6C384,fg+:#DCD7BA,prompt:#957FB8,hl+:#957FB8
 "
 
-# Credentials do not belong in tracked dotfiles. Authenticate with `gh auth login`
-# or inject tokens from an untracked, permission-restricted local environment.
-# Never add GITHUB_TOKEN or other secrets directly to this file.
+# Never put GITHUB_TOKEN, API keys, passwords, or private keys in this file.
+# Authenticate with gh auth login or use an external/local secret manager.
