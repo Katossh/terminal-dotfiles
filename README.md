@@ -44,7 +44,7 @@ Hyprland itself is maintained separately in [Katossh/NixOS-Configuration](https:
 
 For Debian/Ubuntu, the installer uses apt-get; for Fedora-family systems it uses dnf. It installs core shell tools and adds optional packages only when they are available in configured repositories. Debian's batcat and fdfind command names are mapped to bat and fd in ~/.local/bin/ when necessary.
 
-NixOS package installation stays declarative. The optional module at nix/packages.nix enables Zsh and installs common terminal utilities. Import it into your NixOS configuration and rebuild after reviewing it; the script never edits system configuration or executes nixos-rebuild automatically.
+NixOS package installation stays declarative. The optional module at nix/packages.nix enables Zsh and installs common terminal utilities. Import it into your NixOS configuration and rebuild after reviewing it; the script never edits system configuration or executes nixos-rebuild automatically. See [resources/packages_list.md](./resources/packages_list.md) for the package matrix.
 
 ## Dependencies and local behavior
 
