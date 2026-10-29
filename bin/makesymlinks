@@ -49,7 +49,7 @@ done
 
 # Most config entries map directly to ~/.config/<name>.
 mkdir -p -- "$HOME/.config"
-for source in "$repo_dir"/config/* "$repo_dir"/config/.[!.]* "$repo_dir"/config/..?*; do
+for source in "$repo_dir"/config/* "$repo_dir"/config/.[!.]*; do
     [[ -e "$source" ]] || continue
     name="$(basename -- "$source")"
 
