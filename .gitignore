@@ -7,6 +7,8 @@ config/zsh/zprofile.local
 config/zsh/zsh_history
 config/zsh/.zsh_history
 config/zsh/.zcompdump
+config/zsh/.zcompdump*
+config/zsh/*.zwc
 config/zsh/.zcompcache
 config/zsh/.zinit
 config/zsh/.zsh_sessions
@@ -17,6 +19,9 @@ config/kitty/kitty.local.conf
 config/git/config-scoro
 
 config/lazygit/state.yml
+
+# Generated desktop-session markers.
+config/hypr/.initial_startup_done
 
 dots/emacs.d/elpa/
 .netrwhist
