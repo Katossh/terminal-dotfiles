@@ -8,4 +8,4 @@
 - The config integrates pane navigation with Neovim through the `IS_NVIM` user variable.
 - The theme and font choices are independent of WSL, but installed fonts must be visible to the WezTerm host.
 
-Keep host-terminal settings here and Linux-shell settings in `config/zsh/`. They solve different layers of the problem.
+Keep host-terminal settings here and Linux-shell settings in `config/terminal/zsh/`. They solve different layers of the problem.
