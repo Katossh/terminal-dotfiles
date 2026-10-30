@@ -45,6 +45,20 @@ jobs:
       - name: Check help output
         run: ./install.sh --help
 
+      - name: Check Zsh syntax and Starship configuration
+        shell: bash
+        run: |
+          for script in dots/zshenv config/zsh/.zshrc config/zsh/prompt.zsh; do
+            zsh -n "$script"
+          done
+          test -s config/starship.toml
+          grep -Fq 'STARSHIP_CONFIG=' dots/zshenv
+          grep -Fq 'starship init zsh' config/zsh/prompt.zsh
+          if grep -ni 'lazygit' install.sh nix/packages.nix config/kitty/kitty.conf config/kitty/README.md config/wezterm/wezterm.lua config/wezterm/README.md README.md resources/packages_list.md; then
+            echo "Unexpected LazyGit reference in active configuration or documentation."
+            exit 1
+          fi
+
       - name: Smoke-test non-destructive dry run
         shell: bash
         run: |
@@ -61,6 +75,7 @@ jobs:
           trap 'rm -rf "$test_home"' EXIT
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
           test -L "$test_home/.zshenv"
+          test -L "$test_home/.config/starship.toml"
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
           grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
           test ! -e "$test_home/.dotfiles-backup"
