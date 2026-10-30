@@ -577,6 +577,10 @@ command_install() {
 
 set_default_shell() {
     [[ "$DRY_RUN" == 1 ]] && { info "Dry run: would offer to change the login shell."; return 0; }
+    if [[ "$(detect_package_manager)" == nixos ]]; then
+        info "On NixOS, set users.users.<name>.shell = pkgs.zsh in your NixOS configuration instead."
+        return 0
+    fi
     local zsh_path
     zsh_path="$(command -v zsh || true)"
     [[ -n "$zsh_path" ]] || { warn "Zsh is not installed; cannot change the login shell."; return 0; }
