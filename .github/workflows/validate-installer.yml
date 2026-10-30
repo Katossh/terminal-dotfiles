@@ -50,7 +50,7 @@ jobs:
         run: |
           test_home="$(mktemp -d)"
           trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" ./install.sh --dry-run --no-packages --yes
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --dry-run --no-packages --yes
           test ! -e "$test_home/.zshenv"
           test ! -e "$test_home/.config"
 
@@ -59,9 +59,9 @@ jobs:
         run: |
           test_home="$(mktemp -d)"
           trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/first.log"
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
           test -L "$test_home/.zshenv"
-          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/second.log"
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
           grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
           test ! -e "$test_home/.dotfiles-backup"
 
@@ -71,7 +71,7 @@ jobs:
           command -v zsh >/dev/null 2>&1
           test_home="$(mktemp -d)"
           trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/install.log"
-          actual="$(HOME="$test_home" DOTFILES_DIR= zsh -c 'print -r -- "$DOTFILES_DIR"')"
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/install.log"
+          actual="$(env -u ZDOTDIR HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" DOTFILES_DIR= zsh -c 'print -r -- "$DOTFILES_DIR"')"
           printf 'Expected repository path: %s\nActual repository path:   %s\n' "$GITHUB_WORKSPACE" "$actual"
           test "$actual" = "$GITHUB_WORKSPACE"
