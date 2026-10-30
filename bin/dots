@@ -808,7 +808,8 @@ command_uninstall() {
         mv "$links_tmp" "$STATE_FILE"
     fi
 
-    while IFS=
+    while IFS=$'\t' read -r kind target backup; do
+        [[ "$kind" == backup ]] || continue
         if [[ -e "$backup" || -L "$backup" ]]; then
             if [[ -e "$target" || -L "$target" ]]; then
                 warn "Cannot restore $backup because $target is occupied; backup preserved."
