@@ -1,11 +1,11 @@
 # tmux
 
-This folder contains a configuration based on [gpakosz/.tmux](https://github.com/gpakosz/.tmux).
+This directory contains a configuration based on [gpakosz/.tmux](https://github.com/gpakosz/.tmux).
 
 - `.tmux.conf` — main configuration; avoid editing this generated/upstream-style file when an override will do.
 - `.tmux.conf.local` — local colors, status line, pane behavior, and plugin options.
 
-The installer links these files to the conventional targets `~/.tmux.conf` and `~/.tmux.conf.local`. The hidden `.tmux` directory is a source folder in this repository, not the runtime config directory.
+The installer links these files to the conventional targets `~/.tmux.conf` and `~/.tmux.conf.local`. This tracked source directory is separate from tmux's runtime plugin directory under `~/.tmux/`.
 
 The local configuration uses **Catppuccin Mocha** colors. The installer also installs the official [Catppuccin tmux plugin](https://github.com/catppuccin/tmux) at the pinned `v2.3.2` tag under `~/.tmux/plugins/catppuccin/tmux` when tmux 3.2+ and Git are available. A built-in Mocha style remains active if the plugin cannot be installed. The plugin is installed manually rather than through TPM, following Catppuccin's recommendation.
 
