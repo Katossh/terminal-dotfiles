@@ -54,6 +54,11 @@ jobs:
           test -s config/starship.toml
           grep -Fq 'STARSHIP_CONFIG=' dots/zshenv
           grep -Fq 'starship init zsh' config/zsh/prompt.zsh
+          grep -Fq 'TMUX_THEME_VERSION="v2.3.2"' install.sh
+          grep -Fq 'install_tmux_theme' install.sh
+          grep -Fq 'configure_tmux_default_shell' install.sh
+          grep -Fq 'set -g @catppuccin_flavor "mocha"' config/.tmux/.tmux.conf.local
+          grep -Fq 'catppuccin.tmux' config/.tmux/.tmux.conf.local
           if grep -ni 'lazygit' install.sh nix/packages.nix config/kitty/kitty.conf config/kitty/README.md config/wezterm/wezterm.lua config/wezterm/README.md README.md resources/packages_list.md; then
             echo "Unexpected LazyGit reference in active configuration or documentation."
             exit 1
@@ -76,6 +81,8 @@ jobs:
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
           test -L "$test_home/.zshenv"
           test -L "$test_home/.config/starship.toml"
+          test -L "$test_home/.tmux.conf"
+          test -L "$test_home/.tmux.conf.local"
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
           grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
           test ! -e "$test_home/.dotfiles-backup"

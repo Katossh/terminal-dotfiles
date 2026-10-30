@@ -30,7 +30,7 @@ The script does not change the default shell unless explicitly asked. On NixOS, 
 - dots/zshenv → ~/.zshenv, including XDG paths and automatic discovery of the repository location.
 - config/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
 - config/starship.toml, config/git/, config/bat/, config/fd/, config/ripgrep/.
-- config/.tmux/ → ~/.tmux.conf and ~/.tmux.conf.local.
+- config/.tmux/ → ~/.tmux.conf and ~/.tmux.conf.local, with Catppuccin Mocha styling and a pinned official theme plugin.
 - config/kitty/, config/wezterm/, config/btop/, config/fastfetch/, and config/htop/.
 - Executable helpers from bin/ → ~/.local/bin/.
 
@@ -48,7 +48,7 @@ NixOS package installation stays declarative. The optional module at nix/package
 
 ## Dependencies and local behavior
 
-The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under `config/zsh/.packages/`. The installer links `config/starship.toml` and exports `STARSHIP_CONFIG` so Starship uses that file. Starship is initialized by `config/zsh/prompt.zsh`; a minimal fallback prompt remains available for config-only installs. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout.
+The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under `config/zsh/.packages/`. The installer links `config/starship.toml` and exports `STARSHIP_CONFIG` so Starship uses that file. Starship is initialized by `config/zsh/prompt.zsh`; a minimal fallback prompt remains available for config-only installs. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout. The tmux setup uses Catppuccin Mocha, installs the official Catppuccin plugin at the pinned `v2.3.2` tag for tmux 3.2+, and synchronizes a running tmux server's `default-shell` with the account login shell.
 
 The bin/ directory includes helpers for copying the current Git branch, extracting archives, previewing files with FZF, selecting Docker containers, selecting processes, and choosing projects. See [bin/README.md](./bin/README.md).
 
