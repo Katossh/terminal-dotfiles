@@ -511,3 +511,6 @@ set -g status-right "#[fg=#cdd6f4,bg=#313244] %H:%M %d-%b "
 # "$@"
 # # /!\ do not remove the previous line
 # #     do not write below this line
+
+# Generated from the canonical dots palette; do not edit this adapter directly.
+source-file -q "$HOME/.tmux/dots-theme.conf"

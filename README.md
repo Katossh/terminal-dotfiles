@@ -1,62 +1,103 @@
-# Dotfiles
+# Dotfiles — terminal environment
 
-Personal configuration for the shell, terminal tools, and optional Linux desktop applications. The installer supports common package managers on Debian/Ubuntu (apt), Fedora/RHEL (dnf), Arch (pacman), openSUSE (zypper), Alpine (apk), Void (xbps), FreeBSD (pkg), and macOS (Homebrew). NixOS uses a separate declarative Nix module for packages. Starship is required: the installer uses a native package when available and otherwise installs the official release into `~/.local/bin`. Other optional packages are checked against configured repositories and skipped with a warning when unavailable.
+A manifest-driven terminal configuration manager for Zsh, terminal tools, and CLI/TUI applications. The manager has no graphical-desktop installation path and does not depend on a window manager, Wayland, X11, Waybar, or Rofi.
 
 ## Install
 
-Clone the repository and run the installer:
+```sh
+git clone https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
+cd "$HOME/dotfiles"
+./install.sh
+```
 
-    git clone https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
-    cd "$HOME/dotfiles"
-    ./install.sh
+On an interactive terminal, `dots install` asks whether to install recommended CLI packages (default yes). In a non-interactive session, packages are skipped unless `--packages` is explicit.
 
-On an interactive terminal, the installer asks whether to install common CLI packages (default yes) and whether to link optional desktop-app configs (default no). Existing files are moved to a timestamped backup under ~/.dotfiles-backup/ before symlinks are created.
+```sh
+./install.sh --no-packages --yes
+dots install --packages
+dots install --dry-run --no-packages
+dots list
+dots --health
+```
 
-Useful modes:
+`install.sh` is only a bootstrap wrapper. The actual command is `bin/dots`, which is linked to `~/.local/bin/dots` during installation.
 
-    ./install.sh --dry-run --no-packages  # preview config links without changing anything
-    ./install.sh --no-packages            # link configs only
-    ./install.sh --packages               # install CLI prerequisites with the detected package manager
-    ./install.sh --desktop                # include optional GUI/desktop application configs
-    ./install.sh --all                    # packages + core + desktop config
-    ./install.sh --default-shell          # optionally make Zsh the default login shell
+## Commands
 
-The script does not change the default shell unless explicitly asked. On NixOS, it does not edit /etc/nixos or run a rebuild: review nix/packages.nix, import it into your NixOS configuration, and run sudo nixos-rebuild switch yourself. Configure a user's login shell declaratively with users.users.<name>.shell = pkgs.zsh if desired.
+| Command | Purpose |
+|---|---|
+| `dots install` | Apply configurations from `manifest/configs.tsv`; optionally install declared packages. |
+| `dots list` | List managed components and installation status. |
+| `dots --health` | Diagnose missing sources, changed or broken links, generated adapters, and missing dependencies. It does not repair anything. |
+| `dots backup` | Snapshot managed target paths and personal overrides. Prints a snapshot ID. |
+| `dots restore [ID]` | Restore a snapshot (latest by default). Current paths are moved to a safety backup first. |
+| `dots uninstall` | Remove only links recorded by dots, restore collision backups, and remove downloads recorded as installer-owned. |
+| `dots uninstall --purge` | Additionally remove only native packages recorded as newly installed by dots. It does not run autoremove. |
+| `dots prune` | Remove broken managed links, abandoned clone staging directories, and stale state records. |
 
-## What gets installed
+Git remains responsible for repository updates and history: use `git pull`, `git status`, `git diff`, and `git log`. There is deliberately no `dots update` or `dots diff` wrapper.
 
-### Core terminal configuration
+## Configuration manifest
 
-- dots/zshenv → ~/.zshenv, including XDG paths and automatic repository discovery.
-- config/terminal/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
-- config/terminal/ contains Kitty, tmux, Starship, Git, bat, fd, ripgrep, btop, htop, fastfetch, Cava, and Stylua configuration.
-- The tmux files are linked to ~/.tmux.conf and ~/.tmux.conf.local; Catppuccin Mocha is installed separately by the installer.
-- Executable helpers from bin/ → ~/.local/bin/.
+`manifest/configs.tsv` is the single inventory of managed configurations. Each row declares a component, source type (`file` or `tree`), repository source, destination namespace/path, and supported platform. `manifest/packages.tsv` is the corresponding package inventory.
 
-### Optional UI configuration
+The installer, listing, health checks, and CI all read the same manifest. There are no separate hardcoded UI or terminal component lists.
 
-Use --desktop to link config/ui/ to the matching ~/.config application paths. This includes Kvantum, Thunar, AGS, GTK/Qt settings, MPV, Rofi, Swappy, SwayNC, Wallust, Waybar, Wlogout, and Thorium flags. These Linux desktop settings are skipped on macOS and are unnecessary for a headless WSL shell.
+Application trees are linked file-by-file, not as one directory symlink. Existing conflicting files are moved to `~/.local/share/dots/backups/collisions/` before links are created. This preserves unrelated files in an existing application config directory and makes per-file overrides possible.
 
-Hyprland itself is maintained separately in [Katossh/NixOS-Configuration](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr).
+## Personal overrides
 
-## Package handling
+Personal overrides live outside the repository and take precedence over the matching shared file:
 
-The installer detects apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, or Homebrew and installs core terminal tools with the native package manager. It then ensures Starship is installed, preferring a native package and falling back to the official release installer in `~/.local/bin` when the enabled repositories do not provide it. This fallback does not enable extra repositories. Optional tools are added only when available in configured repositories. Debian/Ubuntu's `batcat` and `fdfind` command names are mapped to `bat` and `fd` in `~/.local/bin/` when necessary. Homebrew is never run through sudo. On an unrecognized system, package installation is skipped with instructions, while config linking remains available.
+```text
+~/.config/dots/
+├── overrides/
+│   ├── zsh/
+│   │   └── aliases.zsh
+│   ├── kitty/
+│   │   └── kitty.conf
+│   ├── tmux.conf
+│   ├── tmux.conf.local
+│   └── starship          # complete replacement for the single-file Starship component
+└── theme.local.env
+```
 
-NixOS package installation stays declarative. The optional module at nix/packages.nix enables Zsh and installs common terminal utilities. Import it into your NixOS configuration and rebuild after reviewing it; the script never edits system configuration or executes nixos-rebuild automatically. See [resources/packages_list.md](./resources/packages_list.md) for the package matrix.
+For directory components, mirror the repository-relative path under `overrides/<component>/`. For single-file components, use the component name as the override filename (for example `overrides/starship`). An override replaces that one file; dots does not attempt to merge arbitrary application-specific formats.
 
-## Dependencies and local behavior
+Existing untracked files such as `~/.config/zsh/zprofile.local` remain in place. Never put secrets or machine-specific credentials in the repository.
 
-The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under `config/terminal/zsh/.packages/`. The installer links `config/terminal/starship.toml` to `~/.config/starship.toml` and exports `STARSHIP_CONFIG` so Starship uses it. Starship is initialized by `config/terminal/zsh/prompt.zsh`; a minimal fallback prompt remains available for config-only installs. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout. The tmux setup uses Catppuccin Mocha, installs the official Catppuccin plugin at the pinned `v2.3.2` tag for tmux 3.2+, and synchronizes a running tmux server's `default-shell` with the account login shell.
+## Backups, restore, and uninstall
 
-The bin/ directory includes helpers for copying the current Git branch, extracting archives, previewing files with FZF, selecting Docker containers, selecting processes, and choosing projects. See [bin/README.md](./bin/README.md).
+`dots backup` snapshots each manifest destination and the complete `~/.config/dots` directory, including overrides. Files and symlinks are preserved as such. The snapshot lives under `~/.local/share/dots/backups/snapshots/`.
 
-## Security
+`dots restore` first moves current destinations into a restore-safety directory, then restores the snapshot. Restoring an older snapshot can intentionally remove files created after that snapshot.
 
-- Never commit API tokens, passwords, private keys, or machine-specific credentials.
-- If a token has ever been committed, revoke/rotate it. Removing a current line does not remove it from Git history.
-- Local-only values can go in the ignored config/terminal/zsh/zprofile.local file or be handled by a secret manager.
+Every future standalone download is recorded in the installation receipt. Currently this includes the upstream Starship fallback binary and the pinned Catppuccin tmux plugin. Temporary installer scripts are removed immediately. Native packages are recorded only when they were not installed before the dots operation; `--purge` removes those explicitly recorded packages, without asking the package manager to autoremove shared dependencies.
 
-## Upstream sources
+Earlier installer versions did not keep complete ownership receipts. A pre-existing standalone binary in `~/.local/bin` therefore cannot always be attributed safely to the old installer; dots will not delete untracked files merely because their names look familiar.
 
-Third-party projects vendored under config/terminal/ are documented in [resources/upstream-sources.md](./resources/upstream-sources.md). They are tracked as regular files, not Git submodules.
+## Centralized theming
+
+`themes/palettes/catppuccin-mocha.env` is the canonical data-only palette (`NAME=#RRGGBB`). Terminal adapters consume it: Zsh/FZF read it directly, while dots generates Kitty and tmux native configuration files. `~/.config/dots/theme.local.env` can override individual palette tokens. Generated adapters should not be edited directly; use the palette override or an application-specific personal override.
+
+The palette format is intentionally easy for a separate UI repository to consume. This terminal manager does not install, test, import, or otherwise depend on that repository.
+
+## Scope and directory layout
+
+- `config/terminal/` contains active shell, terminal, multiplexer, and CLI/TUI configurations.
+- `bin/` contains optional helper commands, including `kp` (kept intentionally).
+- `manifest/` contains component and package inventories.
+- `themes/` contains the canonical palette and terminal adapters.
+- `legacy/ui/` preserves the former desktop configurations while they await migration to a separate repository. Nothing under `legacy/ui/` is installed or tested by dots.
+- `nix/packages.nix` remains an optional declarative package module for NixOS; the installer does not edit system configuration or run `nixos-rebuild`.
+
+Supported package managers are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. Unsupported systems can still use configuration linking with `--no-packages`.
+
+## Safety
+
+- Run dots as your normal user, never through `sudo`.
+- Package-manager operations alone use privilege escalation.
+- `uninstall` preserves native packages by default; `--purge` is explicit.
+- Existing files are backed up before replacement.
+- `--health` is read-only; `--dry-run` previews installation, prune, restore, and uninstall operations.
+- Review scripts before running them. This is a personal configuration manager, not a security boundary.
