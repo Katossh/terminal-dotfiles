@@ -30,6 +30,14 @@ jobs:
             sudo apt-get install -y shellcheck
           fi
 
+      - name: Install Zsh
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v zsh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zsh
+          fi
+
       - name: Lint installer
         if: runner.os == 'Linux'
         run: shellcheck --severity=warning install.sh
@@ -60,10 +68,10 @@ jobs:
       - name: Test Zsh repository path discovery
         shell: bash
         run: |
-          if command -v zsh >/dev/null 2>&1; then
-            test_home="$(mktemp -d)"
-            trap 'rm -rf "$test_home"' EXIT
-            HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/install.log"
-            actual="$(HOME="$test_home" zsh -c 'unset DOTFILES_DIR; print -r -- "$DOTFILES_DIR"')"
-            test "$actual" = "$GITHUB_WORKSPACE"
-          fi
+          command -v zsh >/dev/null 2>&1
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" ./install.sh --no-packages --yes >"$test_home/install.log"
+          actual="$(HOME="$test_home" DOTFILES_DIR= zsh -c 'print -r -- "$DOTFILES_DIR"')"
+          printf 'Expected repository path: %s\nActual repository path:   %s\n' "$GITHUB_WORKSPACE" "$actual"
+          test "$actual" = "$GITHUB_WORKSPACE"
