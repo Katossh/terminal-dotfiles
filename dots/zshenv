@@ -5,6 +5,7 @@
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export STARSHIP_CONFIG="${STARSHIP_CONFIG:-$XDG_CONFIG_HOME/starship.toml}"
 
 # Some systems (notably macOS and WSL) do not provide XDG_RUNTIME_DIR.
 # Never fall back to shared /tmp directly: create a private per-user directory.

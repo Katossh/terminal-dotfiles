@@ -23,6 +23,5 @@
     btop
     fastfetch
     eza
-    lazygit
   ];
 }
