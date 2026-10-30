@@ -1,0 +1,937 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# dots: manifest-driven terminal configuration manager.
+# Run as the normal user. Privilege escalation is limited to package operations.
+
+SOURCE_FILE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE_FILE" ]]; do
+    SOURCE_DIR="$(cd -P "$(dirname "$SOURCE_FILE")" >/dev/null 2>&1 && pwd)"
+    LINK_TARGET="$(readlink "$SOURCE_FILE")"
+    case "$LINK_TARGET" in
+        /*) SOURCE_FILE="$LINK_TARGET" ;;
+        *) SOURCE_FILE="$SOURCE_DIR/$LINK_TARGET" ;;
+    esac
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE_FILE")" >/dev/null 2>&1 && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+
+HOME_DIR="${HOME:?HOME must be set}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME_DIR/.config}"
+DATA_DIR="${XDG_DATA_HOME:-$HOME_DIR/.local/share}"
+LOCAL_BIN="$HOME_DIR/.local/bin"
+DOTS_CONFIG_DIR="$CONFIG_DIR/dots"
+OVERRIDES_DIR="$DOTS_CONFIG_DIR/overrides"
+STATE_DIR="$DATA_DIR/dots"
+STATE_FILE="$STATE_DIR/state.tsv"
+MANIFEST="$REPO_DIR/manifest/configs.tsv"
+PACKAGES_MANIFEST="$REPO_DIR/manifest/packages.tsv"
+THEME_PALETTE="$REPO_DIR/themes/palettes/catppuccin-mocha.env"
+LOCAL_THEME_PALETTE="$DOTS_CONFIG_DIR/theme.local.env"
+PLATFORM="$(uname -s 2>/dev/null || printf unknown)"
+DISTRO_ID="unknown"
+DISTRO_LIKE=""
+
+DRY_RUN=0
+ASSUME_YES=0
+PACKAGE_MODE="auto"
+SET_DEFAULT_SHELL=0
+ERRORS=0
+WARNINGS=0
+
+say()  { printf '\n==> %s\n' "$*"; }
+info() { printf '    %s\n' "$*"; }
+warn() { WARNINGS=$((WARNINGS + 1)); printf 'Warning: %s\n' "$*" >&2; }
+error(){ ERRORS=$((ERRORS + 1)); printf 'Error: %s\n' "$*" >&2; }
+die()  { printf 'Error: %s\n' "$*" >&2; exit 2; }
+
+usage() {
+    cat <<'USAGE'
+dots — terminal configuration manager
+
+Usage:
+  dots install [--packages|--no-packages] [--yes] [--dry-run] [--default-shell]
+  dots list
+  dots --health
+  dots health
+  dots backup
+  dots restore [SNAPSHOT|latest] [--yes] [--dry-run]
+  dots uninstall [--purge] [--yes] [--dry-run]
+  dots prune [--yes] [--dry-run]
+  dots --print-repo
+  dots --help
+
+Commands:
+  install       Link terminal configurations, install tracked resources and (optionally) packages.
+  list          List manifest components and their installation state.
+  --health      Inspect manifest sources, managed links, generated files and dependencies.
+  backup        Snapshot all managed target paths and personal overrides.
+  restore       Restore a snapshot; defaults to the latest snapshot.
+  uninstall     Remove managed links, restore collision backups and remove installer downloads.
+  prune         Remove broken/stale managed links and stale installer state.
+  --print-repo  Print the checkout path (used by Zsh startup).
+
+Options:
+  --packages       Install recommended CLI packages.
+  --no-packages    Skip native package installation.
+  --purge          Also remove packages recorded as newly installed by dots.
+  --yes            Do not prompt; use safe defaults.
+  --dry-run        Print planned changes without modifying the filesystem.
+  --default-shell  Offer to make Zsh the account login shell.
+  -h, --help       Show help.
+
+Git operations deliberately remain Git operations:
+  git pull, git status, git diff, git log, and so on.
+
+UI/desktop configuration is not part of this manager.
+USAGE
+}
+
+ensure_state() {
+    [[ "$DRY_RUN" == 1 ]] && return 0
+    mkdir -p "$STATE_DIR"
+    touch "$STATE_FILE"
+}
+
+record_state() {
+    local line="$1"$'\t'"$2"$'\t'"$3"
+    ensure_state
+    grep -Fqx -- "$line" "$STATE_FILE" 2>/dev/null || printf '%s\n' "$line" >> "$STATE_FILE"
+}
+
+set_state() {
+    local kind="$1" key="$2" value="$3" tmp
+    ensure_state
+    if [[ "$kind" == link ]]; then
+        # Link receipts are appended during traversal and compacted once per install.
+        printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$STATE_FILE"
+        return 0
+    fi
+    tmp="$STATE_FILE.tmp.$"
+    awk -F '\t' -v kind="$kind" -v key="$key" '$1 != kind || $2 != key' "$STATE_FILE" > "$tmp"
+    printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+compact_link_state() {
+    [[ -f "$STATE_FILE" ]] || return 0
+    local tmp="$STATE_FILE.compact.$"
+    awk -F '\t' '
+        $1 == "link" { links[$2] = $0; next }
+        { other[++count] = $0 }
+        END {
+            for (i = 1; i <= count; i++) print other[i]
+            for (key in links) print links[key]
+        }
+    ' "$STATE_FILE" > "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+remove_state() {
+    local kind="$1" key="$2" tmp
+    [[ -f "$STATE_FILE" ]] || return 0
+    tmp="$STATE_FILE.tmp.$$"
+    awk -F '\t' -v kind="$kind" -v key="$key" '$1 != kind || $2 != key' "$STATE_FILE" > "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+target_path() {
+    case "$1" in
+        home:*)    printf '%s/%s' "$HOME_DIR" "${1#home:}" ;;
+        config:*)  printf '%s/%s' "$CONFIG_DIR" "${1#config:}" ;;
+        localbin:*) printf '%s/%s' "$LOCAL_BIN" "${1#localbin:}" ;;
+        data:*)    printf '%s/%s' "$DATA_DIR" "${1#data:}" ;;
+        *) die "Unknown target namespace in manifest: $1" ;;
+    esac
+}
+
+platform_allowed() {
+    local wanted="$1"
+    case "$wanted" in
+        all) return 0 ;;
+        linux) [[ "$PLATFORM" == Linux ]] ;;
+        macos) [[ "$PLATFORM" == Darwin ]] ;;
+        bsd) [[ "$PLATFORM" == FreeBSD || "$PLATFORM" == OpenBSD || "$PLATFORM" == NetBSD ]] ;;
+        *) return 1 ;;
+    esac
+}
+
+ask_yes_no() {
+    local prompt="$1" default="$2" answer=""
+    [[ "$ASSUME_YES" == 1 ]] && [[ "$default" == yes ]] && return 0
+    [[ "$ASSUME_YES" == 1 ]] && return 1
+    [[ -t 0 ]] || return 1
+    if [[ "$default" == yes ]]; then
+        read -r -p "$prompt [Y/n] " answer || true
+        answer="${answer:-y}"
+    else
+        read -r -p "$prompt [y/N] " answer || true
+        answer="${answer:-n}"
+    fi
+    [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]
+}
+
+backup_collision() {
+    local target="$1" stamp backup relative
+    [[ -e "$target" || -L "$target" ]] || return 0
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    relative="${target#/}"
+    backup="$STATE_DIR/backups/collisions/$stamp/$relative"
+    if [[ -e "$backup" || -L "$backup" ]]; then backup="$backup.$$"; fi
+    if [[ "$DRY_RUN" == 1 ]]; then
+        info "Would back up $target -> $backup"
+        return 0
+    fi
+    mkdir -p "$(dirname "$backup")"
+    mv -- "$target" "$backup"
+    record_state backup "$target" "$backup"
+    info "Backed up existing path: $target"
+}
+
+link_file() {
+    local component="$1" source="$2" target="$3" override="$4" selected current=""
+    selected="$source"
+    if [[ -n "$override" && ( -f "$override" || -L "$override" ) ]]; then selected="$override"; fi
+    if [[ -L "$target" ]]; then
+        current="$(readlink "$target" 2>/dev/null || true)"
+        if [[ "$current" == "$selected" ]]; then
+            info "Already linked: $target"
+            set_state link "$target" "$selected"
+            return 0
+        fi
+    fi
+    if [[ "$DRY_RUN" == 1 ]]; then
+        [[ -e "$target" || -L "$target" ]] && info "Would back up: $target"
+        info "Would link: $target -> $selected"
+        return 0
+    fi
+    backup_collision "$target"
+    mkdir -p "$(dirname "$target")"
+    ln -s "$selected" "$target"
+    set_state link "$target" "$selected"
+    info "[$component] Linked: $target"
+}
+
+link_tree() {
+    local component="$1" source_root="$2" target_root="$3" file relative override
+    if [[ ! -d "$source_root" ]]; then
+        error "Manifest source directory is missing: $source_root"
+        return 1
+    fi
+    # Old versions linked whole application directories. Move those symlinks aside
+    # before creating file-level links, allowing local files to coexist.
+    if [[ -L "$target_root" || ( -e "$target_root" && ! -d "$target_root" ) ]]; then
+        backup_collision "$target_root"
+    fi
+    [[ "$DRY_RUN" == 1 ]] || mkdir -p "$target_root"
+    while IFS= read -r -d '' file; do
+        relative="${file#"$source_root"/}"
+        override="$OVERRIDES_DIR/$component/$relative"
+        link_file "$component" "$file" "$target_root/$relative" "$override"
+    done < <(find "$source_root" \( -type f -o -type l \) -print0)
+}
+
+link_executable_helpers() {
+    local file target
+    [[ "$DRY_RUN" == 1 ]] || mkdir -p "$LOCAL_BIN"
+    for file in "$REPO_DIR"/bin/*; do
+        [[ -f "$file" || -L "$file" ]] || continue
+        [[ -x "$file" ]] || continue
+        target="$LOCAL_BIN/$(basename "$file")"
+        link_file helpers "$file" "$target" ""
+    done
+}
+
+manifest_targets() {
+    local component kind source target platforms resolved
+    while IFS=$'\t' read -r component kind source target platforms; do
+        [[ -z "$component" || "$component" == \#* ]] && continue
+        platform_allowed "$platforms" || continue
+        resolved="$(target_path "$target")"
+        printf '%s\n' "$resolved"
+    done < "$MANIFEST"
+}
+
+write_generated() {
+    local target="$1" content="$2" checksum tmp previous
+    previous="$(awk -F '\t' -v p="$target" '$1=="generated" && $2==p {print $3}' "$STATE_FILE" 2>/dev/null || true)"
+    if [[ -e "$target" && ! -L "$target" && -z "$previous" ]]; then backup_collision "$target"
+    elif [[ -L "$target" ]]; then backup_collision "$target"; fi
+    [[ "$DRY_RUN" == 1 ]] && { info "Would generate: $target"; return 0; }
+    mkdir -p "$(dirname "$target")"
+    tmp="$target.tmp.$$"
+    printf '%s\n' "$content" > "$tmp"
+    mv "$tmp" "$target"
+    checksum="$(cksum "$target" | awk '{print $1 ":" $2}')"
+    set_state generated "$target" "$checksum"
+}
+
+load_theme_palette() {
+    local palette_file key value
+    for palette_file in "$THEME_PALETTE" "$LOCAL_THEME_PALETTE"; do
+        [[ -r "$palette_file" ]] || continue
+        while IFS='=' read -r key value; do
+            [[ "$key" == DOTS_THEME_* ]] || continue
+            [[ "$value" =~ ^#[0-9A-Fa-f]{6}$ ]] || { warn "Ignoring invalid palette value: $key"; continue; }
+            export "$key=$value"
+        done < "$palette_file"
+    done
+}
+
+generate_theme_adapters() {
+    [[ -r "$THEME_PALETTE" ]] || { error "Theme palette missing: $THEME_PALETTE"; return 1; }
+    load_theme_palette
+    local kitty tmux
+    kitty="foreground $DOTS_THEME_TEXT
+background $DOTS_THEME_BASE
+selection_foreground $DOTS_THEME_BASE
+selection_background $DOTS_THEME_LAVENDER
+cursor $DOTS_THEME_ROSEWATER
+url_color $DOTS_THEME_BLUE
+active_border_color $DOTS_THEME_LAVENDER
+inactive_border_color $DOTS_THEME_SURFACE1
+color0 $DOTS_THEME_CRUST
+color1 $DOTS_THEME_RED
+color2 $DOTS_THEME_GREEN
+color3 $DOTS_THEME_YELLOW
+color4 $DOTS_THEME_BLUE
+color5 $DOTS_THEME_PINK
+color6 $DOTS_THEME_TEAL
+color7 $DOTS_THEME_SUBTEXT1
+color8 $DOTS_THEME_SURFACE1
+color9 $DOTS_THEME_RED
+color10 $DOTS_THEME_GREEN
+color11 $DOTS_THEME_YELLOW
+color12 $DOTS_THEME_BLUE
+color13 $DOTS_THEME_PINK
+color14 $DOTS_THEME_TEAL
+color15 $DOTS_THEME_TEXT"
+    tmux="set -g status-style \"fg=$DOTS_THEME_TEXT,bg=$DOTS_THEME_MANTLE\"
+set -g message-style \"fg=$DOTS_THEME_BASE,bg=$DOTS_THEME_YELLOW\"
+set -g message-command-style \"fg=$DOTS_THEME_BASE,bg=$DOTS_THEME_YELLOW\"
+set -g mode-style \"fg=$DOTS_THEME_TEXT,bg=$DOTS_THEME_SURFACE0\"
+set -g pane-border-style \"fg=$DOTS_THEME_SURFACE1\"
+set -g pane-active-border-style \"fg=$DOTS_THEME_LAVENDER\"
+set -g window-status-style \"fg=$DOTS_THEME_SUBTEXT0,bg=$DOTS_THEME_MANTLE\"
+set -g window-status-current-style \"fg=$DOTS_THEME_BASE,bg=$DOTS_THEME_LAVENDER,bold\"
+set -g window-status-format \"#[fg=$DOTS_THEME_SUBTEXT0,bg=$DOTS_THEME_MANTLE] #I #W \"
+set -g window-status-current-format \"#[fg=$DOTS_THEME_BASE,bg=$DOTS_THEME_LAVENDER,bold] #I #W \""
+    write_generated "$CONFIG_DIR/kitty/themes/dots-palette.conf" "$kitty"
+    write_generated "$HOME_DIR/.tmux/dots-theme.conf" "$tmux"
+}
+
+detect_package_manager() {
+    if [[ "$PLATFORM" == Darwin ]]; then printf brew; return; fi
+    if [[ "$PLATFORM" == FreeBSD ]]; then printf pkg; return; fi
+    if [[ "$PLATFORM" == Linux && -r /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        DISTRO_ID="${ID:-unknown}"
+        DISTRO_LIKE="${ID_LIKE:-}"
+    fi
+    case "$DISTRO_ID $DISTRO_LIKE" in
+        *nixos*) printf nixos ;;
+        *debian*|*ubuntu*|*linuxmint*|*pop*|*elementary*|*raspbian*|*kali*) printf apt ;;
+        *fedora*|*rhel*|*centos*|*rocky*|*almalinux*|*oracle*) printf dnf ;;
+        *arch*|*manjaro*|*endeavour*|*garuda*|*cachyos*) printf pacman ;;
+        *opensuse*|*suse*) printf zypper ;;
+        *alpine*) printf apk ;;
+        *void*) printf xbps ;;
+        *) printf unknown ;;
+    esac
+}
+
+root_command() {
+    if [[ "${EUID:-$(id -u)}" == 0 ]]; then "$@"
+    elif command -v sudo >/dev/null 2>&1; then sudo "$@"
+    elif command -v doas >/dev/null 2>&1; then doas "$@"
+    else die "Package installation requires sudo or doas."; fi
+}
+
+package_installed() {
+    local manager="$1" package="$2"
+    case "$manager" in
+        apt) dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed' ;;
+        dnf|zypper) rpm -q "$package" >/dev/null 2>&1 ;;
+        pacman) pacman -Q "$package" >/dev/null 2>&1 ;;
+        apk) apk info -e "$package" >/dev/null 2>&1 ;;
+        xbps) xbps-query -l "$package" 2>/dev/null | grep -q "^ii $package-" ;;
+        pkg) pkg info -e "$package" >/dev/null 2>&1 ;;
+        brew) brew list --formula "$package" >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
+}
+
+package_available() {
+    local manager="$1" package="$2"
+    case "$manager" in
+        apt) apt-cache show "$package" >/dev/null 2>&1 ;;
+        dnf) dnf -q repoquery --available "$package" >/dev/null 2>&1 ;;
+        pacman) pacman -Si "$package" >/dev/null 2>&1 ;;
+        zypper) zypper --non-interactive search --match-exact --type package "$package" 2>/dev/null | grep -Fq "| $package |" ;;
+        apk) apk search -x "$package" 2>/dev/null | grep -Fxq "$package" ;;
+        xbps) xbps-query -Rs "$package" 2>/dev/null | grep -Fq "$package-" ;;
+        pkg) pkg search -x "$package" >/dev/null 2>&1 ;;
+        brew) brew info --formula "$package" >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
+}
+
+install_package_batch() {
+    local manager="$1"
+    shift
+    (($#)) || return 0
+    say "Installing packages with $manager"
+    case "$manager" in
+        apt) root_command apt-get install -y "$@" ;;
+        dnf) root_command dnf install -y "$@" ;;
+        pacman) root_command pacman -S --needed --noconfirm "$@" ;;
+        zypper) root_command zypper --non-interactive install --no-recommends "$@" ;;
+        apk) root_command apk add --no-cache "$@" ;;
+        xbps) root_command xbps-install -y "$@" ;;
+        pkg) root_command pkg install -y "$@" ;;
+        brew) brew install "$@" ;;
+        *) return 1 ;;
+    esac
+}
+
+refresh_package_index() {
+    case "$1" in
+        apt) root_command apt-get update ;;
+        dnf) root_command dnf makecache ;;
+        zypper) root_command zypper --non-interactive refresh ;;
+        apk) root_command apk update ;;
+        xbps) root_command xbps-install -S -y ;;
+        pkg) root_command pkg update -f ;;
+        *) return 0 ;;
+    esac
+}
+
+install_packages() {
+    local manager package class was
+    local -a required optional
+    local before="$STATE_DIR/packages-before-$$.tsv"
+    manager="$(detect_package_manager)"
+    if [[ "$manager" == nixos ]]; then
+        info "NixOS detected: package installation remains declarative. Review nix/packages.nix and rebuild manually."
+        return 0
+    fi
+    if [[ "$manager" == unknown ]]; then
+        warn "No supported package manager detected; skipping package installation."
+        return 0
+    fi
+    mkdir -p "$STATE_DIR"
+    : > "$before"
+    required=()
+    optional=()
+    refresh_package_index "$manager"
+    while IFS=$'\t' read -r pkg_manager package class; do
+        [[ -z "$pkg_manager" || "$pkg_manager" == \#* ]] && continue
+        [[ "$pkg_manager" == "$manager" ]] || continue
+        if package_installed "$manager" "$package"; then
+            printf '%s\talready\n' "$package" >> "$before"
+        else
+            printf '%s\tnew\n' "$package" >> "$before"
+            if [[ "$class" == required ]]; then required+=("$package")
+            elif package_available "$manager" "$package"; then optional+=("$package")
+            else info "Optional package unavailable in configured repositories: $package"; fi
+        fi
+    done < "$PACKAGES_MANIFEST"
+    ((${#required[@]})) && install_package_batch "$manager" "${required[@]}"
+    ((${#optional[@]})) && install_package_batch "$manager" "${optional[@]}"
+    while IFS=$'\t' read -r package was; do
+        [[ "$was" == new ]] || continue
+        if package_installed "$manager" "$package"; then record_state package "$manager:$package" "$package"; fi
+    done < "$before"
+    rm -f "$before"
+    if ! command -v starship >/dev/null 2>&1 && [[ ! -x "$LOCAL_BIN/starship" ]]; then install_starship_upstream; fi
+}
+
+create_compat_command() {
+    local target_command="$1" alias_name="$2" actual_path
+    command -v "$alias_name" >/dev/null 2>&1 && return 0
+    actual_path="$(command -v "$target_command" 2>/dev/null || true)"
+    [[ -n "$actual_path" ]] || return 0
+    link_file compatibility "$actual_path" "$LOCAL_BIN/$alias_name" ""
+}
+install_starship_upstream() {
+    command -v curl >/dev/null 2>&1 || { warn "curl unavailable; cannot install Starship fallback."; return 1; }
+    mkdir -p "$LOCAL_BIN"
+    local installer
+    installer="$(mktemp "${TMPDIR:-/tmp}/dots-starship.XXXXXX")"
+    if ! curl -fsSL https://starship.rs/install.sh -o "$installer"; then
+        rm -f "$installer"
+        warn "Could not download Starship installer."
+        return 1
+    fi
+    if ! sh "$installer" -y -b "$LOCAL_BIN"; then
+        rm -f "$installer"
+        warn "Starship installer failed."
+        return 1
+    fi
+    rm -f "$installer"
+    if [[ -x "$LOCAL_BIN/starship" ]]; then
+        record_state download "$LOCAL_BIN/starship" starship-upstream
+        info "Installed standalone Starship to $LOCAL_BIN/starship"
+    else
+        warn "Starship installer completed without creating the expected binary."
+        return 1
+    fi
+}
+
+install_tmux_theme() {
+    command -v tmux >/dev/null 2>&1 || { info "tmux is absent; skipping Catppuccin plugin download."; return 0; }
+    command -v git >/dev/null 2>&1 || { warn "Git is absent; built-in theme adapter will be used."; return 0; }
+    local version parent target stage origin
+    version="$(tmux -V 2>/dev/null || true)"
+    if [[ ! "$version" =~ ([0-9]+)\.([0-9]+) ]] ||
+       (( BASH_REMATCH[1] < 3 || (BASH_REMATCH[1] == 3 && BASH_REMATCH[2] < 2) )); then
+        info "Catppuccin plugin requires tmux 3.2+; local palette adapter remains available."
+        return 0
+    fi
+    parent="$HOME_DIR/.tmux/plugins/catppuccin"
+    target="$parent/tmux"
+    if [[ -f "$target/catppuccin.tmux" ]]; then
+        origin="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
+        if [[ "$origin" == https://github.com/catppuccin/tmux.git ]]; then
+            info "Catppuccin tmux plugin already present; leaving its ownership unclaimed."
+        fi
+        return 0
+    fi
+    [[ -e "$target" ]] && { warn "Existing $target is not recognised as the Catppuccin plugin; leaving it untouched."; return 0; }
+    [[ "$DRY_RUN" == 1 ]] && { info "Would clone Catppuccin tmux v2.3.2"; return 0; }
+    mkdir -p "$parent"
+    stage="$(mktemp -d "$parent/.dots-clone.XXXXXX")"
+    if git clone --depth 1 --branch v2.3.2 --single-branch https://github.com/catppuccin/tmux.git "$stage"; then
+        mv "$stage" "$target"
+        record_state download "$target" catppuccin-tmux
+        info "Installed Catppuccin tmux v2.3.2."
+    else
+        rm -rf "$stage"
+        warn "Could not install Catppuccin tmux; generated local colors remain available."
+    fi
+}
+
+install_configs() {
+    local component kind source target platforms resolved local_override
+    [[ -f "$MANIFEST" ]] || die "Configuration manifest not found: $MANIFEST"
+    say "Installing manifest-defined terminal configurations"
+    while IFS=$'\t' read -r component kind source target platforms; do
+        [[ -z "$component" || "$component" == \#* ]] && continue
+        platform_allowed "$platforms" || continue
+        source="$REPO_DIR/$source"
+        resolved="$(target_path "$target")"
+        case "$kind" in
+            file)
+                [[ -f "$source" || -L "$source" ]] || { error "Missing manifest source: $source"; continue; }
+                local_override="$OVERRIDES_DIR/$component"
+                link_file "$component" "$source" "$resolved" "$local_override"
+                ;;
+            tree) link_tree "$component" "$source" "$resolved" ;;
+            *) error "Unknown manifest entry type '$kind' for $component" ;;
+        esac
+    done < "$MANIFEST"
+    link_executable_helpers
+    generate_theme_adapters
+    if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
+    else install_tmux_theme; fi
+    compact_link_state
+}
+
+command_install() {
+    while (($#)); do
+        case "$1" in
+            --packages) PACKAGE_MODE=yes ;;
+            --no-packages) PACKAGE_MODE=no ;;
+            --yes) ASSUME_YES=1 ;;
+            --dry-run) DRY_RUN=1 ;;
+            --default-shell) SET_DEFAULT_SHELL=1 ;;
+            -h|--help) usage; return 0 ;;
+            *) die "Unknown install option: $1" ;;
+        esac
+        shift
+    done
+    if [[ "${EUID:-$(id -u)}" == 0 && -n "${SUDO_USER:-}" ]]; then
+        die "Do not run dots through sudo. Run as your normal user."
+    fi
+    if [[ "$PACKAGE_MODE" == auto ]]; then
+        if ask_yes_no "Install recommended CLI packages?" yes; then PACKAGE_MODE=yes; else PACKAGE_MODE=no; fi
+    fi
+    install_configs
+    if [[ "$PACKAGE_MODE" == yes ]]; then
+        if [[ "$DRY_RUN" == 1 ]]; then info "Dry run: package installation skipped."
+        else install_packages; fi
+    else
+        info "Skipping native package installation."
+    fi
+    if [[ "$DRY_RUN" != 1 ]]; then
+        mkdir -p "$LOCAL_BIN"
+        create_compat_command batcat bat
+        create_compat_command fdfind fd
+    fi
+    [[ "$SET_DEFAULT_SHELL" == 1 ]] && set_default_shell
+    if [[ "$DRY_RUN" == 1 ]]; then info "Dry run complete; no changes made."
+    else info "Installation complete. Start a new shell or run: exec zsh"; fi
+    (( ERRORS == 0 ))
+}
+
+set_default_shell() {
+    [[ "$DRY_RUN" == 1 ]] && { info "Dry run: would offer to change the login shell."; return 0; }
+    if [[ "$(detect_package_manager)" == nixos ]]; then
+        info "On NixOS, set users.users.<name>.shell = pkgs.zsh in your NixOS configuration instead."
+        return 0
+    fi
+    local zsh_path
+    zsh_path="$(command -v zsh || true)"
+    [[ -n "$zsh_path" ]] || { warn "Zsh is not installed; cannot change the login shell."; return 0; }
+    command -v chsh >/dev/null 2>&1 || { warn "chsh is unavailable."; return 0; }
+    [[ -r /etc/shells ]] && grep -Fxq "$zsh_path" /etc/shells || { warn "$zsh_path is not listed in /etc/shells."; return 0; }
+    if ask_yes_no "Make Zsh your default login shell ($zsh_path)?" no; then chsh -s "$zsh_path"; fi
+}
+
+command_list() {
+    local component kind source target platforms resolved status
+    printf '%-16s %-9s %-12s %s\n' COMPONENT TYPE STATUS TARGET
+    while IFS=$'\t' read -r component kind source target platforms; do
+        [[ -z "$component" || "$component" == \#* ]] && continue
+        platform_allowed "$platforms" || continue
+        resolved="$(target_path "$target")"
+        status=missing
+        if [[ -L "$resolved" ]]; then status=linked
+        elif [[ -d "$resolved" ]] && [[ -n "$(find "$resolved" -type l -print)" ]]; then status=linked
+        elif [[ -e "$resolved" ]]; then status=present; fi
+        printf '%-16s %-9s %-12s %s\n' "$component" "$kind" "$status" "$resolved"
+    done < "$MANIFEST"
+    printf '\nManaged state: %s\n' "$STATE_DIR"
+    if [[ -f "$STATE_FILE" ]]; then
+        awk -F '\t' '$1=="download" { print "downloaded: " $2 } $1=="package" { print "package: " $3 " (" $2 ")" }' "$STATE_FILE"
+    fi
+}
+
+command_health() {
+    local component kind source target platforms resolved expected dep actual
+    say "dots health"
+    [[ -f "$MANIFEST" ]] || { error "Manifest missing: $MANIFEST"; return 1; }
+    [[ -r "$THEME_PALETTE" ]] || error "Theme palette missing: $THEME_PALETTE"
+    while IFS=$'\t' read -r component kind source target platforms; do
+        [[ -z "$component" || "$component" == \#* ]] && continue
+        platform_allowed "$platforms" || continue
+        expected="$REPO_DIR/$source"
+        if [[ ! -e "$expected" && ! -L "$expected" ]]; then
+            error "Missing source for $component: $expected"
+            continue
+        fi
+        resolved="$(target_path "$target")"
+        if [[ ! -e "$resolved" && ! -L "$resolved" ]]; then warn "Not installed: $resolved"; fi
+    done < "$MANIFEST"
+    if [[ -f "$STATE_FILE" ]]; then
+        while IFS=$'\t' read -r kind expected actual; do
+            [[ "$kind" == link ]] || continue
+            if [[ -L "$expected" ]]; then
+                local current
+                current="$(readlink "$expected" 2>/dev/null || true)"
+                [[ "$current" == "$actual" ]] || warn "Managed link was changed manually: $expected"
+            elif [[ -e "$expected" ]]; then warn "Managed target is no longer a symlink: $expected"
+            else warn "Managed target is missing: $expected"; fi
+            [[ -e "$actual" || -L "$actual" ]] || error "Managed link source is missing: $actual"
+        done < "$STATE_FILE"
+    else
+        warn "No installation receipt exists yet."
+    fi
+    for dep in zsh git fzf rg tmux nvim starship; do
+        command -v "$dep" >/dev/null 2>&1 || warn "Dependency not found in PATH: $dep"
+    done
+    [[ -e "$CONFIG_DIR/kitty/themes/dots-palette.conf" ]] && info "Generated Kitty palette: present" || warn "Generated Kitty palette is missing."
+    [[ -e "$HOME_DIR/.tmux/dots-theme.conf" ]] && info "Generated tmux palette: present" || warn "Generated tmux palette is missing."
+    printf '\nHealth summary: %s error(s), %s warning(s)\n' "$ERRORS" "$WARNINGS"
+    (( ERRORS == 0 ))
+}
+
+snapshot_add() {
+    local target="$1" snapshot_dir="$2" rel status
+    rel="${target#/}"
+    if [[ -e "$target" || -L "$target" ]]; then
+        status=present
+        mkdir -p "$(dirname "$snapshot_dir/payload/$rel")"
+        cp -a "$target" "$snapshot_dir/payload/$rel"
+    else status=absent; fi
+    printf '%s\t%s\n' "$target" "$status" >> "$snapshot_dir/snapshot.tsv"
+}
+
+command_backup() {
+    local id snapshot_dir target seen="$STATE_DIR/.backup-targets.$$"
+    [[ "$DRY_RUN" == 1 ]] && { info "Backup is not a dry-run operation."; return 1; }
+    mkdir -p "$STATE_DIR/backups/snapshots"
+    id="$(date +%Y%m%d-%H%M%S)-$$"
+    snapshot_dir="$STATE_DIR/backups/snapshots/$id"
+    mkdir -p "$snapshot_dir/payload"
+    : > "$snapshot_dir/snapshot.tsv"
+    : > "$seen"
+    while IFS= read -r target; do
+        [[ -n "$target" ]] || continue
+        grep -Fqx -- "$target" "$seen" && continue
+        printf '%s\n' "$target" >> "$seen"
+        snapshot_add "$target" "$snapshot_dir"
+    done < <(manifest_targets)
+    if ! grep -Fqx -- "$DOTS_CONFIG_DIR" "$seen"; then snapshot_add "$DOTS_CONFIG_DIR" "$snapshot_dir"; fi
+    snapshot_add "$HOME_DIR/.tmux/dots-theme.conf" "$snapshot_dir"
+    rm -f "$seen"
+    printf '%s\n' "$id"
+    info "Snapshot created: $snapshot_dir"
+}
+
+latest_snapshot() {
+    local base="$STATE_DIR/backups/snapshots"
+    [[ -d "$base" ]] || return 1
+    for snapshot_dir in "$base"/*; do
+        [[ -d "$snapshot_dir" ]] || continue
+        printf "%s\n" "$snapshot_dir"
+    done | sort | tail -n 1
+}
+
+command_restore() {
+    local snapshot="${1:-latest}" snapshot_dir target status rel payload rollback
+    shift || true
+    while (($#)); do
+        case "$1" in
+            --yes) ASSUME_YES=1 ;;
+            --dry-run) DRY_RUN=1 ;;
+            *) die "Unknown restore option: $1" ;;
+        esac
+        shift
+    done
+    [[ "$snapshot" == latest ]] && snapshot="$(basename "$(latest_snapshot 2>/dev/null || true)")"
+    [[ -n "$snapshot" ]] || die "No snapshots exist."
+    snapshot_dir="$STATE_DIR/backups/snapshots/$snapshot"
+    [[ -r "$snapshot_dir/snapshot.tsv" ]] || die "Snapshot not found: $snapshot"
+    if [[ "$ASSUME_YES" != 1 ]] && ! ask_yes_no "Restore snapshot '$snapshot'? Existing targets move to a safety backup." no; then
+        info "Restore cancelled."
+        return 0
+    fi
+    rollback="$STATE_DIR/backups/restore-rollback/$snapshot-$(date +%H%M%S)"
+    while IFS=$'\t' read -r target status; do
+        rel="${target#/}"
+        payload="$snapshot_dir/payload/$rel"
+        if [[ "$DRY_RUN" == 1 ]]; then info "Would restore: $target ($status)"; continue; fi
+        if [[ -e "$target" || -L "$target" ]]; then
+            mkdir -p "$rollback/$(dirname "$rel")"
+            mv -- "$target" "$rollback/$rel"
+        fi
+        if [[ "$status" == present ]]; then
+            mkdir -p "$(dirname "$target")"
+            cp -a "$payload" "$target"
+        fi
+    done < "$snapshot_dir/snapshot.tsv"
+    [[ "$DRY_RUN" == 1 ]] || info "Restore safety copies: $rollback"
+}
+
+remove_download() {
+    local path="$1" kind="$2" origin
+    case "$kind" in
+        starship-upstream)
+            [[ "$path" == "$LOCAL_BIN/starship" ]] || { warn "Refusing to remove unexpected Starship path: $path"; return 1; }
+            if [[ -f "$path" && ! -L "$path" ]]; then rm -f "$path"; info "Removed installer-managed Starship binary."; fi
+            ;;
+        catppuccin-tmux)
+            [[ "$path" == "$HOME_DIR/.tmux/plugins/catppuccin/tmux" ]] || { warn "Refusing to remove unexpected tmux plugin path: $path"; return 1; }
+            origin="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
+            if [[ "$origin" == https://github.com/catppuccin/tmux.git ]]; then
+                rm -rf -- "$path"
+                rmdir "$HOME_DIR/.tmux/plugins/catppuccin" 2>/dev/null || true
+                info "Removed installer-managed Catppuccin tmux clone."
+            else
+                warn "Plugin origin does not match; leaving $path untouched."
+                return 1
+            fi
+            ;;
+        *) warn "Unknown downloaded resource type '$kind'; leaving it untouched."; return 1 ;;
+    esac
+}
+
+remove_package() {
+    local manager="$1" package="$2"
+    package_installed "$manager" "$package" || { info "Package already absent: $package"; return 0; }
+    say "Removing package $package ($manager)"
+    case "$manager" in
+        apt) root_command apt-get remove -y "$package" ;;
+        dnf) root_command dnf remove -y "$package" ;;
+        pacman) root_command pacman -R --noconfirm "$package" ;;
+        zypper) root_command zypper --non-interactive remove "$package" ;;
+        apk) root_command apk del "$package" ;;
+        xbps) root_command xbps-remove -y "$package" ;;
+        pkg) root_command pkg remove -y "$package" ;;
+        brew) brew uninstall "$package" ;;
+        *) warn "Cannot remove package from unknown manager: $manager"; return 1 ;;
+    esac
+}
+
+prune_empty_dirs() {
+    local dir="$1"
+    [[ "$DRY_RUN" == 1 ]] && return 0
+    while [[ "$dir" == "$CONFIG_DIR"/* || "$dir" == "$LOCAL_BIN"/* || "$dir" == "$HOME_DIR/.tmux"/* ]]; do
+        rmdir "$dir" 2>/dev/null || break
+        dir="$(dirname "$dir")"
+    done
+}
+
+command_uninstall() {
+    local purge=0 kind target source backup value actual
+    while (($#)); do
+        case "$1" in
+            --purge) purge=1 ;;
+            --yes) ASSUME_YES=1 ;;
+            --dry-run) DRY_RUN=1 ;;
+            *) die "Unknown uninstall option: $1" ;;
+        esac
+        shift
+    done
+    if [[ "$ASSUME_YES" != 1 ]] && ! ask_yes_no "Uninstall managed configs and installer downloads?" no; then
+        info "Uninstall cancelled."
+        return 0
+    fi
+    [[ -f "$STATE_FILE" ]] || { warn "No installation receipt found; nothing tracked can be safely removed."; return 0; }
+
+    # Remove only symlinks that still point to the source recorded at installation.
+    while IFS=$'\t' read -r kind target source; do
+        [[ "$kind" == link ]] || continue
+        if [[ -L "$target" ]]; then
+            actual="$(readlink "$target" 2>/dev/null || true)"
+            if [[ "$actual" == "$source" ]]; then
+                if [[ "$DRY_RUN" == 1 ]]; then info "Would remove link: $target"
+                else rm -f -- "$target"; prune_empty_dirs "$(dirname "$target")"; fi
+            else warn "Leaving manually changed symlink untouched: $target"; fi
+        elif [[ -e "$target" ]]; then warn "Leaving non-symlink target untouched: $target"; fi
+    done < "$STATE_FILE"
+    if [[ "$DRY_RUN" != 1 ]]; then
+        local links_tmp="$STATE_FILE.links.$"
+        awk -F '\t' '$1 != "link"' "$STATE_FILE" > "$links_tmp"
+        mv "$links_tmp" "$STATE_FILE"
+    fi
+
+    while IFS=$'\t' read -r kind target backup; do
+        [[ "$kind" == backup ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            if [[ -e "$target" || -L "$target" ]]; then
+                warn "Cannot restore $backup because $target is occupied; backup preserved."
+            elif [[ "$DRY_RUN" == 1 ]]; then info "Would restore previous path: $target"
+            else
+                mkdir -p "$(dirname "$target")"
+                mv -- "$backup" "$target"
+                remove_state backup "$target"
+            fi
+        fi
+    done < "$STATE_FILE"
+
+    while IFS=$'\t' read -r kind target value; do
+        [[ "$kind" == download ]] || continue
+        if [[ "$DRY_RUN" == 1 ]]; then info "Would remove installer download: $target ($value)"
+        else remove_download "$target" "$value" && remove_state download "$target"; fi
+    done < "$STATE_FILE"
+
+    while IFS=$'\t' read -r kind target value; do
+        [[ "$kind" == generated ]] || continue
+        if [[ -f "$target" ]]; then
+            actual="$(cksum "$target" | awk '{print $1 ":" $2}')"
+            if [[ "$actual" == "$value" ]]; then
+                if [[ "$DRY_RUN" == 1 ]]; then info "Would remove generated file: $target"
+                else rm -f "$target"; remove_state generated "$target"; prune_empty_dirs "$(dirname "$target")"; fi
+            else warn "Generated file was modified; preserving it: $target"; fi
+        fi
+    done < "$STATE_FILE"
+
+    if [[ "$purge" == 1 ]]; then
+        while IFS=$'\t' read -r kind target value; do
+            [[ "$kind" == package ]] || continue
+            local package_manager="${target%%:*}"
+            if [[ "$DRY_RUN" == 1 ]]; then info "Would remove newly installed package: $value ($package_manager)"
+            else remove_package "$package_manager" "$value" && remove_state package "$target"; fi
+        done < "$STATE_FILE"
+    else
+        info "Native packages were retained. Use --purge to remove only packages recorded as newly installed by dots."
+    fi
+    prune_empty_dirs "$CONFIG_DIR"
+    prune_empty_dirs "$LOCAL_BIN"
+    prune_empty_dirs "$HOME_DIR/.tmux"
+    info "Uninstall pass complete. Review preserved backups and manually modified files."
+}
+
+command_prune() {
+    local kind target value actual tmp removed=0
+    while (($#)); do
+        case "$1" in
+            --yes) ASSUME_YES=1 ;;
+            --dry-run) DRY_RUN=1 ;;
+            *) die "Unknown prune option: $1" ;;
+        esac
+        shift
+    done
+    [[ -f "$STATE_FILE" ]] || { info "No dots state to prune."; return 0; }
+    if [[ "$DRY_RUN" != 1 && "$ASSUME_YES" != 1 ]] && ! ask_yes_no "Remove stale managed links and obsolete state records?" no; then
+        info "Prune cancelled."
+        return 0
+    fi
+    say "Scanning for stale managed resources"
+    tmp="$STATE_FILE.prune.$$"
+    : > "$tmp"
+    while IFS=$'\t' read -r kind target value; do
+        case "$kind" in
+            link)
+                if [[ ! -e "$value" && ! -L "$value" && -L "$target" ]]; then
+                    actual="$(readlink "$target" 2>/dev/null || true)"
+                    if [[ "$actual" == "$value" ]]; then
+                        if [[ "$DRY_RUN" == 1 ]]; then info "Would remove broken managed link: $target"
+                        else rm -f -- "$target"; removed=$((removed + 1)); fi
+                        continue
+                    fi
+                fi
+                printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                ;;
+            download|generated)
+                if [[ ! -e "$target" && ! -L "$target" ]]; then
+                    info "Dropping stale state record: $target"
+                    removed=$((removed + 1))
+                else printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"; fi
+                ;;
+            backup)
+                if [[ -e "$value" || -L "$value" ]]; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                else removed=$((removed + 1)); fi
+                ;;
+            package)
+                package_manager="${target%%:*}"
+                if package_installed "$package_manager" "$value"; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                else removed=$((removed + 1)); fi
+                ;;
+            *) printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp" ;;
+        esac
+    done < "$STATE_FILE"
+    if [[ "$DRY_RUN" == 1 ]]; then rm -f "$tmp"; else mv "$tmp" "$STATE_FILE"; fi
+
+    if [[ -d "$HOME_DIR/.tmux/plugins/catppuccin" ]]; then
+        for target in "$HOME_DIR"/.tmux/plugins/catppuccin/.dots-clone.*; do
+            [[ -d "$target" ]] || continue
+            if [[ "$DRY_RUN" == 1 ]]; then info "Would remove abandoned clone: $target"
+            else rm -rf -- "$target"; fi
+        done
+    fi
+    info "Prune complete; stale records/resources handled: $removed"
+}
+
+main() {
+    local command="${1:-}"
+    [[ -n "$command" ]] || { usage; exit 0; }
+    shift || true
+    case "$command" in
+        install) command_install "$@" ;;
+        list) command_list ;;
+        health|--health) command_health ;;
+        backup) command_backup "$@" ;;
+        restore) command_restore "$@" ;;
+        uninstall) command_uninstall "$@" ;;
+        prune) command_prune "$@" ;;
+        --print-repo) printf '%s\n' "$REPO_DIR" ;;
+        -h|--help|help) usage ;;
+        *) die "Unknown command: $command (use --help)" ;;
+    esac
+}
+
+main "$@"

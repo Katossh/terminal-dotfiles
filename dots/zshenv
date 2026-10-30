@@ -32,32 +32,61 @@ export XDG_RUNTIME_DIR
 # Keep Zsh configuration under XDG_CONFIG_HOME.
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
-# Resolve the repository path from the linked Zsh config. Follow symlink chains
-# using portable readlink instead of GNU-only readlink -f.
-_zsh_config_real="$ZDOTDIR"
-_zsh_link_hops=0
-while [[ -L "$_zsh_config_real" && "$_zsh_link_hops" -lt 20 ]]; do
-    _zsh_link_target="$(readlink "$_zsh_config_real" 2>/dev/null || true)"
-    [[ -n "$_zsh_link_target" ]] || break
-    case "$_zsh_link_target" in
-        /*) _zsh_config_real="$_zsh_link_target" ;;
-        *) _zsh_config_real="$(dirname "$_zsh_config_real")/$_zsh_link_target" ;;
-    esac
-    _zsh_link_hops=$((_zsh_link_hops + 1))
-done
-if [[ -n "$_zsh_config_real" ]]; then
-    _zsh_config_dir="$(cd -P "$(dirname "$_zsh_config_real")" 2>/dev/null && pwd -P)"
-    if [[ -n "$_zsh_config_dir" ]]; then
-        _zsh_config_real="$_zsh_config_dir/$(basename "$_zsh_config_real")"
-    fi
+# Find the checkout through the installed manager first. This survives file-level
+# links and lets a personal .zshrc override replace the repository default.
+if [[ -z "${DOTFILES_DIR:-}" && -x "$HOME/.local/bin/dots" ]]; then
+    _dots_entry="$HOME/.local/bin/dots"
+    _dots_hops=0
+    while [[ -L "$_dots_entry" && "$_dots_hops" -lt 20 ]]; do
+        _dots_target="$(readlink "$_dots_entry" 2>/dev/null || true)"
+        [[ -n "$_dots_target" ]] || break
+        case "$_dots_target" in
+            /*) _dots_entry="$_dots_target" ;;
+            *) _dots_entry="$(dirname "$_dots_entry")/$_dots_target" ;;
+        esac
+        _dots_hops=$((_dots_hops + 1))
+    done
+    _dots_root="$(cd -P "$(dirname "$_dots_entry")/.." 2>/dev/null && pwd -P)"
+    [[ -f "$_dots_root/manifest/configs.tsv" ]] && DOTFILES_DIR="$_dots_root"
 fi
-case "$_zsh_config_real" in
-    */config/terminal/zsh)
-        export DOTFILES_DIR="${DOTFILES_DIR:-${_zsh_config_real%/config/terminal/zsh}}"
-        ;;
-esac
-unset _zsh_config_real _zsh_link_hops _zsh_link_target _zsh_config_dir
+
+# Fallback for legacy installs where the whole Zsh config directory was linked.
+if [[ -z "${DOTFILES_DIR:-}" && -L "$ZDOTDIR" ]]; then
+    _zsh_config_real="$ZDOTDIR"
+    _zsh_dir_hops=0
+    while [[ -L "$_zsh_config_real" && "$_zsh_dir_hops" -lt 20 ]]; do
+        _zsh_dir_target="$(readlink "$_zsh_config_real" 2>/dev/null || true)"
+        [[ -n "$_zsh_dir_target" ]] || break
+        case "$_zsh_dir_target" in
+            /*) _zsh_config_real="$_zsh_dir_target" ;;
+            *) _zsh_config_real="$(dirname "$_zsh_config_real")/$_zsh_dir_target" ;;
+        esac
+        _zsh_dir_hops=$((_zsh_dir_hops + 1))
+    done
+    _zsh_config_real="$(cd -P "$_zsh_config_real" 2>/dev/null && pwd -P)"
+    case "$_zsh_config_real" in
+        */config/terminal/zsh) DOTFILES_DIR="${_zsh_config_real%/config/terminal/zsh}" ;;
+    esac
+fi
+if [[ -z "${DOTFILES_DIR:-}" ]]; then
+    _zsh_anchor="$ZDOTDIR/.zshrc"
+    _zsh_hops=0
+    while [[ -L "$_zsh_anchor" && "$_zsh_hops" -lt 20 ]]; do
+        _zsh_target="$(readlink "$_zsh_anchor" 2>/dev/null || true)"
+        [[ -n "$_zsh_target" ]] || break
+        case "$_zsh_target" in
+            /*) _zsh_anchor="$_zsh_target" ;;
+            *) _zsh_anchor="$(dirname "$_zsh_anchor")/$_zsh_target" ;;
+        esac
+        _zsh_hops=$((_zsh_hops + 1))
+    done
+    _zsh_config_dir="$(cd -P "$(dirname "$_zsh_anchor")" 2>/dev/null && pwd -P)"
+    case "$_zsh_config_dir" in
+        */config/terminal/zsh) DOTFILES_DIR="${_zsh_config_dir%/config/terminal/zsh}" ;;
+    esac
+fi
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+unset _dots_entry _dots_hops _dots_target _dots_root _zsh_anchor _zsh_hops _zsh_target _zsh_config_dir _zsh_config_real _zsh_dir_hops _zsh_dir_target
 
 # Application defaults; override these in a local shell profile if needed.
 export GPG_TTY="${TTY:-$(tty 2>/dev/null || true)}"
@@ -89,13 +118,21 @@ if command -v rg >/dev/null 2>&1; then
     export FZF_DEFAULT_COMMAND='rg --files --hidden --no-ignore-vcs --ignore-file "$XDG_CONFIG_HOME/ripgrep/ignore"'
 fi
 
-# Kanagawa-inspired FZF colors
-export FZF_DEFAULT_OPTS="
---inline-info
---color=bg+:#16161D,spinner:#957FB8,hl:#7E9CD8
---color=fg:#DCD7BA,header:#C8C093,info:#E6C384,pointer:#957FB8
---color=marker:#E6C384,fg+:#DCD7BA,prompt:#957FB8,hl+:#957FB8
-"
+# Shared terminal palette and application adapters.
+_dots_palette="$DOTFILES_DIR/themes/palettes/catppuccin-mocha.env"
+_dots_local_palette="$XDG_CONFIG_HOME/dots/theme.local.env"
+if [[ -r "$_dots_palette" ]]; then
+    for _dots_palette_file in "$_dots_palette" "$_dots_local_palette"; do
+        [[ -r "$_dots_palette_file" ]] || continue
+        while IFS='=' read -r _dots_key _dots_value; do
+            [[ "$_dots_key" == DOTS_THEME_* ]] || continue
+            [[ "$_dots_value" =~ ^#[0-9A-Fa-f]{6}$ ]] || continue
+            export "$_dots_key=$_dots_value"
+        done < "$_dots_palette_file"
+    done
+    [[ -r "$DOTFILES_DIR/themes/adapters/fzf.zsh" ]] && source "$DOTFILES_DIR/themes/adapters/fzf.zsh"
+fi
+unset _dots_palette _dots_local_palette _dots_palette_file _dots_key _dots_value
 
 # Never put GITHUB_TOKEN, API keys, passwords, or private keys in this file.
 # Authenticate with gh auth login or use an external/local secret manager.

@@ -1,0 +1,17 @@
+# component<TAB>kind<TAB>repository source<TAB>target namespace:path<TAB>platform
+# kind is 'file' or 'tree'; tree entries are linked file-by-file for overrides.
+zshenv	file	dots/zshenv	home:.zshenv	all
+zsh	tree	config/terminal/zsh	config:zsh	all
+git	tree	config/terminal/git	config:git	all
+bat	tree	config/terminal/bat	config:bat	all
+fd	tree	config/terminal/fd	config:fd	all
+ripgrep	tree	config/terminal/ripgrep	config:ripgrep	all
+kitty	tree	config/terminal/kitty	config:kitty	all
+btop	tree	config/terminal/btop	config:btop	all
+htop	tree	config/terminal/htop	config:htop	all
+fastfetch	tree	config/terminal/fastfetch	config:fastfetch	all
+cava	tree	config/terminal/cava	config:cava	all
+starship	file	config/terminal/starship.toml	config:starship.toml	all
+stylua	file	config/terminal/stylua.toml	config:stylua.toml	all
+tmux.conf	file	config/terminal/tmux/.tmux.conf	home:.tmux.conf	all
+tmux.conf.local	file	config/terminal/tmux/.tmux.conf.local	home:.tmux.conf.local	all

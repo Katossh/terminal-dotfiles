@@ -1,4 +1,4 @@
-name: Validate dotfiles installer
+name: Validate terminal manager
 
 on:
   push:
@@ -8,115 +8,63 @@ permissions:
   contents: read
 
 jobs:
-  installer:
+  validate:
     strategy:
+      fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Check Bash syntax
-        run: bash -n install.sh
-
-      - name: Install ShellCheck
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v shellcheck >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y shellcheck
-          fi
-
-      - name: Install Zsh
-        if: runner.os == 'Linux'
-        run: |
-          if ! command -v zsh >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y zsh
-          fi
-
-      - name: Lint installer
-        if: runner.os == 'Linux'
-        run: shellcheck --severity=warning install.sh
-
-      - name: Check help output
-        run: ./install.sh --help
-
-      - name: Check Zsh syntax and Starship configuration
+      - name: Install validation tools
         shell: bash
         run: |
-          for script in dots/zshenv config/terminal/zsh/.zshrc config/terminal/zsh/prompt.zsh; do
-            zsh -n "$script"
-          done
-          test -s config/terminal/starship.toml
-          grep -Fq 'STARSHIP_CONFIG=' dots/zshenv
-          grep -Fq 'starship init zsh' config/terminal/zsh/prompt.zsh
-          grep -Fq 'TMUX_THEME_VERSION="v2.3.2"' install.sh
-          grep -Fq 'install_tmux_theme' install.sh
-          grep -Fq 'configure_tmux_default_shell' install.sh
-          grep -Fq 'set -g @catppuccin_flavor "mocha"' config/terminal/tmux/.tmux.conf.local
-          grep -Fq 'catppuccin.tmux' config/terminal/tmux/.tmux.conf.local
-          test -d config/terminal
-          test -d config/ui
-          test ! -e config/Kvantum-b4-upgrade
-          test ! -e config/ghidra
-          test ! -e config/pulse
-          test ! -e config/ui/rofi/.current_wallpaper
-          test ! -e config/ui/swaync/icons/backup.png
-          test ! -e config/terminal/wezterm
-          test ! -e config/terminal/mods
+          if [[ "${RUNNER_OS}" == Linux ]]; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck zsh
+          else
+            brew install shellcheck
+          fi
 
-          if grep -ni 'lazygit' install.sh nix/packages.nix config/terminal/kitty/kitty.conf config/terminal/kitty/README.md README.md resources/packages_list.md; then
-            echo "Unexpected LazyGit reference in active configuration or documentation."
+      - name: Check shell syntax
+        run: |
+          bash -n bin/dots install.sh tests/test-dots.sh
+          zsh -n dots/zshenv
+          zsh -n config/terminal/zsh/.zshrc
+          zsh -n config/terminal/zsh/prompt.zsh
+          zsh -n themes/adapters/fzf.zsh
+
+      - name: ShellCheck
+        run: shellcheck --severity=warning bin/dots install.sh tests/test-dots.sh
+
+      - name: Validate manifest sources
+        shell: bash
+        run: |
+          test -s manifest/configs.tsv
+          test -s manifest/packages.tsv
+          test -d config/terminal
+          test -d legacy/ui
+          test ! -e config/ui
+          while IFS=$'\t' read -r component kind source target platforms; do
+            [[ -z "$component" || "$component" == \#* ]] && continue
+            [[ "$kind" == file || "$kind" == tree ]]
+            [[ -e "$source" || -L "$source" ]]
+          done < manifest/configs.tsv
+          if grep -n -E -- '--desktop|config/ui' bin/dots install.sh; then
+            echo 'UI references found in active manager.'
             exit 1
           fi
 
-      - name: Smoke-test non-destructive dry run
-        shell: bash
+      - name: Help and non-destructive dry run
         run: |
+          ./install.sh --help
           test_home="$(mktemp -d)"
           trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --dry-run --no-packages --yes
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" XDG_DATA_HOME="$test_home/.local/share" DOTS_SKIP_DOWNLOADS=1 ./bin/dots install --dry-run --no-packages --yes
           test ! -e "$test_home/.zshenv"
           test ! -e "$test_home/.config"
 
-      - name: Smoke-test linking and idempotence
-        shell: bash
-        run: |
-          test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
-          test -L "$test_home/.zshenv"
-          test -L "$test_home/.config/starship.toml"
-          test -L "$test_home/.config/zsh"
-          test -L "$test_home/.config/cava"
-          test ! -e "$test_home/.config/mods"
-          test ! -e "$test_home/.config/wezterm"
-          test -L "$test_home/.config/stylua.toml"
-          test -L "$test_home/.tmux.conf"
-          test -L "$test_home/.tmux.conf.local"
-          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
-          grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
-          test ! -e "$test_home/.dotfiles-backup"
-          test ! -e "$test_home/.config/waybar"
-          if [[ "$(uname -s)" == Linux ]]; then
-            ui_home="$(mktemp -d)"
-            HOME="$ui_home" XDG_CONFIG_HOME="$ui_home/.config" ./install.sh --desktop --no-packages --yes >"$ui_home/ui.log"
-            test -L "$ui_home/.config/waybar"
-            test -L "$ui_home/.config/thorium-flags.conf"
-            rm -rf "$ui_home"
-          fi
-
-      - name: Test Zsh repository path discovery
-        shell: bash
-        run: |
-          command -v zsh >/dev/null 2>&1
-          test_home="$(mktemp -d)"
-          trap 'rm -rf "$test_home"' EXIT
-          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/install.log"
-          actual="$(env -u ZDOTDIR HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" DOTFILES_DIR= zsh -c 'print -r -- "$DOTFILES_DIR"')"
-          printf 'Expected repository path: %s\nActual repository path:   %s\n' "$GITHUB_WORKSPACE" "$actual"
-          test "$actual" = "$GITHUB_WORKSPACE"
+      - name: End-to-end lifecycle tests
+        run: bash tests/test-dots.sh
