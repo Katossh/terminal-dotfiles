@@ -170,7 +170,8 @@ backup_collision() {
 }
 
 link_file() {
-    local component="$1" source="$2" target="$3" override="$4" selected="$source" current=""
+    local component="$1" source="$2" target="$3" override="$4" selected current=""
+    selected="$source"
     if [[ -n "$override" && ( -f "$override" || -L "$override" ) ]]; then selected="$override"; fi
     if [[ -L "$target" ]]; then
         current="$(readlink "$target" 2>/dev/null || true)"
@@ -474,8 +475,7 @@ install_tmux_theme() {
     if [[ -f "$target/catppuccin.tmux" ]]; then
         origin="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
         if [[ "$origin" == https://github.com/catppuccin/tmux.git ]]; then
-            record_state download "$target" catppuccin-tmux
-            info "Catppuccin tmux plugin already present."
+            info "Catppuccin tmux plugin already present; leaving its ownership unclaimed."
         fi
         return 0
     fi
@@ -650,6 +650,7 @@ command_backup() {
         snapshot_add "$target" "$snapshot_dir"
     done < <(manifest_targets)
     if ! grep -Fqx -- "$DOTS_CONFIG_DIR" "$seen"; then snapshot_add "$DOTS_CONFIG_DIR" "$snapshot_dir"; fi
+    snapshot_add "$HOME_DIR/.tmux/dots-theme.conf" "$snapshot_dir"
     rm -f "$seen"
     printf '%s\n' "$id"
     info "Snapshot created: $snapshot_dir"
@@ -864,6 +865,11 @@ command_prune() {
                 ;;
             backup)
                 if [[ -e "$value" || -L "$value" ]]; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                else removed=$((removed + 1)); fi
+                ;;
+            package)
+                package_manager="${target%%:*}"
+                if package_installed "$package_manager" "$value"; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
                 else removed=$((removed + 1)); fi
                 ;;
             *) printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp" ;;
