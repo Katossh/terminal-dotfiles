@@ -102,9 +102,28 @@ record_state() {
 set_state() {
     local kind="$1" key="$2" value="$3" tmp
     ensure_state
-    tmp="$STATE_FILE.tmp.$$"
+    if [[ "$kind" == link ]]; then
+        # Link receipts are appended during traversal and compacted once per install.
+        printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$STATE_FILE"
+        return 0
+    fi
+    tmp="$STATE_FILE.tmp.$"
     awk -F '\t' -v kind="$kind" -v key="$key" '$1 != kind || $2 != key' "$STATE_FILE" > "$tmp"
     printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$tmp"
+    mv "$tmp" "$STATE_FILE"
+}
+
+compact_link_state() {
+    [[ -f "$STATE_FILE" ]] || return 0
+    local tmp="$STATE_FILE.compact.$"
+    awk -F '\t' '
+        $1 == "link" { links[$2] = $0; next }
+        { other[++count] = $0 }
+        END {
+            for (i = 1; i <= count; i++) print other[i]
+            for (key in links) print links[key]
+        }
+    ' "$STATE_FILE" > "$tmp"
     mv "$tmp" "$STATE_FILE"
 }
 
@@ -516,6 +535,7 @@ install_configs() {
     generate_theme_adapters
     if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
     else install_tmux_theme; fi
+    compact_link_state
 }
 
 command_install() {
@@ -774,12 +794,144 @@ command_uninstall() {
             actual="$(readlink "$target" 2>/dev/null || true)"
             if [[ "$actual" == "$source" ]]; then
                 if [[ "$DRY_RUN" == 1 ]]; then info "Would remove link: $target"
-                else rm -f -- "$target"; remove_state link "$target"; prune_empty_dirs "$(dirname "$target")"; fi
+                else rm -f -- "$target"; prune_empty_dirs "$(dirname "$target")"; fi
             else warn "Leaving manually changed symlink untouched: $target"; fi
         elif [[ -e "$target" ]]; then warn "Leaving non-symlink target untouched: $target"; fi
     done < "$STATE_FILE"
+    if [[ "$DRY_RUN" != 1 ]]; then
+        local links_tmp="$STATE_FILE.links.$"
+        awk -F '\t' '$1 != "link"' "$STATE_FILE" > "$links_tmp"
+        mv "$links_tmp" "$STATE_FILE"
+    fi
 
-    while IFS=$'\t' read -r kind target backup; do
+    while IFS=
+        [[ "$kind" == backup ]] || continue
+        if [[ -e "$backup" || -L "$backup" ]]; then
+            if [[ -e "$target" || -L "$target" ]]; then
+                warn "Cannot restore $backup because $target is occupied; backup preserved."
+            elif [[ "$DRY_RUN" == 1 ]]; then info "Would restore previous path: $target"
+            else
+                mkdir -p "$(dirname "$target")"
+                mv -- "$backup" "$target"
+                remove_state backup "$target"
+            fi
+        fi
+    done < "$STATE_FILE"
+
+    while IFS=$'\t' read -r kind target value; do
+        [[ "$kind" == download ]] || continue
+        if [[ "$DRY_RUN" == 1 ]]; then info "Would remove installer download: $target ($value)"
+        else remove_download "$target" "$value" && remove_state download "$target"; fi
+    done < "$STATE_FILE"
+
+    while IFS=$'\t' read -r kind target value; do
+        [[ "$kind" == generated ]] || continue
+        if [[ -f "$target" ]]; then
+            actual="$(cksum "$target" | awk '{print $1 ":" $2}')"
+            if [[ "$actual" == "$value" ]]; then
+                if [[ "$DRY_RUN" == 1 ]]; then info "Would remove generated file: $target"
+                else rm -f "$target"; remove_state generated "$target"; prune_empty_dirs "$(dirname "$target")"; fi
+            else warn "Generated file was modified; preserving it: $target"; fi
+        fi
+    done < "$STATE_FILE"
+
+    if [[ "$purge" == 1 ]]; then
+        while IFS=$'\t' read -r kind target value; do
+            [[ "$kind" == package ]] || continue
+            local package_manager="${target%%:*}"
+            if [[ "$DRY_RUN" == 1 ]]; then info "Would remove newly installed package: $value ($package_manager)"
+            else remove_package "$package_manager" "$value" && remove_state package "$target"; fi
+        done < "$STATE_FILE"
+    else
+        info "Native packages were retained. Use --purge to remove only packages recorded as newly installed by dots."
+    fi
+    prune_empty_dirs "$CONFIG_DIR"
+    prune_empty_dirs "$LOCAL_BIN"
+    prune_empty_dirs "$HOME_DIR/.tmux"
+    info "Uninstall pass complete. Review preserved backups and manually modified files."
+}
+
+command_prune() {
+    local kind target value actual tmp removed=0
+    while (($#)); do
+        case "$1" in
+            --yes) ASSUME_YES=1 ;;
+            --dry-run) DRY_RUN=1 ;;
+            *) die "Unknown prune option: $1" ;;
+        esac
+        shift
+    done
+    [[ -f "$STATE_FILE" ]] || { info "No dots state to prune."; return 0; }
+    if [[ "$DRY_RUN" != 1 && "$ASSUME_YES" != 1 ]] && ! ask_yes_no "Remove stale managed links and obsolete state records?" no; then
+        info "Prune cancelled."
+        return 0
+    fi
+    say "Scanning for stale managed resources"
+    tmp="$STATE_FILE.prune.$$"
+    : > "$tmp"
+    while IFS=$'\t' read -r kind target value; do
+        case "$kind" in
+            link)
+                if [[ ! -e "$value" && ! -L "$value" && -L "$target" ]]; then
+                    actual="$(readlink "$target" 2>/dev/null || true)"
+                    if [[ "$actual" == "$value" ]]; then
+                        if [[ "$DRY_RUN" == 1 ]]; then info "Would remove broken managed link: $target"
+                        else rm -f -- "$target"; removed=$((removed + 1)); fi
+                        continue
+                    fi
+                fi
+                printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                ;;
+            download|generated)
+                if [[ ! -e "$target" && ! -L "$target" ]]; then
+                    info "Dropping stale state record: $target"
+                    removed=$((removed + 1))
+                else printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"; fi
+                ;;
+            backup)
+                if [[ -e "$value" || -L "$value" ]]; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                else removed=$((removed + 1)); fi
+                ;;
+            package)
+                package_manager="${target%%:*}"
+                if package_installed "$package_manager" "$value"; then printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp"
+                else removed=$((removed + 1)); fi
+                ;;
+            *) printf '%s\t%s\t%s\n' "$kind" "$target" "$value" >> "$tmp" ;;
+        esac
+    done < "$STATE_FILE"
+    if [[ "$DRY_RUN" == 1 ]]; then rm -f "$tmp"; else mv "$tmp" "$STATE_FILE"; fi
+
+    if [[ -d "$HOME_DIR/.tmux/plugins/catppuccin" ]]; then
+        for target in "$HOME_DIR"/.tmux/plugins/catppuccin/.dots-clone.*; do
+            [[ -d "$target" ]] || continue
+            if [[ "$DRY_RUN" == 1 ]]; then info "Would remove abandoned clone: $target"
+            else rm -rf -- "$target"; fi
+        done
+    fi
+    info "Prune complete; stale records/resources handled: $removed"
+}
+
+main() {
+    local command="${1:-}"
+    [[ -n "$command" ]] || { usage; exit 0; }
+    shift || true
+    case "$command" in
+        install) command_install "$@" ;;
+        list) command_list ;;
+        health|--health) command_health ;;
+        backup) command_backup "$@" ;;
+        restore) command_restore "$@" ;;
+        uninstall) command_uninstall "$@" ;;
+        prune) command_prune "$@" ;;
+        --print-repo) printf '%s\n' "$REPO_DIR" ;;
+        -h|--help|help) usage ;;
+        *) die "Unknown command: $command (use --help)" ;;
+    esac
+}
+
+main "$@"
+\t' read -r kind target backup; do
         [[ "$kind" == backup ]] || continue
         if [[ -e "$backup" || -L "$backup" ]]; then
             if [[ -e "$target" || -L "$target" ]]; then
