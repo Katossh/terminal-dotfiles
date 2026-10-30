@@ -1,25 +1,22 @@
 tmux*.log
-config/btop/btop.log
+config/terminal/btop/btop.log
 
-config/nvim/spell/*.spl
-config/nvim/lua/packer_compiled.lua
 
-config/zsh/zprofile.local
-config/zsh/zsh_history
-config/zsh/.zsh_history
-config/zsh/.zcompdump
-config/zsh/.zcompdump*
-config/zsh/*.zwc
-config/zsh/.zcompcache
-config/zsh/.zinit
-config/zsh/.zsh_sessions
-config/zsh/.p10k.zsh.zwc
+config/terminal/zsh/zprofile.local
+config/terminal/zsh/zsh_history
+config/terminal/zsh/.zsh_history
+config/terminal/zsh/.zcompdump
+config/terminal/zsh/.zcompdump*
+config/terminal/zsh/*.zwc
+config/terminal/zsh/.zcompcache
+config/terminal/zsh/.zinit
+config/terminal/zsh/.zsh_sessions
+config/terminal/zsh/.p10k.zsh.zwc
 
-config/kitty/kitty.local.conf
+config/terminal/kitty/kitty.local.conf
 
-config/git/config-scoro
+config/terminal/git/config-scoro
 
-config/lazygit/state.yml
 
 dots/emacs.d/elpa/
 .netrwhist
@@ -44,3 +41,7 @@ secrets/
 
 # JavaScript dependency trees are not part of this shell-only repository.
 /node_modules/
+
+# Runtime and machine-specific state must never be committed.
+**/pulse/cookie
+/config/ui/rofi/.current_wallpaper

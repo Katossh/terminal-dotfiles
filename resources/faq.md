@@ -26,25 +26,17 @@ x-scheme-handler/unknown=google-chrome.desktop
 
 ## Overriding environment variables
 
-If you want to override environment variables without polluting the Git status, 
-then you can create a new file `config/zsh/zprofile.local`. This will link that 
-file to `~/.config/zsh/zprofile.local` and source it inside `profile`. Feel free 
+If you want to override environment variables without polluting the Git status,
+then you can create a new file `config/terminal/zsh/zprofile.local`. This will link that
+file to `~/.config/zsh/zprofile.local` and source it inside `profile`. Feel free
 to override any environment variables here (for example, monitors).
 
-## To change the color scheme in Vim & terminal
+## To change terminal colors
 
-1. Change the Vim color scheme in `config/nvim/init.vim`
-2. Change the terminal color scheme in `config/kitty/kitty.conf`, find the 
-   `include themes/*.conf` file & change the theme file name
-3. Change the `THEME` variable in `dots/zshrc` in order to customize the FZF 
-   colors
+1. For Kitty, edit `config/terminal/kitty/kitty.conf` and select a file from its `themes/` directory.
+2. FZF colors are configured in `dots/zshenv`.
 
-Available themes include:
-
-* `OceanicNext`
-* `palenight` -- in `config/nvim/init.vim` change to `colorscheme material` and 
-    add `let g:material_theme_style = 'palenight'` before the `colorscheme` 
-    setting).
+Neovim configuration is not maintained in this repository.
 
 
 ## Slow Yabai controls
