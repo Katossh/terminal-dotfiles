@@ -29,7 +29,7 @@ The script does not change the default shell unless explicitly asked. On NixOS, 
 
 - dots/zshenv → ~/.zshenv, including XDG paths and automatic repository discovery.
 - config/terminal/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
-- config/terminal/ contains terminal emulators, tmux, Starship, Git, bat, fd, ripgrep, btop, htop, fastfetch, Cava, Mods, and Stylua configuration.
+- config/terminal/ contains Kitty, tmux, Starship, Git, bat, fd, ripgrep, btop, htop, fastfetch, Cava, and Stylua configuration.
 - The tmux files are linked to ~/.tmux.conf and ~/.tmux.conf.local; Catppuccin Mocha is installed separately by the installer.
 - Executable helpers from bin/ → ~/.local/bin/.
 

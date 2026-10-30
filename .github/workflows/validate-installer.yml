@@ -66,8 +66,10 @@ jobs:
           test ! -e config/pulse
           test ! -e config/ui/rofi/.current_wallpaper
           test ! -e config/ui/swaync/icons/backup.png
+          test ! -e config/terminal/wezterm
+          test ! -e config/terminal/mods
 
-          if grep -ni 'lazygit' install.sh nix/packages.nix config/terminal/kitty/kitty.conf config/terminal/kitty/README.md config/terminal/wezterm/wezterm.lua config/terminal/wezterm/README.md README.md resources/packages_list.md; then
+          if grep -ni 'lazygit' install.sh nix/packages.nix config/terminal/kitty/kitty.conf config/terminal/kitty/README.md README.md resources/packages_list.md; then
             echo "Unexpected LazyGit reference in active configuration or documentation."
             exit 1
           fi
@@ -91,7 +93,8 @@ jobs:
           test -L "$test_home/.config/starship.toml"
           test -L "$test_home/.config/zsh"
           test -L "$test_home/.config/cava"
-          test -L "$test_home/.config/mods"
+          test ! -e "$test_home/.config/mods"
+          test ! -e "$test_home/.config/wezterm"
           test -L "$test_home/.config/stylua.toml"
           test -L "$test_home/.tmux.conf"
           test -L "$test_home/.tmux.conf.local"
