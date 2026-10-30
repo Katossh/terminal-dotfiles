@@ -52,8 +52,8 @@ if [[ -n "$_zsh_config_real" ]]; then
     fi
 fi
 case "$_zsh_config_real" in
-    */config/zsh)
-        export DOTFILES_DIR="${DOTFILES_DIR:-${_zsh_config_real%/config/zsh}}"
+    */config/terminal/zsh)
+        export DOTFILES_DIR="${DOTFILES_DIR:-${_zsh_config_real%/config/terminal/zsh}}"
         ;;
 esac
 unset _zsh_config_real _zsh_link_hops _zsh_link_target _zsh_config_dir

@@ -48,18 +48,26 @@ jobs:
       - name: Check Zsh syntax and Starship configuration
         shell: bash
         run: |
-          for script in dots/zshenv config/zsh/.zshrc config/zsh/prompt.zsh; do
+          for script in dots/zshenv config/terminal/zsh/.zshrc config/terminal/zsh/prompt.zsh; do
             zsh -n "$script"
           done
-          test -s config/starship.toml
+          test -s config/terminal/starship.toml
           grep -Fq 'STARSHIP_CONFIG=' dots/zshenv
-          grep -Fq 'starship init zsh' config/zsh/prompt.zsh
+          grep -Fq 'starship init zsh' config/terminal/zsh/prompt.zsh
           grep -Fq 'TMUX_THEME_VERSION="v2.3.2"' install.sh
           grep -Fq 'install_tmux_theme' install.sh
           grep -Fq 'configure_tmux_default_shell' install.sh
-          grep -Fq 'set -g @catppuccin_flavor "mocha"' config/.tmux/.tmux.conf.local
-          grep -Fq 'catppuccin.tmux' config/.tmux/.tmux.conf.local
-          if grep -ni 'lazygit' install.sh nix/packages.nix config/kitty/kitty.conf config/kitty/README.md config/wezterm/wezterm.lua config/wezterm/README.md README.md resources/packages_list.md; then
+          grep -Fq 'set -g @catppuccin_flavor "mocha"' config/terminal/tmux/.tmux.conf.local
+          grep -Fq 'catppuccin.tmux' config/terminal/tmux/.tmux.conf.local
+          test -d config/terminal
+          test -d config/ui
+          test ! -e config/Kvantum-b4-upgrade
+          test ! -e config/ghidra
+          test ! -e config/pulse
+          test ! -e config/ui/rofi/.current_wallpaper
+          test ! -e config/ui/swaync/icons/backup.png
+
+          if grep -ni 'lazygit' install.sh nix/packages.nix config/terminal/kitty/kitty.conf config/terminal/kitty/README.md config/terminal/wezterm/wezterm.lua config/terminal/wezterm/README.md README.md resources/packages_list.md; then
             echo "Unexpected LazyGit reference in active configuration or documentation."
             exit 1
           fi
@@ -81,11 +89,23 @@ jobs:
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
           test -L "$test_home/.zshenv"
           test -L "$test_home/.config/starship.toml"
+          test -L "$test_home/.config/zsh"
+          test -L "$test_home/.config/cava"
+          test -L "$test_home/.config/mods"
+          test -L "$test_home/.config/stylua.toml"
           test -L "$test_home/.tmux.conf"
           test -L "$test_home/.tmux.conf.local"
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
           grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
           test ! -e "$test_home/.dotfiles-backup"
+          test ! -e "$test_home/.config/waybar"
+          if [[ "$(uname -s)" == Linux ]]; then
+            ui_home="$(mktemp -d)"
+            HOME="$ui_home" XDG_CONFIG_HOME="$ui_home/.config" ./install.sh --desktop --no-packages --yes >"$ui_home/ui.log"
+            test -L "$ui_home/.config/waybar"
+            test -L "$ui_home/.config/thorium-flags.conf"
+            rm -rf "$ui_home"
+          fi
 
       - name: Test Zsh repository path discovery
         shell: bash

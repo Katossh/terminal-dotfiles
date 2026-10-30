@@ -1,0 +1,116 @@
+scan_timeout = 60
+add_newline = false
+
+[line_break]
+disabled = false
+
+[status]
+disabled = false
+format = " [$symbol $status]($style) "
+not_found_symbol = "󰙧"
+not_executable_symbol = "󰛲"
+sigint_symbol = "󰫃"
+map_symbol = true
+style = "bold yellow"
+
+[package]
+format = "[$symbol$version]($style) "
+symbol = "󰏔"
+disabled = false
+
+[git_commit]
+commit_hash_length = 4
+tag_symbol = "󰃬"
+
+[git_state]
+format = '[\($state( $progress_current of $progress_total)\)]($style) '
+cherry_pick = "[🍒 PICKING](bold red)"
+
+[git_status]
+conflicted = "🏳"
+ahead = "💨"
+behind = "😰"
+diverged = "😵"
+untracked = "🤷"
+stashed = "📦"
+modified = "📝"
+staged = '[++\($count\)](green)'
+renamed = "󰁕"
+deleted = "🗑"
+
+[hostname]
+ssh_only = true
+trim_at = ".companyname.com"
+disabled = false
+
+[username]
+style_user = "bold dimmed green"
+style_root = "red bold"
+disabled = false
+show_always = false
+
+[memory_usage]
+disabled = true
+threshold = -1
+symbol = " "
+style = "bold dimmed green"
+
+[directory]
+home_symbol = "󰉖"
+read_only = "󰈦"
+truncation_length = 1
+
+[directory.substitutions]
+"Desktop" = "󰝰"
+"Documents" = "󰈙"
+"Downloads" = "󰱟"
+"Music" = "󰎈"
+"Pictures" = "󰉜"
+"Videos" = "󰇮"
+
+[nodejs]
+disabled = true
+format = "[$symbol ($version)]($style)"
+symbol = "󰌞"
+style = "bold green"
+
+[python]
+format = '[${symbol} ${pyenv_prefix}(${version})(\($virtualenv\))]($style)'
+symbol = "󰌠"
+style = "bold blue"
+
+[php]
+format = "[$symbol ($version)]($style)"
+symbol = "󰈛"
+style = "bold purple"
+
+[java]
+format = "[${symbol} (${version})]($style)"
+symbol = "󰄛"
+style = "bold red"
+
+[rust]
+format = "[$symbol ($version)]($style)"
+style = "bold orange"
+
+[ruby]
+format = "[$symbol ($version)]($style)"
+symbol = "󰟃"
+style = "bold magenta"
+
+[perl]
+format = "[$symbol ($version)]($style)"
+symbol = "󰗏"
+style = "bold pink"
+
+[haskell]
+format = "[$symbol ($version)]($style)"
+symbol = "󰴩"
+style = "bold blue"
+
+[golang]
+format = "[$symbol ($version )]($style)"
+symbol = "󰟓"
+style = "bold cyan"
+detect_extensions = ["go"]
+detect_files = ["go.mod", "go.sum"]

@@ -25,18 +25,17 @@ The script does not change the default shell unless explicitly asked. On NixOS, 
 
 ## What gets installed
 
-### Core shell and terminal tools
+### Core terminal configuration
 
-- dots/zshenv → ~/.zshenv, including XDG paths and automatic discovery of the repository location.
-- config/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
-- config/starship.toml, config/git/, config/bat/, config/fd/, config/ripgrep/.
-- config/.tmux/ → ~/.tmux.conf and ~/.tmux.conf.local, with Catppuccin Mocha styling and a pinned official theme plugin.
-- config/kitty/, config/wezterm/, config/btop/, config/fastfetch/, and config/htop/.
+- dots/zshenv → ~/.zshenv, including XDG paths and automatic repository discovery.
+- config/terminal/zsh/ → ~/.config/zsh/ — shell options, aliases, completion, prompt, and plugins.
+- config/terminal/ contains terminal emulators, tmux, Starship, Git, bat, fd, ripgrep, btop, htop, fastfetch, Cava, Mods, and Stylua configuration.
+- The tmux files are linked to ~/.tmux.conf and ~/.tmux.conf.local; Catppuccin Mocha is installed separately by the installer.
 - Executable helpers from bin/ → ~/.local/bin/.
 
-### Optional desktop configs
+### Optional UI configuration
 
-Use --desktop to link configs for Kvantum, Thunar, AGS, Cava, GTK, MPV, PulseAudio, Qt settings, Rofi, Swappy, SwayNC, Wallust, Waybar, and Wlogout. This group targets a graphical Linux desktop and is not necessary for a headless WSL shell. Old Kvantum snapshots and version-specific Ghidra preferences/logs are intentionally excluded.
+Use --desktop to link config/ui/ to the matching ~/.config application paths. This includes Kvantum, Thunar, AGS, GTK/Qt settings, MPV, Rofi, Swappy, SwayNC, Wallust, Waybar, Wlogout, and Thorium flags. These Linux desktop settings are skipped on macOS and are unnecessary for a headless WSL shell.
 
 Hyprland itself is maintained separately in [Katossh/NixOS-Configuration](https://github.com/Katossh/NixOS-Configuration/tree/master/.config/hypr).
 
@@ -48,7 +47,7 @@ NixOS package installation stays declarative. The optional module at nix/package
 
 ## Dependencies and local behavior
 
-The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under `config/zsh/.packages/`. The installer links `config/starship.toml` and exports `STARSHIP_CONFIG` so Starship uses that file. Starship is initialized by `config/zsh/prompt.zsh`; a minimal fallback prompt remains available for config-only installs. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout. The tmux setup uses Catppuccin Mocha, installs the official Catppuccin plugin at the pinned `v2.3.2` tag for tmux 3.2+, and synchronizes a running tmux server's `default-shell` with the account login shell.
+The Zsh setup expects Zsh, Starship, Git, FZF, ripgrep, tmux, Neovim, and the plugin sources included under `config/terminal/zsh/.packages/`. The installer links `config/terminal/starship.toml` to `~/.config/starship.toml` and exports `STARSHIP_CONFIG` so Starship uses it. Starship is initialized by `config/terminal/zsh/prompt.zsh`; a minimal fallback prompt remains available for config-only installs. Shell history and completion caches live under XDG data/cache directories rather than inside the Git checkout. The tmux setup uses Catppuccin Mocha, installs the official Catppuccin plugin at the pinned `v2.3.2` tag for tmux 3.2+, and synchronizes a running tmux server's `default-shell` with the account login shell.
 
 The bin/ directory includes helpers for copying the current Git branch, extracting archives, previewing files with FZF, selecting Docker containers, selecting processes, and choosing projects. See [bin/README.md](./bin/README.md).
 
@@ -56,8 +55,8 @@ The bin/ directory includes helpers for copying the current Git branch, extracti
 
 - Never commit API tokens, passwords, private keys, or machine-specific credentials.
 - If a token has ever been committed, revoke/rotate it. Removing a current line does not remove it from Git history.
-- Local-only values can go in the ignored config/zsh/zprofile.local file or be handled by a secret manager.
+- Local-only values can go in the ignored config/terminal/zsh/zprofile.local file or be handled by a secret manager.
 
 ## Upstream sources
 
-Third-party projects vendored under config/ are documented in [resources/upstream-sources.md](./resources/upstream-sources.md). They are tracked as regular files, not Git submodules.
+Third-party projects vendored under config/terminal/ are documented in [resources/upstream-sources.md](./resources/upstream-sources.md). They are tracked as regular files, not Git submodules.

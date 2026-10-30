@@ -1,0 +1,13 @@
+{
+  "extends": [
+    "xo-space",
+    "xo-typescript"
+  ],
+  "rules": {
+    "@typescript-eslint/indent": ["error", 2, { "SwitchCase": 1 }],
+    "@typescript-eslint/member-naming": 0
+  },
+  "env": {
+    "browser": true
+  }
+}

@@ -1,0 +1,96 @@
+[color]
+    pager = true
+    ui = true
+    status = auto
+    diff = auto
+    branch = auto
+    showBranch = auto
+    interactive = auto
+    grep = auto
+[color "status"]
+    header = dim white
+    branch = cyan
+    nobranch = red
+    unmerged = red
+    untracked = cyan
+    added = green
+    changed = red bold
+[color "diff"]
+    meta = "11"
+    frag = magenta bold
+    commit = yellow bold
+    old = red bold
+    new = green bold
+    whitespace = red reverse
+    func = blue
+    context = normal
+[color "branch"]
+    current = cyan
+    local = blue
+    remote = magenta
+    upstream = magenta
+    plain = normal
+[color "decorate"]
+    branch = blue
+    remoteBranch = magenta
+    tag = magenta
+    stash = cyan
+    HEAD = blue
+[color "interactive"]
+    prompt = red
+    header = red bold
+    error = red
+    help = black bold
+[color "grep"]
+    context = normal
+    match = cyan
+    filename = blue
+    function = blue
+    selected = normal
+    separator = red bold
+    linenumber = normal
+[user]
+	name = katossh
+	email = gtrtr2000@gmail.com
+[core]
+    excludesfile = ~/.config/git/gitignore_global
+    quotepath = false # Better display of some UTF-8 filenames
+[pager]
+    diff = less --tabs=4 -RFX
+    show = less --tabs=4 -RFX
+[color "diff-highlight"]
+	oldNormal = red bold
+	oldHighlight = red bold 52
+	newNormal = green bold
+	newHighlight = green bold 22
+[merge]
+    tool = vimdiff
+[mergetool]
+    prompt = true
+[mergetool "vimdiff"]
+    cmd = nvim -d $LOCAL $REMOTE $MERGED -c '$wincmd w' -c 'wincmd J'
+[difftool]
+    prompt = false
+[diff]
+	algorithm = patience
+    tool = vimdiff
+[diff-so-fancy]
+	markEmptyLines = false
+[alias]
+    patch = !git --no-pager diff --no-color
+    push-this = push -u origin HEAD
+    bb = !"$HOME/.local/bin/copy-branch"
+
+    lg = !"git lg1"
+    lg1 = !"git lg1-specific --all"
+
+    lg1-specific = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) %C(cyan)%aD%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(auto)%d%C(reset)'
+
+    fixup = !sha=$( git -c color.ui=always log --oneline -n 1000 | fzf +s --no-multi --prompt 'Fixup> ' ) && git commit --fixup "${sha%% *}"
+[pull]
+	rebase = false
+[init]
+	defaultBranch = main
+
+[includeIf "gitdir:~/Code/Scoro/"]
+  path = ~/.config/git/config-scoro
