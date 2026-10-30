@@ -1,0 +1,77 @@
+name: Validate dotfiles installer
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check Bash syntax
+        run: bash -n install.sh
+
+      - name: Install ShellCheck
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          fi
+
+      - name: Install Zsh
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v zsh >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y zsh
+          fi
+
+      - name: Lint installer
+        if: runner.os == 'Linux'
+        run: shellcheck --severity=warning install.sh
+
+      - name: Check help output
+        run: ./install.sh --help
+
+      - name: Smoke-test non-destructive dry run
+        shell: bash
+        run: |
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --dry-run --no-packages --yes
+          test ! -e "$test_home/.zshenv"
+          test ! -e "$test_home/.config"
+
+      - name: Smoke-test linking and idempotence
+        shell: bash
+        run: |
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/first.log"
+          test -L "$test_home/.zshenv"
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/second.log"
+          grep -Fq "Already linked: $test_home/.zshenv" "$test_home/second.log"
+          test ! -e "$test_home/.dotfiles-backup"
+
+      - name: Test Zsh repository path discovery
+        shell: bash
+        run: |
+          command -v zsh >/dev/null 2>&1
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" ./install.sh --no-packages --yes >"$test_home/install.log"
+          actual="$(env -u ZDOTDIR HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" DOTFILES_DIR= zsh -c 'print -r -- "$DOTFILES_DIR"')"
+          printf 'Expected repository path: %s\nActual repository path:   %s\n' "$GITHUB_WORKSPACE" "$actual"
+          test "$actual" = "$GITHUB_WORKSPACE"

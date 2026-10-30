@@ -6,12 +6,24 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# WSL may not provide XDG_RUNTIME_DIR. Prefer the standard per-user path when
-# available; otherwise use /tmp as a compatibility fallback.
-if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -w "$XDG_RUNTIME_DIR" ]]; then
+# Some systems (notably macOS and WSL) do not provide XDG_RUNTIME_DIR.
+# Never fall back to shared /tmp directly: create a private per-user directory.
+if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ]]; then
     XDG_RUNTIME_DIR="/run/user/$UID"
     if [[ ! -d "$XDG_RUNTIME_DIR" || ! -w "$XDG_RUNTIME_DIR" ]]; then
-        XDG_RUNTIME_DIR="/tmp"
+        _xdg_runtime_root="${TMPDIR:-/tmp}"
+        XDG_RUNTIME_DIR="${_xdg_runtime_root%/}/dotfiles-runtime-$UID"
+        if [[ ! -e "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" ]]; then
+            (umask 077 && mkdir "$XDG_RUNTIME_DIR") 2>/dev/null || true
+        fi
+        if [[ -d "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" && -O "$XDG_RUNTIME_DIR" && -w "$XDG_RUNTIME_DIR" ]]; then
+            chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+        else
+            XDG_RUNTIME_DIR="$XDG_CACHE_HOME/runtime"
+            mkdir -p "$XDG_RUNTIME_DIR"
+            chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+        fi
+        unset _xdg_runtime_root
     fi
 fi
 export XDG_RUNTIME_DIR
@@ -19,20 +31,40 @@ export XDG_RUNTIME_DIR
 # Keep Zsh configuration under XDG_CONFIG_HOME.
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
 
-# Resolve the repository path from the linked Zsh config. This allows the repo
-# to live somewhere other than ~/dotfiles without breaking helper scripts.
-_zsh_config_real="$(readlink -f -- "$ZDOTDIR" 2>/dev/null || true)"
+# Resolve the repository path from the linked Zsh config. Follow symlink chains
+# using portable readlink instead of GNU-only readlink -f.
+_zsh_config_real="$ZDOTDIR"
+_zsh_link_hops=0
+while [[ -L "$_zsh_config_real" && "$_zsh_link_hops" -lt 20 ]]; do
+    _zsh_link_target="$(readlink "$_zsh_config_real" 2>/dev/null || true)"
+    [[ -n "$_zsh_link_target" ]] || break
+    case "$_zsh_link_target" in
+        /*) _zsh_config_real="$_zsh_link_target" ;;
+        *) _zsh_config_real="$(dirname "$_zsh_config_real")/$_zsh_link_target" ;;
+    esac
+    _zsh_link_hops=$((_zsh_link_hops + 1))
+done
+if [[ -n "$_zsh_config_real" ]]; then
+    _zsh_config_dir="$(cd -P "$(dirname "$_zsh_config_real")" 2>/dev/null && pwd -P)"
+    if [[ -n "$_zsh_config_dir" ]]; then
+        _zsh_config_real="$_zsh_config_dir/$(basename "$_zsh_config_real")"
+    fi
+fi
 case "$_zsh_config_real" in
     */config/zsh)
         export DOTFILES_DIR="${DOTFILES_DIR:-${_zsh_config_real%/config/zsh}}"
         ;;
 esac
-unset _zsh_config_real
+unset _zsh_config_real _zsh_link_hops _zsh_link_target _zsh_config_dir
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
 
 # Application defaults; override these in a local shell profile if needed.
 export GPG_TTY="${TTY:-$(tty 2>/dev/null || true)}"
-export BROWSER="${BROWSER:-xdg-open}"
+if [[ "$OSTYPE" == darwin* ]]; then
+    export BROWSER="${BROWSER:-open}"
+else
+    export BROWSER="${BROWSER:-xdg-open}"
+fi
 export TERMINAL="${TERMINAL:-kitty}"
 export EDITOR="${EDITOR:-nvim}"
 export VISUAL="${VISUAL:-$EDITOR}"
