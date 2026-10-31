@@ -47,6 +47,7 @@ jobs:
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
           test -s nix/packages.nix
+          test -s nix/niri.nix
           test ! -e install.sh
           grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
           awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
