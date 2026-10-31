@@ -12,6 +12,6 @@ The local configuration uses **Catppuccin Mocha** colors. The installer also ins
 ## Runtime notes
 - Install tmux from your Linux distribution.
 - The config keeps the existing TPM-managed `tmux-copycat`, `tmux-resurrect`, and `tmux-continuum` plugins. Catppuccin is installed separately and is not managed by TPM.
-- After linking the configs, the installer aligns a running tmux server's `default-shell` with the account login shell and reloads the configuration. Existing panes keep their current process; run `exec zsh` once in an old Bash pane.
+- The local config resolves the installed Zsh executable and sets the tmux server's global `default-shell` to it, so all new windows and panes use Zsh regardless of the account's login-shell setting. Existing panes keep their current process; run `exec zsh` in an old Bash pane or recreate it.
 - Clipboard integration is currently disabled in the local config. On WSL, configure tmux's copy command separately if copying should reach the Windows clipboard.
 - Test the config with `tmux -f ~/.tmux.conf` before relying on it for persistent sessions.

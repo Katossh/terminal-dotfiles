@@ -1,7 +1,4 @@
-# Initialize Zsh completion with cache files kept out of the dotfiles checkout.
-mkdir -p "$XDG_CACHE_HOME/zsh"
-autoload -U compinit
-compinit -d "$XDG_CACHE_HOME/zsh/.zcompdump"
+# Oh My Zsh initializes compinit with the XDG cache path configured in .zshrc.
 _comp_options+=(globdots)
 
 # Menu-driven completion and case-insensitive matching.

@@ -7,7 +7,6 @@ The current `master` tree contains the following third-party projects as regular
 | `config/terminal/bat/themes/oceanic-next-color-scheme` | [voronianski/oceanic-next-color-scheme](https://github.com/voronianski/oceanic-next-color-scheme) |
 | `config/terminal/bat/themes/material-theme` | [equinusocio/material-theme](https://github.com/equinusocio/material-theme) |
 | `config/terminal/kitty/kitty_grab` | [yurikhan/kitty_grab](https://github.com/yurikhan/kitty_grab) |
-| `config/terminal/zsh/.packages/zsh-z` | [agkozak/zsh-z](https://github.com/agkozak/zsh-z) |
 | `config/terminal/zsh/.packages/fast-syntax-highlighting` | [zdharma-continuum/fast-syntax-highlighting](https://github.com/zdharma-continuum/fast-syntax-highlighting) |
 | `config/terminal/zsh/.packages/zsh-autosuggestions` | [zsh-users/zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) |
 | `config/terminal/zsh/.packages/fzf-tab` | [Aloxaf/fzf-tab](https://github.com/Aloxaf/fzf-tab) |

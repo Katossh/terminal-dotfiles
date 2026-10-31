@@ -374,6 +374,10 @@ tmux_conf_urlscan_options="--compact --dedupe"
 
 # this is the place to override or undo settings
 
+# Use Zsh for every new window and pane on this tmux server.
+# Resolve the executable dynamically so NixOS and conventional paths both work.
+run-shell 'zsh_path="$(command -v zsh 2>/dev/null)" && [ -x "$zsh_path" ] && tmux set-option -g default-shell "$zsh_path"'
+
 # increase history size
 set -g history-limit 10000
 

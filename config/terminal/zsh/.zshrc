@@ -42,19 +42,33 @@ tab_title_precmd() {
 typeset -a precmd_functions
 precmd_functions+=(tab_title_precmd)
 
+# Load the vendored Oh My Zsh framework, keeping all generated data outside
+# the repository. Starship remains the prompt provider.
+export ZSH="$ZDOTDIR/.packages/ohmyzsh"
+export ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
+export ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/.zcompdump"
+mkdir -p "$ZSH_CACHE_DIR" "$XDG_CACHE_HOME/zsh"
+
+# Keep additional third-party completion definitions available to compinit.
+typeset -U fpath
+fpath=("$ZDOTDIR/.packages/zsh-completions/src" $fpath)
+
+ZSH_THEME=""
+plugins=(git z)
+source "$ZSH/oh-my-zsh.sh"
+
 # Modular configuration
 source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/completion.zsh"
 source "$ZDOTDIR/handlers.zsh"
 
-# Optional plugins vendored under config/zsh/.packages.
-# Load only files that exist so partial installs remain usable.
+# These features are not provided by Oh My Zsh, so they remain standalone plugins.
+# fzf-tab is loaded before autosuggestions; syntax highlighting is loaded last.
 for plugin in \
-    "$ZDOTDIR/.packages/zsh-z/zsh-z.plugin.zsh" \
-    "$ZDOTDIR/.packages/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" \
-    "$ZDOTDIR/.packages/zsh-autosuggestions/zsh-autosuggestions.zsh" \
     "$ZDOTDIR/.packages/fzf-tab/fzf-tab.plugin.zsh" \
-    "$ZDOTDIR/.packages/zsh-manydots-magic/manydots-magic"; do
+    "$ZDOTDIR/.packages/zsh-autosuggestions/zsh-autosuggestions.zsh" \
+    "$ZDOTDIR/.packages/zsh-manydots-magic/manydots-magic" \
+    "$ZDOTDIR/.packages/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"; do
     [[ -f "$plugin" ]] && source "$plugin"
 done
 
