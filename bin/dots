@@ -28,7 +28,7 @@ MANIFEST="$REPO_DIR/manifest/configs.tsv"
 PACKAGES_MANIFEST="$REPO_DIR/manifest/packages.tsv"
 THEME_PALETTE="$REPO_DIR/themes/palettes/catppuccin-mocha.env"
 LOCAL_THEME_PALETTE="$DOTS_CONFIG_DIR/theme.local.env"
-PLATFORM="$(uname -s 2>/dev/null || printf unknown)"
+PLATFORM="${DOTS_PLATFORM:-$(uname -s 2>/dev/null || printf unknown)}"
 DISTRO_ID="unknown"
 DISTRO_LIKE=""
 

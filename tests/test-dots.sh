@@ -50,7 +50,7 @@ test ! -e "$HOME/.tmux/dots-theme.conf"
 
 # NixOS gets the same user configuration links and a declarative package handoff.
 printf '%s\n' 'ID=nixos' 'ID_LIKE=""' > "$TEST_ROOT/nixos-os-release"
-nixos_output="$(DOTS_OS_RELEASE="$TEST_ROOT/nixos-os-release" "$REPO_DIR/bin/dots" install --packages --yes)"
+nixos_output="$(DOTS_PLATFORM=Linux DOTS_OS_RELEASE="$TEST_ROOT/nixos-os-release" "$REPO_DIR/bin/dots" install --packages --yes)"
 grep -Fq 'NixOS package integration' <<< "$nixos_output"
 grep -Fq "$REPO_DIR/nix/packages.nix" <<< "$nixos_output"
 grep -Fq 'sudo nixos-rebuild switch' <<< "$nixos_output"
