@@ -32,13 +32,14 @@ jobs:
         run: |
           bash -n bin/dots
           bash -n tests/test-dots.sh
+          for script in bin/niri-*; do bash -n "$script"; done
           zsh -n dots/zshenv
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
 
       - name: ShellCheck
-        run: shellcheck --severity=warning bin/dots tests/test-dots.sh
+        run: shellcheck --severity=warning bin/dots tests/test-dots.sh bin/niri-*
 
       - name: Validate manifest sources
         shell: bash
@@ -46,12 +47,16 @@ jobs:
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
           test -s nix/packages.nix
+          test -s nix/niri.nix
           test ! -e install.sh
           grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
           awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
           test -d config/terminal
-          test -d legacy/ui
-          test ! -e config/ui
+          test -d config/ui
+          test ! -e legacy/ui
+          for component in niri waybar mako rofi; do
+            awk -F '\t' -v component="$component" '$1 == component && $2 == "tree" && $3 == ("config/ui/" component) && $4 == ("config:" component) && $5 == "linux" { found=1 } END { exit !found }' manifest/configs.tsv
+          done
           while IFS=$'\t' read -r component kind source target platforms; do
             [[ -z "$component" || "$component" == \#* ]] && continue
             [[ "$kind" == file || "$kind" == tree ]]

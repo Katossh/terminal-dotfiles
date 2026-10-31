@@ -19,3 +19,7 @@ The current `master` tree contains the following third-party projects as regular
 ## Updating vendored code
 
 These directories are part of this repository's tracked tree. Updating one is therefore a normal file change, not a `git submodule update`. Before updating, check the upstream project's license and compatibility with the shell setup. Avoid editing third-party files directly unless the change is intentionally maintained as a local patch.
+
+## Design references (not vendored)
+
+- [kianblakley/niri-land](https://github.com/kianblakley/niri-land) — reference for an overview-first Waybar, Rofi app/power/wallpaper menus, and compact Mako volume notifications. The upstream README describes the project as being in maintenance mode. The Niri profile here is an independent implementation in `config/ui/` and `bin/niri-*`; no upstream source files, wallpapers, or screenshot assets are copied. The upstream repository currently has no `LICENSE` file, so its code and bundled assets are not redistributed.

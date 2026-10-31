@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command -v niri >/dev/null 2>&1 || {
+    printf 'niri-overview-bar: niri is required.\n' >&2
+    exit 127
+}
+command -v jq >/dev/null 2>&1 || {
+    printf 'niri-overview-bar: jq is required.\n' >&2
+    exit 127
+}
+command -v pkill >/dev/null 2>&1 || {
+    printf 'niri-overview-bar: pkill is required.\n' >&2
+    exit 127
+}
+
+# Waybar starts hidden. Niri's event stream begins with the current state and
+# reports subsequent overview transitions; SIGUSR1 toggles Waybar visibility.
+while :; do
+    niri msg --json event-stream 2>/dev/null |
+        while IFS= read -r event; do
+            state="$(jq -r '.OverviewOpenedOrClosed.is_open // empty' <<<"$event" 2>/dev/null || true)"
+            [[ "$state" == true || "$state" == false ]] || continue
+
+            if [[ "$state" == true && "${previous_state:-}" != true ]]; then
+                pkill -x -USR1 waybar 2>/dev/null || true
+            elif [[ "$state" == false && "${previous_state:-}" == true ]]; then
+                pkill -x -USR1 waybar 2>/dev/null || true
+            fi
+            previous_state="$state"
+        done
+    sleep 1
+done
