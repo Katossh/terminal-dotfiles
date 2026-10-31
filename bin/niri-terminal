@@ -25,10 +25,8 @@ resolve_binary() {
         return 0
     fi
 
-    user_name=${USER:-$(id -un)}
     for directory in \
         /run/current-system/sw/bin \
-        "/etc/profiles/per-user/$user_name/bin" \
         "$HOME/.nix-profile/bin" \
         /usr/local/bin \
         /usr/bin \
@@ -40,6 +38,14 @@ resolve_binary() {
             return 0
         fi
     done
+
+    if [ -n "${USER:-}" ]; then
+        candidate="/etc/profiles/per-user/$USER/bin/$binary"
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    fi
 
     return 1
 }
