@@ -28,7 +28,7 @@ MANIFEST="$REPO_DIR/manifest/configs.tsv"
 PACKAGES_MANIFEST="$REPO_DIR/manifest/packages.tsv"
 THEME_PALETTE="$REPO_DIR/themes/palettes/catppuccin-mocha.env"
 LOCAL_THEME_PALETTE="$DOTS_CONFIG_DIR/theme.local.env"
-PLATFORM="$(uname -s 2>/dev/null || printf unknown)"
+PLATFORM="${DOTS_PLATFORM:-$(uname -s 2>/dev/null || printf unknown)}"
 DISTRO_ID="unknown"
 DISTRO_LIKE=""
 
@@ -323,9 +323,10 @@ set -g window-status-current-format \"#[fg=$DOTS_THEME_BASE,bg=$DOTS_THEME_LAVEN
 detect_package_manager() {
     if [[ "$PLATFORM" == Darwin ]]; then printf brew; return; fi
     if [[ "$PLATFORM" == FreeBSD ]]; then printf pkg; return; fi
-    if [[ "$PLATFORM" == Linux && -r /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
+    local os_release="${DOTS_OS_RELEASE:-/etc/os-release}"
+    if [[ "$PLATFORM" == Linux && -r "$os_release" ]]; then
+        # shellcheck disable=SC1090,SC1091
+        . "$os_release"
         DISTRO_ID="${ID:-unknown}"
         DISTRO_LIKE="${ID_LIKE:-}"
     fi
@@ -413,7 +414,13 @@ install_packages() {
     local before="$STATE_DIR/packages-before-$$.tsv"
     manager="$(detect_package_manager)"
     if [[ "$manager" == nixos ]]; then
-        info "NixOS detected: package installation remains declarative. Review nix/packages.nix and rebuild manually."
+        say "NixOS package integration"
+        info "Configuration links have been installed normally; NixOS package management stays declarative."
+        info "Import this module from your NixOS configuration:"
+        info "  $REPO_DIR/nix/packages.nix"
+        info "Then apply it with: sudo nixos-rebuild switch"
+        info "The module reads manifest/packages.tsv, so the package inventory has one source of truth."
+        info "dots never edits /etc/nixos or runs nixos-rebuild automatically."
         return 0
     fi
     if [[ "$manager" == unknown ]]; then

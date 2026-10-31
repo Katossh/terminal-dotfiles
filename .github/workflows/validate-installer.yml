@@ -30,20 +30,25 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          bash -n bin/dots install.sh tests/test-dots.sh
+          bash -n bin/dots
+          bash -n tests/test-dots.sh
           zsh -n dots/zshenv
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
 
       - name: ShellCheck
-        run: shellcheck --severity=warning bin/dots install.sh tests/test-dots.sh
+        run: shellcheck --severity=warning bin/dots tests/test-dots.sh
 
       - name: Validate manifest sources
         shell: bash
         run: |
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
+          test -s nix/packages.nix
+          test ! -e install.sh
+          grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
+          awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
           test -d config/terminal
           test -d legacy/ui
           test ! -e config/ui
@@ -52,14 +57,14 @@ jobs:
             [[ "$kind" == file || "$kind" == tree ]]
             [[ -e "$source" || -L "$source" ]]
           done < manifest/configs.tsv
-          if grep -n -E -- '--desktop|config/ui' bin/dots install.sh; then
+          if grep -n -E -- '--desktop|config/ui' bin/dots; then
             echo 'UI references found in active manager.'
             exit 1
           fi
 
       - name: Help and non-destructive dry run
         run: |
-          ./install.sh --help
+          ./bin/dots --help
           test_home="$(mktemp -d)"
           trap 'rm -rf "$test_home"' EXIT
           HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" XDG_DATA_HOME="$test_home/.local/share" DOTS_SKIP_DOWNLOADS=1 ./bin/dots install --dry-run --no-packages --yes
