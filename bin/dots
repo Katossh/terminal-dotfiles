@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# dots: manifest-driven terminal configuration manager.
+# dots: manifest-driven terminal and Niri desktop configuration manager.
 # Run as the normal user. Privilege escalation is limited to package operations.
 
 SOURCE_FILE="${BASH_SOURCE[0]}"
@@ -47,7 +47,7 @@ die()  { printf 'Error: %s\n' "$*" >&2; exit 2; }
 
 usage() {
     cat <<'USAGE'
-dots — terminal configuration manager
+dots — manifest-driven dotfiles manager
 
 Usage:
   dots install [--packages|--no-packages] [--yes] [--dry-run] [--default-shell]
@@ -83,7 +83,7 @@ Options:
 Git operations deliberately remain Git operations:
   git pull, git status, git diff, git log, and so on.
 
-UI/desktop configuration is not part of this manager.
+Desktop configuration is managed from the same manifest as terminal configuration. Niri is the first-class Wayland session profile.
 USAGE
 }
 
@@ -416,10 +416,11 @@ install_packages() {
     if [[ "$manager" == nixos ]]; then
         say "NixOS package integration"
         info "Configuration links have been installed normally; NixOS package management stays declarative."
-        info "Import this module from your NixOS configuration:"
+        info "Import these modules from your NixOS configuration:"
         info "  $REPO_DIR/nix/packages.nix"
-        info "Then apply it with: sudo nixos-rebuild switch"
-        info "The module reads manifest/packages.tsv, so the package inventory has one source of truth."
+        info "  $REPO_DIR/nix/niri.nix"
+        info "Then apply them with: sudo nixos-rebuild switch"
+        info "The packages module reads manifest/packages.tsv; the Niri module enables the compositor and desktop dependencies."
         info "dots never edits /etc/nixos or runs nixos-rebuild automatically."
         return 0
     fi

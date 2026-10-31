@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+for dependency in rofi swww find sort; do
+    command -v "$dependency" >/dev/null 2>&1 || {
+        printf 'niri-wallpaper: %s is required.\n' "$dependency" >&2
+        exit 127
+    }
+done
+
+wall_dir="$HOME/Pictures/Wallpapers"
+if [[ ! -d "$wall_dir" && -d "$HOME/Pictures/wallpapers" ]]; then
+    wall_dir="$HOME/Pictures/wallpapers"
+fi
+if [[ ! -d "$wall_dir" ]]; then
+    notify-send -a niri-wallpaper "No wallpaper directory" "Create $wall_dir and add images."
+    exit 0
+fi
+
+images=()
+while IFS= read -r -d '' file; do
+    images+=("$file")
+done < <(
+    find "$wall_dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 |
+        sort -z
+)
+
+(("${#images[@]}")) || {
+    notify-send -a niri-wallpaper "No wallpapers found" "$wall_dir is empty."
+    exit 0
+}
+
+labels=()
+for file in "${images[@]}"; do
+    labels+=("${file#"$wall_dir"/}")
+done
+
+selected="$(
+    printf '%s\n' "${labels[@]}" |
+        rofi -dmenu -i -p 'Wallpaper' -config "${XDG_CONFIG_HOME:-$HOME/.config}/rofi/config.rasi"
+)"
+[[ -n "$selected" ]] || exit 0
+
+for file in "${images[@]}"; do
+    if [[ "${file#"$wall_dir"/}" == "$selected" ]]; then
+        exec swww img "$file" --transition-type grow --transition-duration 1
+    fi
+done
+
+exit 1

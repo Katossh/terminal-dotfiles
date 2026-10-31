@@ -26,6 +26,16 @@ test -L "$HOME/.local/bin/dots"
 test -L "$HOME/.local/bin/kp"
 test -f "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
 test -f "$HOME/.tmux/dots-theme.conf"
+
+if [[ "$(uname -s)" == Linux ]]; then
+    test -L "$XDG_CONFIG_HOME/niri/config.kdl"
+    test -L "$XDG_CONFIG_HOME/waybar/config.jsonc"
+    test -L "$XDG_CONFIG_HOME/mako/config"
+    test -L "$XDG_CONFIG_HOME/rofi/config.rasi"
+    for helper in niri-appdrawer niri-wallpaper niri-powermenu niri-volume niri-overview-bar; do
+        test -L "$HOME/.local/bin/$helper"
+    done
+fi
 grep -Fq 'Already linked:' "$TEST_ROOT/install-2.log"
 
 "$REPO_DIR/bin/dots" list > "$TEST_ROOT/list.log"
@@ -48,11 +58,22 @@ test ! -e "$HOME/.local/bin/kp"
 test ! -e "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
 test ! -e "$HOME/.tmux/dots-theme.conf"
 
+if [[ "$(uname -s)" == Linux ]]; then
+    test ! -e "$XDG_CONFIG_HOME/niri/config.kdl"
+    test ! -e "$XDG_CONFIG_HOME/waybar/config.jsonc"
+    test ! -e "$XDG_CONFIG_HOME/mako/config"
+    test ! -e "$XDG_CONFIG_HOME/rofi/config.rasi"
+    for helper in niri-appdrawer niri-wallpaper niri-powermenu niri-volume niri-overview-bar; do
+        test ! -e "$HOME/.local/bin/$helper"
+    done
+fi
+
 # NixOS gets the same user configuration links and a declarative package handoff.
 printf '%s\n' 'ID=nixos' 'ID_LIKE=""' > "$TEST_ROOT/nixos-os-release"
 nixos_output="$(DOTS_PLATFORM=Linux DOTS_OS_RELEASE="$TEST_ROOT/nixos-os-release" "$REPO_DIR/bin/dots" install --packages --yes)"
 grep -Fq 'NixOS package integration' <<< "$nixos_output"
 grep -Fq "$REPO_DIR/nix/packages.nix" <<< "$nixos_output"
+grep -Fq "$REPO_DIR/nix/niri.nix" <<< "$nixos_output"
 grep -Fq 'sudo nixos-rebuild switch' <<< "$nixos_output"
 grep -Fq 'dots never edits /etc/nixos' <<< "$nixos_output"
 awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"

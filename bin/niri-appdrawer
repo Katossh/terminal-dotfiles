@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command -v rofi >/dev/null 2>&1 || {
+    printf 'niri-appdrawer: rofi is required.\n' >&2
+    exit 127
+}
+
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/rofi"
+exec rofi -show drun -config "$config_dir/config.rasi"

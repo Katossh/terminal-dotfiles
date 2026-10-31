@@ -15,3 +15,7 @@ starship	file	config/terminal/starship.toml	config:starship.toml	all
 stylua	file	config/terminal/stylua.toml	config:stylua.toml	all
 tmux.conf	file	config/terminal/tmux/.tmux.conf	home:.tmux.conf	all
 tmux.conf.local	file	config/terminal/tmux/.tmux.conf.local	home:.tmux.conf.local	all
+niri	tree	config/ui/niri	config:niri	linux
+waybar	tree	config/ui/waybar	config:waybar	linux
+mako	tree	config/ui/mako	config:mako	linux
+rofi	tree	config/ui/rofi	config:rofi	linux

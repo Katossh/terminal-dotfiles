@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+command -v rofi >/dev/null 2>&1 || {
+    printf 'niri-powermenu: rofi is required.\n' >&2
+    exit 127
+}
+
+choice="$(
+    printf '%s\n' 'Suspend' 'Restart' 'Power off' 'Log out' |
+        rofi -dmenu -i -p 'Session' -config "${XDG_CONFIG_HOME:-$HOME/.config}/rofi/config.rasi"
+)"
+
+case "$choice" in
+    Suspend) systemctl suspend ;;
+    Restart) systemctl reboot ;;
+    'Power off') systemctl poweroff ;;
+    'Log out') niri msg action quit ;;
+    *) exit 0 ;;
+esac

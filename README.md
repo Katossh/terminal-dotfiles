@@ -1,6 +1,6 @@
-# Dotfiles — terminal environment
+# Dotfiles
 
-A manifest-driven terminal configuration manager for Zsh, terminal tools, and CLI/TUI applications. The manager has no graphical-desktop installation path and does not depend on a window manager, Wayland, X11, Waybar, or Rofi.
+A manifest-driven configuration manager for a terminal-focused development environment and a Niri Wayland desktop. Terminal and desktop profiles share one installer, one component manifest, backups, personal overrides, health checks, and lifecycle commands.
 
 ## Install
 
@@ -20,30 +20,57 @@ dots list
 dots --health
 ```
 
-`bin/dots` is the only installer and command-line entry point. On the first run, invoke it from the checkout as shown above; it then links itself to `~/.local/bin/dots`. There is no separate bootstrap script.
+`bin/dots` is the only installer and command-line entry point. On the first run, invoke it from the checkout; it then links itself to `~/.local/bin/dots`. There is no separate bootstrap installer.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `dots install` | Apply configurations from `manifest/configs.tsv`; optionally install declared packages. |
-| `dots list` | List managed components and installation status. |
-| `dots --health` | Diagnose missing sources, changed or broken links, generated adapters, and missing dependencies. It does not repair anything. |
-| `dots backup` | Snapshot managed target paths and personal overrides. Prints a snapshot ID. |
-| `dots restore [ID]` | Restore a snapshot (latest by default). Current paths are moved to a safety backup first. |
-| `dots uninstall` | Remove only links recorded by dots, restore collision backups, and remove downloads recorded as installer-owned. |
-| `dots uninstall --purge` | Additionally remove only native packages recorded as newly installed by dots. It does not run autoremove. |
+| `dots list` | List managed components and installation state. |
+| `dots --health` | Diagnose missing sources, changed or broken links, generated adapters, and dependencies. |
+| `dots backup` | Snapshot managed target paths and personal overrides. |
+| `dots restore [ID]` | Restore a snapshot (latest by default), moving current paths to a safety backup first. |
+| `dots uninstall` | Remove links recorded by dots, restore collision backups, and remove installer-owned downloads. |
+| `dots uninstall --purge` | Also remove only native packages recorded as newly installed by dots. |
 | `dots prune` | Remove broken managed links, abandoned clone staging directories, and stale state records. |
 
 Git remains responsible for repository updates and history: use `git pull`, `git status`, `git diff`, and `git log`. There is deliberately no `dots update` or `dots diff` wrapper.
 
-## Configuration manifest
+## Desktop profile: Niri
 
-`manifest/configs.tsv` is the single inventory of managed configurations. Each row declares a component, source type (`file` or `tree`), repository source, destination namespace/path, and supported platform. `manifest/packages.tsv` is the corresponding package inventory.
+The Linux desktop profile uses [Niri](https://github.com/niri-wm/niri), [Waybar](https://github.com/Alexays/Waybar), [Mako](https://github.com/emersion/mako), and [Rofi](https://github.com/davatorium/rofi). It takes workflow inspiration from [Niri Land by Kian Blakley](https://github.com/kianblakley/niri-land), but this repository contains an independent implementation; no upstream source files, wallpapers, or screenshot assets are copied.
 
-The installer, listing, health checks, and CI all read the same manifest. There are no separate hardcoded UI or terminal component lists.
+The profile includes gapless, borderless windows; a Waybar hidden until the Niri overview opens; an application drawer; a power menu; a wallpaper selector using `~/Pictures/Wallpapers`; and volume notifications through Mako.
 
-Application trees are linked file-by-file, not as one directory symlink. Existing conflicting files are moved to `~/.local/share/dots/backups/collisions/` before links are created. This preserves unrelated files in an existing application config directory and makes per-file overrides possible.
+| Action | Shortcut |
+|---|---|
+| Terminal | `Mod+Enter` |
+| Application drawer | `Mod+D` |
+| Wallpaper selector | `Mod+B` |
+| Power menu | `Mod+P` |
+| Toggle overview | `Mod+O` |
+| Close window | `Mod+Q` |
+| Screenshot | `Mod+Shift+S` |
+
+The profile is Linux-only. Install dependencies using the distribution package manager, then run `dots install`. The helper scripts expect `rofi`, `swww`, `wpctl`, `notify-send`, `jq`, and `systemctl` to be available. No wallpaper collection is bundled.
+
+### NixOS
+
+Import both modules from your NixOS host configuration:
+
+```nix
+{
+  imports = [
+    /home/your-user/dotfiles/nix/packages.nix
+    /home/your-user/dotfiles/nix/niri.nix
+  ];
+}
+```
+
+Then run `sudo nixos-rebuild switch`. The Niri module enables `programs.niri` and installs desktop dependencies. It intentionally does not select or configure SDDM, GDM, greetd, or another display manager; keep that decision in the host configuration. Niri session and portal integration are supplied by the NixOS Niri module.
+
+`dots` never edits `/etc/nixos` or invokes a system rebuild. Other Linux distributions can use the same config links and install dependencies separately.
 
 ## Personal overrides
 
@@ -56,57 +83,41 @@ Personal overrides live outside the repository and take precedence over the matc
 │   │   └── aliases.zsh
 │   ├── kitty/
 │   │   └── kitty.conf
-│   ├── tmux.conf
-│   ├── tmux.conf.local
-│   └── starship          # complete replacement for the single-file Starship component
+│   ├── niri/
+│   │   └── config.kdl
+│   └── tmux.conf
 └── theme.local.env
 ```
 
-For directory components, mirror the repository-relative path under `overrides/<component>/`. For single-file components, use the component name as the override filename (for example `overrides/starship`). An override replaces that one file; dots does not attempt to merge arbitrary application-specific formats.
+For directory components, mirror the repository-relative path under `overrides/<component>/`. For single-file components, use the component name as the override filename. An override replaces that file; dots does not merge arbitrary application-specific formats.
 
-Existing untracked files such as `~/.config/zsh/zprofile.local` remain in place. Never put secrets or machine-specific credentials in the repository.
+Existing untracked files remain untouched. Never put secrets or machine-specific credentials in the repository.
 
-## Backups, restore, and uninstall
+## Backups and uninstall
 
-`dots backup` snapshots each manifest destination and the complete `~/.config/dots` directory, including overrides. Files and symlinks are preserved as such. The snapshot lives under `~/.local/share/dots/backups/snapshots/`.
+`dots backup` snapshots each manifest destination and the complete `~/.config/dots` directory, including overrides. Snapshots live under `~/.local/share/dots/backups/snapshots/`.
 
-`dots restore` first moves current destinations into a restore-safety directory, then restores the snapshot. Restoring an older snapshot can intentionally remove files created after that snapshot.
+`dots restore` first moves current destinations into a safety directory, then restores the snapshot. Restoring an older snapshot can intentionally remove files created after it.
 
-Every future standalone download is recorded in the installation receipt. Currently this includes the upstream Starship fallback binary and the pinned Catppuccin tmux plugin. Temporary installer scripts are removed immediately. Native packages are recorded only when they were not installed before the dots operation; `--purge` removes those explicitly recorded packages, without asking the package manager to autoremove shared dependencies.
-
-Earlier installer versions did not keep complete ownership receipts. A pre-existing standalone binary in `~/.local/bin` therefore cannot always be attributed safely to the old installer; dots will not delete untracked files merely because their names look familiar.
+Native packages are recorded only when they were not installed before the dots operation. `--purge` removes only those explicitly recorded packages; it does not ask the package manager to autoremove shared dependencies.
 
 ## Centralized theming
 
-`themes/palettes/catppuccin-mocha.env` is the canonical data-only palette (`NAME=#RRGGBB`). Terminal adapters consume it: Zsh/FZF read it directly, while dots generates Kitty and tmux native configuration files. `~/.config/dots/theme.local.env` can override individual palette tokens. Generated adapters should not be edited directly; use the palette override or an application-specific personal override.
+`themes/palettes/catppuccin-mocha.env` is the canonical data-only terminal palette (`NAME=#RRGGBB`). Zsh/FZF read it directly, while dots generates Kitty and tmux adapters. `~/.config/dots/theme.local.env` can override individual palette tokens.
 
-The palette format is intentionally easy for a separate UI repository to consume. This terminal manager does not install, test, import, or otherwise depend on that repository.
+The Niri profile uses a coordinated Catppuccin Mocha palette and the normal per-file override mechanism.
 
-## Scope and directory layout
+## Repository layout
 
-- `config/terminal/` contains active shell, terminal, multiplexer, and CLI/TUI configurations.
-- `bin/` contains optional helper commands, including `kp` (kept intentionally).
+- `config/terminal/` contains shell, terminal, multiplexer, and CLI/TUI configurations.
+- `config/ui/` contains active Linux desktop configurations for Niri, Waybar, Mako, and Rofi.
+- `bin/` contains the installer and helper commands, including `kp` and the `niri-*` utilities.
 - `manifest/` contains component and package inventories.
-- `themes/` contains the canonical palette and terminal adapters.
-- `legacy/ui/` preserves the former desktop configurations while they await migration to a separate repository. Nothing under `legacy/ui/` is installed or tested by dots.
-- `nix/packages.nix` is the NixOS package module. It reads the `nixpkgs` rows from `manifest/packages.tsv`, enables Zsh, and exposes the same recommended toolset declaratively.
+- `themes/` contains the canonical terminal palette and adapters.
+- `nix/packages.nix` provides the declarative terminal package module.
+- `nix/niri.nix` provides the NixOS Niri desktop module.
 
-Supported package managers are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the declarative module: run `./bin/dots install --packages`, add the printed module path to the `imports` list in your NixOS configuration, then run `sudo nixos-rebuild switch`. For example:
-
-```nix
-{ pkgs, ... }:
-
-{
-  imports = [
-    /home/your-user/dotfiles/nix/packages.nix
-  ];
-
-  # Optional: make Zsh the login shell as well.
-  users.users.your-user.shell = pkgs.zsh;
-}
-```
-
-The module derives its package list from `manifest/packages.tsv`; there is no second manually maintained package list. `dots` never edits `/etc/nixos` or invokes a system rebuild. Other unsupported systems can still use configuration linking with `--no-packages`.
+Native package managers supported for the terminal profile are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the optional declarative modules.
 
 ## Safety
 
@@ -114,5 +125,5 @@ The module derives its package list from `manifest/packages.tsv`; there is no se
 - Package-manager operations alone use privilege escalation.
 - `uninstall` preserves native packages by default; `--purge` is explicit.
 - Existing files are backed up before replacement.
-- `--health` is read-only; `--dry-run` previews installation, prune, restore, and uninstall operations.
+- `--health` is read-only; `--dry-run` previews operations.
 - Review scripts before running them. This is a personal configuration manager, not a security boundary.
