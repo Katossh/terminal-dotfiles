@@ -1,4 +1,4 @@
-name: Validate terminal manager
+name: Validate common dotfiles manager
 
 on:
   push:
@@ -32,45 +32,41 @@ jobs:
         run: |
           bash -n bin/dots
           bash -n tests/test-dots.sh
-          for script in bin/niri-*; do bash -n "$script"; done
           zsh -n dots/zshenv
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
 
       - name: ShellCheck
-        run: shellcheck --severity=warning bin/dots tests/test-dots.sh bin/niri-*
+        run: shellcheck --severity=warning bin/dots tests/test-dots.sh
 
-      - name: Validate manifest sources
+      - name: Validate common profile
         shell: bash
         run: |
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
           test -s nix/packages.nix
-          test -s nix/niri.nix
-          test -s config/ui/rofi/themes/appdrawer.rasi
-          test -s config/ui/rofi/themes/bgselector.rasi
-          test -s config/ui/rofi/themes/powermenu.rasi
-          grep -Fq 'imagemagick' nix/niri.nix
-          grep -Fq 'papirus-icon-theme' nix/niri.nix
-          grep -Fq '/etc/niri/wallpapers' bin/niri-wallpaper
-          grep -Fq 'themes/appdrawer.rasi' bin/niri-appdrawer
+          test ! -e nix/niri.nix
+          test ! -d nix/hosts/starforge
+          test ! -d config/ui
           test ! -e install.sh
           grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
           awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
           test -d config/terminal
-          test -d config/ui
-          test ! -e legacy/ui
+          test ! -d legacy/ui
           for component in niri waybar mako rofi; do
-            awk -F '\t' -v component="$component" '$1 == component && $2 == "tree" && $3 == ("config/ui/" component) && $4 == ("config:" component) && $5 == "linux" { found=1 } END { exit !found }' manifest/configs.tsv
+            if awk -F '\t' -v component="$component" '$1 == component { found=1 } END { exit !found }' manifest/configs.tsv; then
+              echo "Desktop component unexpectedly included in common manifest: $component"
+              exit 1
+            fi
           done
           while IFS=$'\t' read -r component kind source target platforms; do
             [[ -z "$component" || "$component" == \#* ]] && continue
             [[ "$kind" == file || "$kind" == tree ]]
             [[ -e "$source" || -L "$source" ]]
           done < manifest/configs.tsv
-          if grep -n -E -- '--desktop|config/ui' bin/dots; then
-            echo 'UI references found in active manager.'
+          if grep -n -E -- '--desktop|config/ui|niri|waybar|mako|rofi' bin/dots; then
+            echo 'Desktop-specific references found in the common installer.'
             exit 1
           fi
 

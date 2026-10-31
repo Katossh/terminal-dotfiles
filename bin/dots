@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# dots: manifest-driven terminal and Niri desktop configuration manager.
+# dots: manifest-driven cross-distro terminal configuration manager.
 # Run as the normal user. Privilege escalation is limited to package operations.
 
 SOURCE_FILE="${BASH_SOURCE[0]}"
@@ -62,7 +62,7 @@ Usage:
   dots --help
 
 Commands:
-  install       Link terminal configurations, install tracked resources and (optionally) packages.
+  install       Link common configurations and install (optionally) declared packages.
   list          List manifest components and their installation state.
   --health      Inspect manifest sources, managed links, generated files and dependencies.
   backup        Snapshot all managed target paths and personal overrides.
@@ -83,7 +83,7 @@ Options:
 Git operations deliberately remain Git operations:
   git pull, git status, git diff, git log, and so on.
 
-Desktop configuration is managed from the same manifest as terminal configuration. Niri is the first-class Wayland session profile.
+Desktop environments and machine-specific system configuration are intentionally outside this common installer.
 USAGE
 }
 
@@ -418,9 +418,9 @@ install_packages() {
         info "Configuration links have been installed normally; NixOS package management stays declarative."
         info "Import these modules from your NixOS configuration:"
         info "  $REPO_DIR/nix/packages.nix"
-        info "  $REPO_DIR/nix/niri.nix"
-        info "Then apply them with: sudo nixos-rebuild switch"
-        info "The packages module reads manifest/packages.tsv; the Niri module enables the compositor and desktop dependencies."
+
+        info "Then apply your configuration with: sudo nixos-rebuild switch"
+        info "The module reads manifest/packages.tsv and enables the common Zsh and CLI package set."
         info "dots never edits /etc/nixos or runs nixos-rebuild automatically."
         return 0
     fi

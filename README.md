@@ -1,6 +1,6 @@
 # Dotfiles
 
-A manifest-driven configuration manager for a terminal-focused development environment and a Niri Wayland desktop. Terminal and desktop profiles share one installer, one component manifest, backups, personal overrides, health checks, and lifecycle commands.
+A manifest-driven, cross-distro configuration manager for a terminal-focused development environment. The common profile provides the same baseline tools and configuration across supported Linux distributions, BSD, macOS, and NixOS.
 
 ## Install
 
@@ -10,7 +10,7 @@ cd "$HOME/dotfiles"
 ./bin/dots install
 ```
 
-On an interactive terminal, `dots install` asks whether to install recommended CLI packages (default yes). In a non-interactive session, packages are skipped unless `--packages` is explicit.
+On an interactive terminal, `dots install` asks whether to install the recommended CLI packages (default yes). In a non-interactive session, packages are skipped unless `--packages` is explicit.
 
 ```sh
 ./bin/dots install --no-packages --yes
@@ -21,6 +21,12 @@ dots --health
 ```
 
 `bin/dots` is the only installer and command-line entry point. On the first run, invoke it from the checkout; it then links itself to `~/.local/bin/dots`. There is no separate bootstrap installer.
+
+## Scope
+
+The `master` branch is the common baseline: shell, terminal, multiplexer, CLI/TUI configuration, shared helper commands, and package installation. It deliberately does not configure a desktop environment, compositor, window manager, display manager, or machine-specific hardware.
+
+Desktop profiles and machine-specific system configurations belong in separate profiles. Applying the common baseline therefore does not impose a particular graphical session or alter an existing desktop setup.
 
 ## Commands
 
@@ -37,43 +43,6 @@ dots --health
 
 Git remains responsible for repository updates and history: use `git pull`, `git status`, `git diff`, and `git log`. There is deliberately no `dots update` or `dots diff` wrapper.
 
-## Desktop profile: Niri
-
-The Linux desktop profile uses [Niri](https://github.com/niri-wm/niri), [Waybar](https://github.com/Alexays/Waybar), [Mako](https://github.com/emersion/mako), and [Rofi](https://github.com/davatorium/rofi). It is independently implemented with a Catppuccin Mocha palette, using [Niri Land](https://github.com/kianblakley/niri-land) as a functional and visual reference.
-
-The profile includes gapless, borderless windows; Waybar hidden until the Niri overview opens; a full-screen dark application drawer with Papirus icons; a themed power menu; a thumbnail-based wallpaper picker; and volume notifications through Mako. On NixOS the picker includes a licensed starter pack under `/etc/niri/wallpapers`, and it also scans `~/Pictures/Wallpapers`, `~/Pictures/wallpapers`, and `$XDG_DATA_HOME/dots/wallpapers`.
-
-The upstream Niri Land repository has no license file, so this repository does not redistribute its wallpapers or configuration files. The UI here is a clean implementation of the same features. NixOS artwork wallpapers are used for the default set; licensing and attribution are documented in [`nix/README.md`](nix/README.md).
-
-| Action | Shortcut |
-|---|---|
-| Terminal | `Mod+Enter` |
-| Application drawer | `Mod+D` |
-| Wallpaper selector | `Mod+B` |
-| Power menu | `Mod+P` |
-| Toggle overview | `Mod+O` |
-| Close window | `Mod+Q` |
-| Screenshot | `Mod+Shift+S` |
-
-The profile is Linux-only. Install dependencies using the distribution package manager, then run `dots install`. The helper scripts expect `rofi`, `swww`, `wpctl`, `notify-send`, `jq`, `magick` (ImageMagick), and `systemctl`. On NixOS, `nix/niri.nix` installs these dependencies, JetBrains Mono Nerd Font, Papirus icons, and the starter wallpapers.
-
-### NixOS
-
-The repository includes a machine-specific NixOS configuration for the `starforge` host:
-
-- `nix/hosts/starforge/configuration.nix` contains host settings and imports shared modules with relative paths.
-- `nix/hosts/starforge/hardware-configuration.nix` contains generated hardware, filesystem, and disk identifier settings. It must not be reused on another machine.
-
-Keep the repository private while it contains host-specific disk identifiers. The host retains SDDM and KDE Plasma, with Niri installed as an additional session. The shared `nix/niri.nix` module enables Niri and its dependencies; it does not select a display manager.
-
-See [`nix/README.md`](nix/README.md) for the safe `/etc/nixos/configuration.nix` wrapper and rebuild instructions. After rebuilding the system, apply user-level desktop configuration as your normal user:
-
-```sh
-./bin/dots install --no-packages --yes
-```
-
-The `Mod+Return` and `Mod+T` bindings use `bin/niri-terminal`, which tries Kitty first and falls back to Alacritty or Foot. NixOS and its system profile are supported explicitly.
-
 ## Personal overrides
 
 Personal overrides live outside the repository and take precedence over the matching shared file:
@@ -85,8 +54,6 @@ Personal overrides live outside the repository and take precedence over the matc
 │   │   └── aliases.zsh
 │   ├── kitty/
 │   │   └── kitty.conf
-│   ├── niri/
-│   │   └── config.kdl
 │   └── tmux.conf
 └── theme.local.env
 ```
@@ -107,19 +74,15 @@ Native packages are recorded only when they were not installed before the dots o
 
 `themes/palettes/catppuccin-mocha.env` is the canonical data-only terminal palette (`NAME=#RRGGBB`). Zsh/FZF read it directly, while dots generates Kitty and tmux adapters. `~/.config/dots/theme.local.env` can override individual palette tokens.
 
-The Niri profile uses a coordinated Catppuccin Mocha palette and the normal per-file override mechanism.
-
 ## Repository layout
 
 - `config/terminal/` contains shell, terminal, multiplexer, and CLI/TUI configurations.
-- `config/ui/` contains active Linux desktop configurations for Niri, Waybar, Mako, and Rofi.
-- `bin/` contains the installer and helper commands, including `kp` and the `niri-*` utilities.
+- `bin/` contains the common installer and portable helper commands.
 - `manifest/` contains component and package inventories.
 - `themes/` contains the canonical terminal palette and adapters.
-- `nix/packages.nix` provides the declarative terminal package module.
-- `nix/niri.nix` provides the NixOS Niri desktop module.
+- `nix/packages.nix` provides the declarative NixOS package module.
 
-Native package managers supported for the terminal profile are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the optional declarative modules.
+Native package managers supported by the installer are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the optional declarative package module.
 
 ## Safety
 
