@@ -39,7 +39,7 @@ jobs:
           zsh -n themes/adapters/fzf.zsh
 
       - name: ShellCheck
-        run: shellcheck --severity=warning bin/dots tests/test-dots.sh
+        run: shellcheck --severity=warning bin/dots tests/test-dots.sh bin/niri-*
 
       - name: Validate manifest sources
         shell: bash
