@@ -48,4 +48,14 @@ test ! -e "$HOME/.local/bin/kp"
 test ! -e "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
 test ! -e "$HOME/.tmux/dots-theme.conf"
 
+# NixOS gets the same user configuration links and a declarative package handoff.
+printf '%s\n' 'ID=nixos' 'ID_LIKE=""' > "$TEST_ROOT/nixos-os-release"
+nixos_output="$(DOTS_OS_RELEASE="$TEST_ROOT/nixos-os-release" "$REPO_DIR/bin/dots" install --packages --yes)"
+grep -Fq 'NixOS package integration' <<< "$nixos_output"
+grep -Fq "$REPO_DIR/nix/packages.nix" <<< "$nixos_output"
+grep -Fq 'sudo nixos-rebuild switch' <<< "$nixos_output"
+grep -Fq 'dots never edits /etc/nixos' <<< "$nixos_output"
+awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
+grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
+
 echo 'dots lifecycle tests passed'

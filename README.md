@@ -94,6 +94,8 @@ The palette format is intentionally easy for a separate UI repository to consume
 Supported package managers are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the declarative module: run `./bin/dots install --packages`, add the printed module path to the `imports` list in your NixOS configuration, then run `sudo nixos-rebuild switch`. For example:
 
 ```nix
+{ pkgs, ... }:
+
 {
   imports = [
     /home/your-user/dotfiles/nix/packages.nix
