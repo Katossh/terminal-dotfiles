@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-command -v rofi >/dev/null 2>&1 || {
-    printf 'niri-powermenu: rofi is required.\n' >&2
-    exit 127
-}
+for dependency in rofi systemctl niri; do
+    command -v "$dependency" >/dev/null 2>&1 || {
+        printf 'niri-powermenu: %s is required.\n' "$dependency" >&2
+        exit 127
+    }
+done
+
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/rofi"
+theme="$config_dir/themes/powermenu.rasi"
 
 choice="$(
-    printf '%s\n' 'Suspend' 'Restart' 'Power off' 'Log out' |
-        rofi -dmenu -i -p 'Session' -config "${XDG_CONFIG_HOME:-$HOME/.config}/rofi/config.rasi"
+    printf '%s\n' \
+        '󰐥  Power off' \
+        '󰜉  Restart' \
+        '󰒲  Suspend' \
+        '󰍃  Log out' |
+        rofi -dmenu -i -no-custom -p 'Session' \
+            -config "$config_dir/config.rasi" \
+            -theme "$theme"
 )"
 
 case "$choice" in
-    Suspend) systemctl suspend ;;
-    Restart) systemctl reboot ;;
-    'Power off') systemctl poweroff ;;
-    'Log out') niri msg action quit ;;
+    '󰐥  Power off') systemctl poweroff ;;
+    '󰜉  Restart') systemctl reboot ;;
+    '󰒲  Suspend') systemctl suspend ;;
+    '󰍃  Log out') niri msg action quit ;;
     *) exit 0 ;;
 esac

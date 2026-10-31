@@ -48,6 +48,13 @@ jobs:
           test -s manifest/packages.tsv
           test -s nix/packages.nix
           test -s nix/niri.nix
+          test -s config/ui/rofi/themes/appdrawer.rasi
+          test -s config/ui/rofi/themes/bgselector.rasi
+          test -s config/ui/rofi/themes/powermenu.rasi
+          grep -Fq 'imagemagick' nix/niri.nix
+          grep -Fq 'papirus-icon-theme' nix/niri.nix
+          grep -Fq '/etc/niri/wallpapers' bin/niri-wallpaper
+          grep -Fq 'themes/appdrawer.rasi' bin/niri-appdrawer
           test ! -e install.sh
           grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
           awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv

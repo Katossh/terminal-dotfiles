@@ -39,9 +39,11 @@ Git remains responsible for repository updates and history: use `git pull`, `git
 
 ## Desktop profile: Niri
 
-The Linux desktop profile uses [Niri](https://github.com/niri-wm/niri), [Waybar](https://github.com/Alexays/Waybar), [Mako](https://github.com/emersion/mako), and [Rofi](https://github.com/davatorium/rofi). It takes workflow inspiration from [Niri Land by Kian Blakley](https://github.com/kianblakley/niri-land), but this repository contains an independent implementation; no upstream source files, wallpapers, or screenshot assets are copied.
+The Linux desktop profile uses [Niri](https://github.com/niri-wm/niri), [Waybar](https://github.com/Alexays/Waybar), [Mako](https://github.com/emersion/mako), and [Rofi](https://github.com/davatorium/rofi). It is independently implemented with a Catppuccin Mocha palette, using [Niri Land](https://github.com/kianblakley/niri-land) as a functional and visual reference.
 
-The profile includes gapless, borderless windows; a Waybar hidden until the Niri overview opens; an application drawer; a power menu; a wallpaper selector using `~/Pictures/Wallpapers`; and volume notifications through Mako.
+The profile includes gapless, borderless windows; Waybar hidden until the Niri overview opens; a full-screen dark application drawer with Papirus icons; a themed power menu; a thumbnail-based wallpaper picker; and volume notifications through Mako. On NixOS the picker includes a licensed starter pack under `/etc/niri/wallpapers`, and it also scans `~/Pictures/Wallpapers`, `~/Pictures/wallpapers`, and `$XDG_DATA_HOME/dots/wallpapers`.
+
+The upstream Niri Land repository has no license file, so this repository does not redistribute its wallpapers or configuration files. The UI here is a clean implementation of the same features. NixOS artwork wallpapers are used for the default set; licensing and attribution are documented in [`nix/README.md`](nix/README.md).
 
 | Action | Shortcut |
 |---|---|
@@ -53,7 +55,7 @@ The profile includes gapless, borderless windows; a Waybar hidden until the Niri
 | Close window | `Mod+Q` |
 | Screenshot | `Mod+Shift+S` |
 
-The profile is Linux-only. Install dependencies using the distribution package manager, then run `dots install`. The helper scripts expect `rofi`, `swww`, `wpctl`, `notify-send`, `jq`, and `systemctl` to be available. No wallpaper collection is bundled.
+The profile is Linux-only. Install dependencies using the distribution package manager, then run `dots install`. The helper scripts expect `rofi`, `swww`, `wpctl`, `notify-send`, `jq`, `magick` (ImageMagick), and `systemctl`. On NixOS, `nix/niri.nix` installs these dependencies, JetBrains Mono Nerd Font, Papirus icons, and the starter wallpapers.
 
 ### NixOS
 
