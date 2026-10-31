@@ -21,6 +21,6 @@ starship file    config/terminal/starship.toml config:starship.toml all
 
 A `tree` entry does not symlink the whole application directory. The manager traverses its files and symlinks, maps each relative path into the destination, and checks for a matching file under `~/.config/dots/overrides/<component>/` first. This is what permits one file to be customized without copying the rest of an application configuration.
 
-`packages.tsv` is a separate package inventory with three fields: package-manager identifier, package name, and `required` or `optional`. Required packages are installed when package installation is selected. Optional packages are installed only when available in the currently configured repositories.
+`packages.tsv` is the package inventory with three fields: package-manager identifier, package name, and `required` or `optional`. Native package managers use their own package names; `nixpkgs` rows use Nixpkgs attribute names and are consumed by `nix/packages.nix`. Required packages are requested directly. Optional packages are installed only when available from a native package manager; the NixOS module includes the declared Nixpkgs entries.
 
 When adding a component, update this manifest rather than adding another hardcoded component list. The same data is consumed by install, list, health, backup/restore target discovery, and CI source validation.

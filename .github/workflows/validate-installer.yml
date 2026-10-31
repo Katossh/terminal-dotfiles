@@ -44,6 +44,34 @@ jobs:
         run: |
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
+          test -s nix/packages.nix
+          test ! -e install.sh
+          grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
+          grep -Fq 
+          test -d legacy/ui
+          test ! -e config/ui
+          while IFS=$'\t' read -r component kind source target platforms; do
+            [[ -z "$component" || "$component" == \#* ]] && continue
+            [[ "$kind" == file || "$kind" == tree ]]
+            [[ -e "$source" || -L "$source" ]]
+          done < manifest/configs.tsv
+          if grep -n -E -- '--desktop|config/ui' bin/dots install.sh; then
+            echo 'UI references found in active manager.'
+            exit 1
+          fi
+
+      - name: Help and non-destructive dry run
+        run: |
+          ./install.sh --help
+          test_home="$(mktemp -d)"
+          trap 'rm -rf "$test_home"' EXIT
+          HOME="$test_home" XDG_CONFIG_HOME="$test_home/.config" XDG_DATA_HOME="$test_home/.local/share" DOTS_SKIP_DOWNLOADS=1 ./bin/dots install --dry-run --no-packages --yes
+          test ! -e "$test_home/.zshenv"
+          test ! -e "$test_home/.config"
+
+      - name: End-to-end lifecycle tests
+        run: bash tests/test-dots.sh
+nixpkgs\\tzsh\\trequired' manifest/packages.tsv
           test -d config/terminal
           test -d legacy/ui
           test ! -e config/ui

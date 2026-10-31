@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 REPO_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+test ! -e "$REPO_DIR/install.sh"
 TEST_ROOT="$(mktemp -d)"
 export HOME="$TEST_ROOT/home"
 export XDG_CONFIG_HOME="$HOME/.config"

@@ -7,20 +7,20 @@ A manifest-driven terminal configuration manager for Zsh, terminal tools, and CL
 ```sh
 git clone https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
 cd "$HOME/dotfiles"
-./install.sh
+./bin/dots install
 ```
 
 On an interactive terminal, `dots install` asks whether to install recommended CLI packages (default yes). In a non-interactive session, packages are skipped unless `--packages` is explicit.
 
 ```sh
-./install.sh --no-packages --yes
+./bin/dots install --no-packages --yes
 dots install --packages
 dots install --dry-run --no-packages
 dots list
 dots --health
 ```
 
-`install.sh` is only a bootstrap wrapper. The actual command is `bin/dots`, which is linked to `~/.local/bin/dots` during installation.
+`bin/dots` is the only installer and command-line entry point. On the first run, invoke it from the checkout as shown above; it then links itself to `~/.local/bin/dots`. There is no separate bootstrap script.
 
 ## Commands
 
@@ -89,9 +89,22 @@ The palette format is intentionally easy for a separate UI repository to consume
 - `manifest/` contains component and package inventories.
 - `themes/` contains the canonical palette and terminal adapters.
 - `legacy/ui/` preserves the former desktop configurations while they await migration to a separate repository. Nothing under `legacy/ui/` is installed or tested by dots.
-- `nix/packages.nix` remains an optional declarative package module for NixOS; the installer does not edit system configuration or run `nixos-rebuild`.
+- `nix/packages.nix` is the NixOS package module. It reads the `nixpkgs` rows from `manifest/packages.tsv`, enables Zsh, and exposes the same recommended toolset declaratively.
 
-Supported package managers are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. Unsupported systems can still use configuration linking with `--no-packages`.
+Supported package managers are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the declarative module: run `./bin/dots install --packages`, add the printed module path to the `imports` list in your NixOS configuration, then run `sudo nixos-rebuild switch`. For example:
+
+```nix
+{
+  imports = [
+    /home/your-user/dotfiles/nix/packages.nix
+  ];
+
+  # Optional: make Zsh the login shell as well.
+  users.users.your-user.shell = pkgs.zsh;
+}
+```
+
+The module derives its package list from `manifest/packages.tsv`; there is no second manually maintained package list. `dots` never edits `/etc/nixos` or invokes a system rebuild. Other unsupported systems can still use configuration linking with `--no-packages`.
 
 ## Safety
 
