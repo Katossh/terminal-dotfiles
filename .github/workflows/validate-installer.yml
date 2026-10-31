@@ -53,7 +53,7 @@ jobs:
           test -d legacy/ui
           test ! -e config/ui
           while IFS=$'\t' read -r component kind source target platforms; do
-            [[ -z "$component" || "$component" == \\#* ]] && continue
+            [[ -z "$component" || "$component" == \#* ]] && continue
             [[ "$kind" == file || "$kind" == tree ]]
             [[ -e "$source" || -L "$source" ]]
           done < manifest/configs.tsv

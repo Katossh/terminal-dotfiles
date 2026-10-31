@@ -325,7 +325,7 @@ detect_package_manager() {
     if [[ "$PLATFORM" == FreeBSD ]]; then printf pkg; return; fi
     local os_release="${DOTS_OS_RELEASE:-/etc/os-release}"
     if [[ "$PLATFORM" == Linux && -r "$os_release" ]]; then
-        # shellcheck disable=SC1091
+        # shellcheck disable=SC1090,SC1091
         . "$os_release"
         DISTRO_ID="${ID:-unknown}"
         DISTRO_LIKE="${ID_LIKE:-}"
