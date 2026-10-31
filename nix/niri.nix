@@ -11,6 +11,7 @@
   environment.systemPackages = with pkgs; [
     brightnessctl
     jq
+    alacritty
     kitty
     libnotify
     mako

@@ -1,0 +1,62 @@
+#!/bin/sh
+# Launch a terminal reliably in Niri, including NixOS sessions with a minimal PATH.
+set -eu
+
+resolve_binary() {
+    binary=$1
+
+    case "$binary" in
+        /*)
+            if [ -x "$binary" ]; then
+                printf '%s\n' "$binary"
+                return 0
+            fi
+            return 1
+            ;;
+        */*) return 1 ;;
+    esac
+
+    if command -v "$binary" >/dev/null 2>&1; then
+        resolved=$(command -v "$binary")
+        case "$resolved" in
+            /*) printf '%s\n' "$resolved" ;;
+            *) printf '%s\n' "$binary" ;;
+        esac
+        return 0
+    fi
+
+    user_name=${USER:-$(id -un)}
+    for directory in \
+        /run/current-system/sw/bin \
+        "/etc/profiles/per-user/$user_name/bin" \
+        "$HOME/.nix-profile/bin" \
+        /usr/local/bin \
+        /usr/bin \
+        /bin \
+        /opt/homebrew/bin; do
+        candidate="$directory/$binary"
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# Kitty is the profile default. Alacritty and Foot are intentional fallbacks.
+for terminal in kitty alacritty foot; do
+    terminal_path=$(resolve_binary "$terminal" 2>/dev/null || true)
+    if [ -n "$terminal_path" ]; then
+        exec "$terminal_path"
+    fi
+done
+
+notify_path=$(resolve_binary notify-send 2>/dev/null || true)
+if [ -n "$notify_path" ]; then
+    "$notify_path" -a niri "No terminal emulator found" \
+        "Install kitty, alacritty, or foot, then reload Niri."
+fi
+
+printf '%s\n' "niri-terminal: no supported terminal found (tried kitty, alacritty, foot)." >&2
+exit 127

@@ -57,20 +57,20 @@ The profile is Linux-only. Install dependencies using the distribution package m
 
 ### NixOS
 
-Import both modules from your NixOS host configuration:
+The repository includes a machine-specific NixOS configuration for the `starforge` host:
 
-```nix
-{
-  imports = [
-    /home/your-user/dotfiles/nix/packages.nix
-    /home/your-user/dotfiles/nix/niri.nix
-  ];
-}
+- `nix/hosts/starforge/configuration.nix` contains host settings and imports shared modules with relative paths.
+- `nix/hosts/starforge/hardware-configuration.nix` contains generated hardware, filesystem, and disk identifier settings. It must not be reused on another machine.
+
+Keep the repository private while it contains host-specific disk identifiers. The host retains SDDM and KDE Plasma, with Niri installed as an additional session. The shared `nix/niri.nix` module enables Niri and its dependencies; it does not select a display manager.
+
+See [`nix/README.md`](nix/README.md) for the safe `/etc/nixos/configuration.nix` wrapper and rebuild instructions. After rebuilding the system, apply user-level desktop configuration as your normal user:
+
+```sh
+./bin/dots install --no-packages --yes
 ```
 
-Then run `sudo nixos-rebuild switch`. The Niri module enables `programs.niri` and installs desktop dependencies. It intentionally does not select or configure SDDM, GDM, greetd, or another display manager; keep that decision in the host configuration. Niri session and portal integration are supplied by the NixOS Niri module.
-
-`dots` never edits `/etc/nixos` or invokes a system rebuild. Other Linux distributions can use the same config links and install dependencies separately.
+The `Mod+Return` and `Mod+T` bindings use `bin/niri-terminal`, which tries Kitty first and falls back to Alacritty or Foot. NixOS and its system profile are supported explicitly.
 
 ## Personal overrides
 

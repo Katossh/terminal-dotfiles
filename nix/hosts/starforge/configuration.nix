@@ -5,14 +5,13 @@
 { config, lib, pkgs, ... }:
 
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-      /home/katossh/dotfiles/nix/packages.nix
-      /home/katossh/dotfiles/nix/niri.nix
-    ];
+  imports = [
+    ./hardware-configuration.nix
+    ../../packages.nix
+    ../../niri.nix
+  ];
 
-  # Use the systemd-boot EFI boot loader
+  # Use GRUB as an EFI boot loader
   boot.loader.grub = {
     enable = true;
     device = "nodev";
@@ -26,10 +25,8 @@
   efiSysMountPoint = "/boot";
   };
 
-  boot.initrd.luks.devices."cryptroot" = {
-    device = "/dev/disk/by-uuid/fb18dd0b-4f76-449f-9d00-67cc9d49b4ee";
-    preLVM = true;
-  };
+  # The LUKS device UUID is defined by hardware-configuration.nix.
+  boot.initrd.luks.devices."cryptroot".preLVM = true;
   boot.supportedFilesystems = [ "btrfs" ];
 
   # Use latest kernel.
@@ -99,26 +96,17 @@
   };
 
   programs.firefox.enable = true;
-  programs.niri.enable = true;
-  xdg.portal = {
-    enable = true;
-    extraPortals = with pkgs; [
-    xdg-desktop-portal-gnome
-    xdg-desktop-portal-gtk
-    ];
-  };
 
+  # Niri, its portal defaults, Polkit, Waybar, Mako, and XWayland support
+  # are configured by the shared nix/niri.nix module.
   environment.systemPackages = with pkgs; [
-  xwayland-satellite
-  alacritty
-  fuzzel
-  waybar
-  swaylock
-  swayidle
-  mako
+    alacritty
+    fuzzel
+    swaylock
+    swayidle
   ];
+
   programs.amnezia-vpn.enable = true;
-  security.polkit.enable = true;
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   # services.displayManager.gdm.enable = true;
   # List packages installed in system profile.
