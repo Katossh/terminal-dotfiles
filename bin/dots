@@ -88,6 +88,7 @@ Options:
 Environment:
   DOTS_SKIP_DOWNLOADS=1       Skip upstream Git downloads (offline/config-only mode).
   DOTS_GIT_CLONE_RETRIES=3     Attempts per required Zsh repository clone.
+  DOTS_GIT_CLONE_RETRY_DELAY=2 Delay between failed clone attempts.
 
 Git operations deliberately remain Git operations:
   git pull, git status, git diff, git log, and so on.
@@ -545,12 +546,29 @@ install_git_checkout() {
                 info "$label already present and validated; leaving it unchanged."
                 return 0
             fi
-            warn "Existing $label checkout is incomplete (missing $required_path): $target"
+
+            # Repair only checkouts previously recorded as installer-managed.
+            # Preserve the incomplete checkout for manual inspection.
+            if [[ -f "$STATE_FILE" ]] && awk -F '\t' -v path="$target" '$1 == "download" && $2 == path { found=1 } END { exit !found }' "$STATE_FILE"; then
+                local quarantine="$STATE_DIR/backups/incomplete-downloads/$(date +%Y%m%d-%H%M%S)-$$/$(basename "$target")"
+                if [[ "$DRY_RUN" == 1 ]]; then
+                    info "Would move incomplete managed checkout aside and refetch: $target"
+                    return 0
+                fi
+                mkdir -p "$(dirname "$quarantine")"
+                mv -- "$target" "$quarantine"
+                remove_state download "$target"
+                warn "Moved incomplete managed $label checkout to: $quarantine"
+            else
+                warn "Existing $label checkout is incomplete (missing $required_path) and is not tracked as installer-managed: $target"
+                return 1
+            fi
+        else
+            warn "Existing Git checkout at $target has an unexpected origin; leaving it untouched."
             return 1
         fi
-        warn "Existing Git checkout at $target has an unexpected origin; leaving it untouched."
-        return 1
     fi
+
     [[ -e "$target" || -L "$target" ]] && {
         warn "Existing $target is not a recognised $label checkout; leaving it untouched."
         return 1
@@ -604,6 +622,10 @@ install_zsh_upstreams() {
     install_git_checkout "$DATA_DIR/oh-my-zsh" \
         "https://github.com/ohmyzsh/ohmyzsh.git" "oh-my-zsh-framework" "Oh My Zsh" \
         "oh-my-zsh.sh" || failed=1
+    if [[ -f "$DATA_DIR/oh-my-zsh/oh-my-zsh.sh" && ! -f "$DATA_DIR/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]]; then
+        error "Oh My Zsh checkout is missing its bundled zsh-autosuggestions plugin."
+        failed=1
+    fi
     install_git_checkout "$custom/fzf-tab" \
         "https://github.com/Aloxaf/fzf-tab.git" "oh-my-zsh-plugin-fzf-tab" "fzf-tab" \
         "fzf-tab.plugin.zsh" || failed=1
