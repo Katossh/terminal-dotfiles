@@ -154,3 +154,4 @@ nixpkgs	htop	optional
 nixpkgs	eza	optional
 nixpkgs	xdg-utils	optional
 nixpkgs	starship	optional
+nixpkgs-fonts	nerd-fonts.jetbrains-mono	required
