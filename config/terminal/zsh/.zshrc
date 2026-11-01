@@ -42,36 +42,43 @@ tab_title_precmd() {
 typeset -a precmd_functions
 precmd_functions+=(tab_title_precmd)
 
-# Load the vendored Oh My Zsh framework, keeping all generated data outside
-# the repository. Starship remains the prompt provider.
-export ZSH="$ZDOTDIR/.packages/ohmyzsh"
+# Oh My Zsh and custom plugins are installed by dots outside the repository.
+# This keeps third-party code out of the configuration tree.
+export ZSH="$XDG_DATA_HOME/oh-my-zsh"
+export ZSH_CUSTOM="$XDG_DATA_HOME/zsh/custom"
 export ZSH_CACHE_DIR="$XDG_CACHE_HOME/oh-my-zsh"
 export ZSH_COMPDUMP="$XDG_CACHE_HOME/zsh/.zcompdump"
+export DISABLE_AUTO_UPDATE=true
 mkdir -p "$ZSH_CACHE_DIR" "$XDG_CACHE_HOME/zsh"
 
-# Keep additional third-party completion definitions available to compinit.
+# Extra completion definitions must be on fpath before Oh My Zsh runs compinit.
 typeset -U fpath
-fpath=("$ZDOTDIR/.packages/zsh-completions/src" $fpath)
+if [[ -d "$ZSH_CUSTOM/plugins/zsh-completions/src" ]]; then
+    fpath=("$ZSH_CUSTOM/plugins/zsh-completions/src" $fpath)
+fi
 
 ZSH_THEME=""
 plugins=(git z)
-source "$ZSH/oh-my-zsh.sh"
+
+# fzf-tab must load before plugins that wrap ZLE widgets. Keep syntax
+# highlighting last so it can observe widgets installed by earlier plugins.
+[[ -r "$ZSH_CUSTOM/plugins/fzf-tab/fzf-tab.plugin.zsh" ]] && plugins+=(fzf-tab)
+[[ -r "$ZSH/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] && plugins+=(zsh-autosuggestions)
+[[ -r "$ZSH_CUSTOM/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" ]] && plugins+=(fast-syntax-highlighting)
+
+if [[ -r "$ZSH/oh-my-zsh.sh" ]]; then
+    source "$ZSH/oh-my-zsh.sh"
+else
+    # A config-only install remains usable when upstream downloads were skipped.
+    autoload -Uz compinit
+    compinit -d "$ZSH_COMPDUMP"
+    print -u2 -- "dots: Oh My Zsh is missing; run './bin/dots install' to install it."
+fi
 
 # Modular configuration
 source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/completion.zsh"
 source "$ZDOTDIR/handlers.zsh"
-
-# These features are not provided by Oh My Zsh, so they remain standalone plugins.
-# fzf-tab is loaded before autosuggestions; syntax highlighting is loaded last.
-# manydots-magic is intentionally not loaded: it wraps backward-delete-char
-# and has been interfering with normal Backspace behaviour.
-for plugin in \
-    "$ZDOTDIR/.packages/fzf-tab/fzf-tab.plugin.zsh" \
-    "$ZDOTDIR/.packages/zsh-autosuggestions/zsh-autosuggestions.zsh" \
-    "$ZDOTDIR/.packages/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"; do
-    [[ -f "$plugin" ]] && source "$plugin"
-done
 
 bindkey "^O" clear-screen
 

@@ -45,6 +45,13 @@ The module reads the same Nixpkgs entries from `manifest/packages.tsv`. It enabl
 
 On an unfamiliar distribution without one of the supported package managers or Nix, `dots install --no-packages` still installs the configuration links. Install the listed dependencies with that distribution's package manager.
 
+## Zsh framework
+
+The installer provisions Oh My Zsh and its external custom plugins outside the repository, under `$XDG_DATA_HOME`. The framework supplies the built-in `git`, `z`, and `zsh-autosuggestions` plugins. The installer separately clones `fzf-tab`, `fast-syntax-highlighting`, and `zsh-completions` into the Oh My Zsh custom-plugin area. Completion definitions are added to `fpath` before `compinit` runs.
+
+Set `DOTS_SKIP_DOWNLOADS=1` to skip these optional upstream clones for offline or config-only installs. The shell remains usable with native Zsh completion, but framework plugins are unavailable until a later `./bin/dots install`.
+
+
 ## Commands
 
 | Command | Purpose |

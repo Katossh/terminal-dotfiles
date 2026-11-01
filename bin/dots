@@ -518,6 +518,93 @@ install_starship_upstream() {
     fi
 }
 
+
+install_git_checkout() {
+    local target="$1" url="$2" state_kind="$3" label="$4"
+    local parent stage origin
+
+    if [[ -d "$target/.git" ]]; then
+        origin="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
+        if [[ "$origin" == "$url" ]]; then
+            info "$label already present; leaving it unchanged."
+        else
+            warn "Existing Git checkout at $target has an unexpected origin; leaving it untouched."
+        fi
+        return 0
+    fi
+    [[ -e "$target" || -L "$target" ]] && {
+        warn "Existing $target is not a recognised $label checkout; leaving it untouched."
+        return 1
+    }
+    [[ "$DRY_RUN" == 1 ]] && { info "Would clone $label"; return 0; }
+
+    parent="$(dirname "$target")"
+    mkdir -p "$parent"
+    stage="$(mktemp -d "$parent/.dots-clone.XXXXXX")"
+    if git clone --depth 1 --single-branch "$url" "$stage"; then
+        if [[ -e "$target" || -L "$target" ]]; then
+            rm -rf -- "$stage"
+            warn "$target appeared during installation; leaving it untouched."
+            return 1
+        fi
+        mv "$stage" "$target"
+        record_state download "$target" "$state_kind"
+        info "Installed $label."
+    else
+        rm -rf -- "$stage"
+        warn "Could not install $label."
+        return 1
+    fi
+}
+
+install_zsh_upstreams() {
+    command -v zsh >/dev/null 2>&1 || {
+        info "Zsh is absent; skipping Oh My Zsh and plugin installation."
+        return 0
+    }
+    command -v git >/dev/null 2>&1 || {
+        warn "Git is absent; cannot install Oh My Zsh or its custom plugins."
+        return 0
+    }
+
+    local custom="$DATA_DIR/zsh/custom/plugins"
+    install_git_checkout "$DATA_DIR/oh-my-zsh" \
+        "https://github.com/ohmyzsh/ohmyzsh.git" "oh-my-zsh-framework" "Oh My Zsh" || true
+    install_git_checkout "$custom/fzf-tab" \
+        "https://github.com/Aloxaf/fzf-tab.git" "oh-my-zsh-plugin-fzf-tab" "fzf-tab" || true
+    install_git_checkout "$custom/fast-syntax-highlighting" \
+        "https://github.com/zdharma-continuum/fast-syntax-highlighting.git" \
+        "oh-my-zsh-plugin-fast-syntax-highlighting" "fast-syntax-highlighting" || true
+    install_git_checkout "$custom/zsh-completions" \
+        "https://github.com/zsh-users/zsh-completions.git" "oh-my-zsh-plugin-zsh-completions" \
+        "zsh-completions" || true
+}
+
+remove_legacy_zsh_package_links() {
+    [[ -f "$STATE_FILE" ]] || return 0
+    local tmp="$STATE_FILE.legacy.$$" kind target source actual
+    : > "$tmp"
+    while IFS=$'\t' read -r kind target source; do
+        if [[ "$kind" == link &&
+              "$source" == "$REPO_DIR/config/terminal/zsh/.packages/"* &&
+              "$target" == "$CONFIG_DIR/zsh/.packages/"* &&
+              -L "$target" ]]; then
+            actual="$(readlink "$target" 2>/dev/null || true)"
+            if [[ "$actual" == "$source" && ! -e "$source" ]]; then
+                if [[ "$DRY_RUN" == 1 ]]; then
+                    info "Would remove obsolete vendored Zsh link: $target"
+                else
+                    rm -f -- "$target"
+                    prune_empty_dirs "$(dirname "$target")"
+                    continue
+                fi
+            fi
+        fi
+        printf '%s\t%s\t%s\n' "$kind" "$target" "$source" >> "$tmp"
+    done < "$STATE_FILE"
+    if [[ "$DRY_RUN" == 1 ]]; then rm -f "$tmp"; else mv "$tmp" "$STATE_FILE"; fi
+}
+
 install_tmux_theme() {
     command -v tmux >/dev/null 2>&1 || { info "tmux is absent; skipping Catppuccin plugin download."; return 0; }
     command -v git >/dev/null 2>&1 || { warn "Git is absent; built-in theme adapter will be used."; return 0; }
@@ -570,10 +657,9 @@ install_configs() {
             *) error "Unknown manifest entry type '$kind' for $component" ;;
         esac
     done < "$MANIFEST"
+    remove_legacy_zsh_package_links
     link_executable_helpers
     generate_theme_adapters
-    if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
-    else install_tmux_theme; fi
     compact_link_state
 }
 
@@ -603,6 +689,16 @@ command_install() {
     else
         info "Skipping native package installation."
     fi
+
+    # Provision frameworks after package installation so a fresh machine that
+    # installs Zsh in this run receives Oh My Zsh and its plugins immediately.
+    if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then
+        info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
+    else
+        install_zsh_upstreams
+        install_tmux_theme
+    fi
+
     if [[ "$DRY_RUN" != 1 ]]; then
         mkdir -p "$LOCAL_BIN"
         create_compat_command batcat bat
@@ -764,6 +860,24 @@ command_restore() {
     [[ "$DRY_RUN" == 1 ]] || info "Restore safety copies: $rollback"
 }
 
+remove_managed_git_checkout() {
+    local path="$1" expected="$2" url="$3" label="$4" origin
+    [[ "$path" == "$expected" ]] || {
+        warn "Refusing to remove unexpected $label path: $path"
+        return 1
+    }
+    [[ -e "$path" || -L "$path" ]] || return 0
+    origin="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
+    if [[ -d "$path/.git" && "$origin" == "$url" ]]; then
+        rm -rf -- "$path"
+        info "Removed installer-managed $label checkout."
+        prune_empty_dirs "$(dirname "$path")"
+    else
+        warn "$label origin does not match; leaving $path untouched."
+        return 1
+    fi
+}
+
 remove_download() {
     local path="$1" kind="$2" origin
     case "$kind" in
@@ -782,6 +896,22 @@ remove_download() {
                 warn "Plugin origin does not match; leaving $path untouched."
                 return 1
             fi
+            ;;
+        oh-my-zsh-framework)
+            remove_managed_git_checkout "$path" "$DATA_DIR/oh-my-zsh" \
+                "https://github.com/ohmyzsh/ohmyzsh.git" "Oh My Zsh"
+            ;;
+        oh-my-zsh-plugin-fzf-tab)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/fzf-tab" \
+                "https://github.com/Aloxaf/fzf-tab.git" "fzf-tab"
+            ;;
+        oh-my-zsh-plugin-fast-syntax-highlighting)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/fast-syntax-highlighting" \
+                "https://github.com/zdharma-continuum/fast-syntax-highlighting.git" "fast-syntax-highlighting"
+            ;;
+        oh-my-zsh-plugin-zsh-completions)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/zsh-completions" \
+                "https://github.com/zsh-users/zsh-completions.git" "zsh-completions"
             ;;
         *) warn "Unknown downloaded resource type '$kind'; leaving it untouched."; return 1 ;;
     esac
@@ -807,7 +937,7 @@ remove_package() {
 prune_empty_dirs() {
     local dir="$1"
     [[ "$DRY_RUN" == 1 ]] && return 0
-    while [[ "$dir" == "$CONFIG_DIR"/* || "$dir" == "$LOCAL_BIN"/* || "$dir" == "$HOME_DIR/.tmux"/* ]]; do
+    while [[ "$dir" == "$CONFIG_DIR"/* || "$dir" == "$LOCAL_BIN"/* || "$dir" == "$HOME_DIR/.tmux"/* || "$dir" == "$DATA_DIR/zsh"/* ]]; do
         rmdir "$dir" 2>/dev/null || break
         dir="$(dirname "$dir")"
     done
