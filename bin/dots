@@ -657,10 +657,9 @@ install_configs() {
             *) error "Unknown manifest entry type '$kind' for $component" ;;
         esac
     done < "$MANIFEST"
+    remove_legacy_zsh_package_links
     link_executable_helpers
     generate_theme_adapters
-    if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
-    else install_tmux_theme; fi
     compact_link_state
 }
 
@@ -690,6 +689,16 @@ command_install() {
     else
         info "Skipping native package installation."
     fi
+
+    # Provision frameworks after package installation so a fresh machine that
+    # installs Zsh in this run receives Oh My Zsh and its plugins immediately.
+    if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then
+        info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
+    else
+        install_zsh_upstreams
+        install_tmux_theme
+    fi
+
     if [[ "$DRY_RUN" != 1 ]]; then
         mkdir -p "$LOCAL_BIN"
         create_compat_command batcat bat
