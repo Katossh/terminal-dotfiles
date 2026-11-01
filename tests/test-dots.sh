@@ -90,12 +90,22 @@ GIT
 chmod +x "$TEST_ROOT/bin/git"
 export GIT_TEST_LOG="$TEST_ROOT/fake-git.log"
 
-# Build a minimal PATH that deliberately excludes zsh but keeps required tools.
-for command_name in bash dirname readlink uname mkdir touch grep awk mv find ln date cksum rmdir rm mktemp chmod cat wc; do
-    command_path="$(type -P "$command_name" || true)"
-    [[ -n "$command_path" ]] && ln -s "$command_path" "$TEST_ROOT/no-zsh-bin/$command_name"
+# Build an isolated PATH with every available executable except zsh. This
+# keeps the test portable across Ubuntu/macOS and avoids relying on a short list
+# of utilities that differs between runner images.
+IFS=: read -r -a original_path_parts <<< "$PATH"
+for path_dir in "${original_path_parts[@]}"; do
+    [[ -d "$path_dir" ]] || continue
+    for executable in "$path_dir"/*; do
+        [[ -f "$executable" && -x "$executable" ]] || continue
+        command_name="${executable##*/}"
+        [[ "$command_name" == zsh ]] && continue
+        [[ -e "$TEST_ROOT/no-zsh-bin/$command_name" || -L "$TEST_ROOT/no-zsh-bin/$command_name" ]] && continue
+        ln -s "$executable" "$TEST_ROOT/no-zsh-bin/$command_name"
+    done
 done
 ln -s "$TEST_ROOT/bin/git" "$TEST_ROOT/no-zsh-bin/git"
+
 if PATH="$TEST_ROOT/no-zsh-bin" command -v zsh >/dev/null 2>&1; then
     echo "test PATH unexpectedly contains zsh" >&2
     exit 1

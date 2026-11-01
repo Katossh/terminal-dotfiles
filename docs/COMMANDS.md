@@ -74,6 +74,7 @@ Prune removes broken managed links and stale state records. It does not search f
 | DOTS_SKIP_DOWNLOADS | 0 | Set to 1 to skip Git downloads |
 | DOTS_GIT_CLONE_RETRIES | 3 | Attempts per required Zsh Git checkout |
 | DOTS_GIT_CLONE_RETRY_DELAY | 2 seconds | Delay between failed clone attempts |
+| DOTS_GIT_CLONE_RETRY_DELAY | 2 seconds | Delay between failed clone attempts |
 | DOTS_PLATFORM | uname -s | Test override for platform detection |
 | DOTS_OS_RELEASE | /etc/os-release | Test override for Linux distro detection |
 
