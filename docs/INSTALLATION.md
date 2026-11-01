@@ -91,7 +91,7 @@ The package manifest contains entries for apt, dnf, pacman, zypper, apk, xbps, F
 
 dots install --packages installs declared packages into the current user's Nix profile. It does not modify /etc/nixos, generate a host configuration or execute nixos-rebuild.
 
-For declarative system-wide packages, import nix/packages.nix from the host's NixOS configuration, review the result, then run sudo nixos-rebuild build followed by sudo nixos-rebuild switch. Set the account's login shell in the NixOS configuration, for example:
+For declarative system-wide packages, import nix/packages.nix from the host's NixOS configuration, review the result, then run sudo nixos-rebuild build followed by sudo nixos-rebuild switch. JetBrainsMono Nerd Font is installed declaratively through fonts.packages by the repository's NixOS module. Set the account's login shell in the NixOS configuration, for example:
 
 ~~~nix
 users.users.<name>.shell = pkgs.zsh;
