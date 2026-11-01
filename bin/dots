@@ -860,6 +860,24 @@ command_restore() {
     [[ "$DRY_RUN" == 1 ]] || info "Restore safety copies: $rollback"
 }
 
+remove_managed_git_checkout() {
+    local path="$1" expected="$2" url="$3" label="$4" origin
+    [[ "$path" == "$expected" ]] || {
+        warn "Refusing to remove unexpected $label path: $path"
+        return 1
+    }
+    [[ -e "$path" || -L "$path" ]] || return 0
+    origin="$(git -C "$path" remote get-url origin 2>/dev/null || true)"
+    if [[ -d "$path/.git" && "$origin" == "$url" ]]; then
+        rm -rf -- "$path"
+        info "Removed installer-managed $label checkout."
+        prune_empty_dirs "$(dirname "$path")"
+    else
+        warn "$label origin does not match; leaving $path untouched."
+        return 1
+    fi
+}
+
 remove_download() {
     local path="$1" kind="$2" origin
     case "$kind" in
@@ -878,6 +896,22 @@ remove_download() {
                 warn "Plugin origin does not match; leaving $path untouched."
                 return 1
             fi
+            ;;
+        oh-my-zsh-framework)
+            remove_managed_git_checkout "$path" "$DATA_DIR/oh-my-zsh" \
+                "https://github.com/ohmyzsh/ohmyzsh.git" "Oh My Zsh"
+            ;;
+        oh-my-zsh-plugin-fzf-tab)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/fzf-tab" \
+                "https://github.com/Aloxaf/fzf-tab.git" "fzf-tab"
+            ;;
+        oh-my-zsh-plugin-fast-syntax-highlighting)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/fast-syntax-highlighting" \
+                "https://github.com/zdharma-continuum/fast-syntax-highlighting.git" "fast-syntax-highlighting"
+            ;;
+        oh-my-zsh-plugin-zsh-completions)
+            remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/zsh-completions" \
+                "https://github.com/zsh-users/zsh-completions.git" "zsh-completions"
             ;;
         *) warn "Unknown downloaded resource type '$kind'; leaving it untouched."; return 1 ;;
     esac
