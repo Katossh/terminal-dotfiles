@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 SOURCE_URL="${SOURCE_URL:-git@github.com:Katossh/dotfiles.git}"
 TARGET_URL="${TARGET_URL:-git@github.com:Katossh/terminal-dotfiles.git}"
-SOURCE_REF="${SOURCE_REF:-refactor/split-terminal-repository}"
+SOURCE_REF="${SOURCE_REF:-master}"
 TARGET_REF="${TARGET_REF:-main}"
 EXPECTED_TARGET_SHA="2883661b163261ea6e0ec6c19a86f86b74259322"
 
