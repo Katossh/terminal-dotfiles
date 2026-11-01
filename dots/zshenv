@@ -85,7 +85,7 @@ if [[ -z "${DOTFILES_DIR:-}" ]]; then
         */config/terminal/zsh) DOTFILES_DIR="${_zsh_config_dir%/config/terminal/zsh}" ;;
     esac
 fi
-export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/dotfiles}"
+export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/terminal-dotfiles}"
 unset _dots_entry _dots_hops _dots_target _dots_root _zsh_anchor _zsh_hops _zsh_target _zsh_config_dir _zsh_config_real _zsh_dir_hops _zsh_dir_target
 
 # Application defaults; override these in a local shell profile if needed.

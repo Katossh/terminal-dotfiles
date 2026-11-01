@@ -1,94 +1,89 @@
-# Dotfiles
+# Terminal dotfiles
 
-A manifest-driven, cross-distro configuration manager for a terminal-focused development environment. The common profile provides the same baseline tools and configuration across supported Linux distributions, BSD, macOS, and NixOS.
+A manifest-driven terminal configuration manager for Linux, NixOS, BSD and macOS. It manages shells, terminal emulators, tmux, CLI/TUI applications, shared helpers and one coherent terminal palette.
 
 ## Install
 
 ```sh
-git clone https://github.com/Katossh/dotfiles.git "$HOME/dotfiles"
-cd "$HOME/dotfiles"
-./bin/dots install
+git clone https://github.com/Katossh/terminal-dotfiles.git "$HOME/terminal-dotfiles"
+cd "$HOME/terminal-dotfiles"
+./bin/dots install --packages
 ```
 
-On an interactive terminal, `dots install` asks whether to install the recommended CLI packages (default yes). In a non-interactive session, packages are skipped unless `--packages` is explicit.
+Use a preview first when installing on an existing machine:
 
 ```sh
-./bin/dots install --no-packages --yes
-dots install --packages
-dots install --dry-run --no-packages
-dots list
-dots --health
+./bin/dots install --dry-run --no-packages --yes
 ```
 
-`bin/dots` is the only installer and command-line entry point. On the first run, invoke it from the checkout; it then links itself to `~/.local/bin/dots`. There is no separate bootstrap installer.
+`bin/dots` is the only installer and command-line entry point. It links configurations without replacing existing files silently: collisions are moved into a managed backup area. Run it as your normal user, never through `sudo`.
 
-## Scope
+## Package installation
 
-The `master` branch is the common baseline: shell, terminal, multiplexer, CLI/TUI configuration, shared helper commands, and package installation. It deliberately does not configure a desktop environment, compositor, window manager, display manager, or machine-specific hardware.
+The installer detects the native package manager and supports apt (Debian/Ubuntu derivatives), dnf (Fedora/RHEL derivatives), pacman (Arch derivatives), zypper (openSUSE), apk (Alpine), xbps (Void), FreeBSD `pkg`, and Homebrew. The configuration-linking step is independent of package installation.
 
-Desktop profiles and machine-specific system configurations belong in separate profiles. Applying the common baseline therefore does not impose a particular graphical session or alter an existing desktop setup.
+On NixOS, `dots install --packages` installs the packages declared in `manifest/packages.tsv` into the invoking user's Nix profile using `nix profile install`. On another Linux distribution, Nix is also used as a fallback when no supported native package manager is detected but `nix` is available. This avoids trying to mutate an immutable NixOS system from an imperative shell script.
+
+For declarative, system-wide NixOS packages, import `nix/packages.nix` from your host configuration instead:
+
+```nix
+{
+  imports = [
+    /home/<user>/terminal-dotfiles/nix/packages.nix
+  ];
+}
+```
+
+Then review and apply the host configuration:
+
+```sh
+sudo nixos-rebuild build
+sudo nixos-rebuild switch
+```
+
+The module reads the same Nixpkgs entries from `manifest/packages.tsv`. It enables Zsh and adds the available packages to `environment.systemPackages`; required missing attributes fail evaluation, while optional missing attributes are skipped. Set the login shell explicitly in your host configuration, for example `users.users.<name>.shell = pkgs.zsh`.
+
+On an unfamiliar distribution without one of the supported package managers or Nix, `dots install --no-packages` still installs the configuration links. Install the listed dependencies with that distribution's package manager.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `dots install` | Apply configurations from `manifest/configs.tsv`; optionally install declared packages. |
-| `dots list` | List managed components and installation state. |
-| `dots --health` | Diagnose missing sources, changed or broken links, generated adapters, and dependencies. |
-| `dots backup` | Snapshot managed target paths and personal overrides. |
-| `dots restore [ID]` | Restore a snapshot (latest by default), moving current paths to a safety backup first. |
-| `dots uninstall` | Remove links recorded by dots, restore collision backups, and remove installer-owned downloads. |
-| `dots uninstall --purge` | Also remove only native packages recorded as newly installed by dots. |
-| `dots prune` | Remove broken managed links, abandoned clone staging directories, and stale state records. |
+| `dots install` | Link configuration; interactively offer dependency installation. |
+| `dots install --packages` | Link configuration and install declared dependencies. |
+| `dots list` | List components and installation state. |
+| `dots --health` | Diagnose missing sources, changed links and dependencies. |
+| `dots backup` | Snapshot managed targets and personal overrides. |
+| `dots restore [ID]` | Restore a snapshot, preserving current files in a safety copy. |
+| `dots uninstall` | Remove only recorded links and restore collision backups. |
+| `dots uninstall --purge` | Also remove native packages recorded as newly installed by dots. |
+| `dots prune` | Remove broken managed links and stale state. |
 
-Git remains responsible for repository updates and history: use `git pull`, `git status`, `git diff`, and `git log`. There is deliberately no `dots update` or `dots diff` wrapper.
+Git remains responsible for updates and history: use `git pull`, `git status`, `git diff` and `git log`.
 
 ## Personal overrides
 
-Personal overrides live outside the repository and take precedence over the matching shared file:
+Personal overrides live outside the repository under `~/.config/dots/overrides/`. Mirror the component-relative path there; for example, `~/.config/dots/overrides/zsh/aliases.zsh` overrides the shared Zsh aliases. `~/.config/dots/theme.local.env` can override individual terminal palette tokens.
 
-```text
-~/.config/dots/
-├── overrides/
-│   ├── zsh/
-│   │   └── aliases.zsh
-│   ├── kitty/
-│   │   └── kitty.conf
-│   └── tmux.conf
-└── theme.local.env
-```
-
-For directory components, mirror the repository-relative path under `overrides/<component>/`. For single-file components, use the component name as the override filename. An override replaces that file; dots does not merge arbitrary application-specific formats.
-
-Existing untracked files remain untouched. Never put secrets or machine-specific credentials in the repository.
-
-## Backups and uninstall
-
-`dots backup` snapshots each manifest destination and the complete `~/.config/dots` directory, including overrides. Snapshots live under `~/.local/share/dots/backups/snapshots/`.
-
-`dots restore` first moves current destinations into a safety directory, then restores the snapshot. Restoring an older snapshot can intentionally remove files created after it.
-
-Native packages are recorded only when they were not installed before the dots operation. `--purge` removes only those explicitly recorded packages; it does not ask the package manager to autoremove shared dependencies.
-
-## Centralized theming
-
-`themes/palettes/catppuccin-mocha.env` is the canonical data-only terminal palette (`NAME=#RRGGBB`). Zsh/FZF read it directly, while dots generates Kitty and tmux adapters. `~/.config/dots/theme.local.env` can override individual palette tokens.
+Existing untracked files are preserved by backing them up before a managed link is created. Never commit credentials or machine-specific secrets.
 
 ## Repository layout
 
-- `config/terminal/` contains shell, terminal, multiplexer, and CLI/TUI configurations.
-- `bin/` contains the common installer and portable helper commands.
-- `manifest/` contains component and package inventories.
-- `themes/` contains the canonical terminal palette and adapters.
-- `nix/packages.nix` provides the declarative NixOS package module.
-
-Native package managers supported by the installer are apt, dnf, pacman, zypper, apk, xbps, FreeBSD pkg, and Homebrew. NixOS is supported through the optional declarative package module.
+- `config/terminal/` contains Zsh, Kitty, tmux and CLI/TUI application settings.
+- `dots/` contains shared shell environment configuration.
+- `bin/` contains the installer and portable helper commands.
+- `manifest/` contains configuration and package inventories.
+- `themes/` contains the canonical Catppuccin palette and application adapters.
+- `nix/` provides the declarative NixOS package module.
+- `tests/` and `.github/workflows/` validate the installer.
 
 ## Safety
 
-- Run dots as your normal user, never through `sudo`.
-- Package-manager operations alone use privilege escalation.
-- `uninstall` preserves native packages by default; `--purge` is explicit.
-- Existing files are backed up before replacement.
-- `--health` is read-only; `--dry-run` previews operations.
-- Review scripts before running them. This is a personal configuration manager, not a security boundary.
+- Run `dots` as your normal user; privilege escalation is limited to native package-manager operations.
+- `--dry-run` previews changes without modifying the filesystem.
+- Existing targets are backed up before replacement.
+- Native packages are not removed by default. `--purge` is limited to packages recorded as newly installed by dots.
+- Nix profile packages are managed by Nix and are not removed by `dots uninstall --purge`.
+- `--health` is read-only.
+
+This is a personal configuration manager, not a security boundary. Review the scripts before running them.

@@ -1,28 +1,42 @@
-# NixOS package integration
+# NixOS integration
 
-This common profile provides one declarative NixOS module:
+There are two supported installation modes.
 
-- `packages.nix` reads the `nixpkgs` rows from `../manifest/packages.tsv`.
-- It enables Zsh and adds the common terminal/CLI package set to `environment.systemPackages`.
-- It does not configure a desktop environment, compositor, display manager, hardware, bootloader, networking, or any host-specific settings.
+## User profile (installer)
 
-Import the module from your own NixOS configuration (adjust the checkout path):
+Run the common installer as your normal user:
+
+```sh
+./bin/dots install --packages
+```
+
+On NixOS, this installs the package manifest's `nixpkgs` entries into the current user's Nix profile using `nix profile install`. It does not modify `/etc/nixos`, require root for the profile operation, or run `nixos-rebuild`.
+
+## Declarative system packages (recommended for managed hosts)
+
+Import the module from your NixOS configuration (adjust the checkout path):
 
 ```nix
 {
   imports = [
-    /home/<user>/dotfiles/nix/packages.nix
+    /home/<user>/terminal-dotfiles/nix/packages.nix
   ];
 }
 ```
 
-Then review and apply your system configuration:
+Then review and apply:
 
 ```sh
 sudo nixos-rebuild build
 sudo nixos-rebuild switch
 ```
 
-The module keeps package installation declarative. On NixOS, `dots install --packages` prints the module path and does not edit `/etc/nixos` or run `nixos-rebuild` automatically.
+The module reads the `nixpkgs` rows from `../manifest/packages.tsv`, enables Zsh and adds packages to `environment.systemPackages`. Missing optional attributes are skipped; missing required attributes fail evaluation rather than silently omitting required dependencies.
 
-Machine-specific host configurations and desktop profiles should be maintained separately from this common baseline.
+Set the login shell in your host configuration if desired:
+
+```nix
+users.users.<name>.shell = pkgs.zsh;
+```
+
+Machine-specific host configuration, desktop environments, bootloader, networking and hardware remain outside this repository.

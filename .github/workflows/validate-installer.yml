@@ -32,13 +32,14 @@ jobs:
         run: |
           bash -n bin/dots
           bash -n tests/test-dots.sh
+          bash -n scripts/migrate-terminal-repo.sh
           zsh -n dots/zshenv
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
 
       - name: ShellCheck
-        run: shellcheck --severity=warning bin/dots tests/test-dots.sh
+        run: shellcheck --severity=warning bin/dots tests/test-dots.sh scripts/migrate-terminal-repo.sh
 
       - name: Validate common profile
         shell: bash
@@ -65,7 +66,7 @@ jobs:
             [[ "$kind" == file || "$kind" == tree ]]
             [[ -e "$source" || -L "$source" ]]
           done < manifest/configs.tsv
-          if grep -n -E -- '--desktop|config/ui|niri|waybar|mako|rofi' bin/dots; then
+          if grep -n -E -- '--desktop|config/ui|(^|[^[:alnum:]_-])(niri|waybar|mako|rofi)([^[:alnum:]_-]|$)' bin/dots; then
             echo 'Desktop-specific references found in the common installer.'
             exit 1
           fi

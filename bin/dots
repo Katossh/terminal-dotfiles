@@ -107,7 +107,7 @@ set_state() {
         printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$STATE_FILE"
         return 0
     fi
-    tmp="$STATE_FILE.tmp.$"
+    tmp="$STATE_FILE.tmp.$$"
     awk -F '\t' -v kind="$kind" -v key="$key" '$1 != kind || $2 != key' "$STATE_FILE" > "$tmp"
     printf '%s\t%s\t%s\n' "$kind" "$key" "$value" >> "$tmp"
     mv "$tmp" "$STATE_FILE"
@@ -338,7 +338,13 @@ detect_package_manager() {
         *opensuse*|*suse*) printf zypper ;;
         *alpine*) printf apk ;;
         *void*) printf xbps ;;
-        *) printf unknown ;;
+        *)
+            if [[ "$PLATFORM" == Linux ]] && command -v nix >/dev/null 2>&1; then
+                printf nix
+            else
+                printf unknown
+            fi
+            ;;
     esac
 }
 
@@ -408,20 +414,46 @@ refresh_package_index() {
     esac
 }
 
+install_nix_packages() {
+    local manager="${1:-nixos}" package pkg_manager
+    local -a profile_refs=() legacy_attrs=()
+
+    command -v nix >/dev/null 2>&1 || die "Nix was selected as the package manager, but the nix command is unavailable."
+
+    while IFS=$'\t' read -r pkg_manager package _; do
+        [[ "$pkg_manager" == nixpkgs ]] || continue
+        profile_refs+=("nixpkgs#$package")
+        legacy_attrs+=("nixpkgs.$package")
+    done < "$PACKAGES_MANIFEST"
+
+    (( ${#profile_refs[@]} )) || { warn "No Nix packages are declared in $PACKAGES_MANIFEST."; return 0; }
+
+    say "Installing terminal dependencies with Nix"
+    if nix --extra-experimental-features 'nix-command flakes' profile install --help >/dev/null 2>&1; then
+        # Install into the invoking user's profile; no /etc/nixos edits or root access.
+        nix --extra-experimental-features 'nix-command flakes' profile install "${profile_refs[@]}"
+    elif command -v nix-env >/dev/null 2>&1; then
+        # Compatibility path for older Nix installations.
+        nix-env -iA "${legacy_attrs[@]}"
+    else
+        die "This Nix installation has neither 'nix profile' nor nix-env. Enable nix-command/flakes or use the declarative NixOS module."
+    fi
+
+    info "Packages installed into the current user's Nix profile."
+    if [[ "$manager" == nixos ]]; then
+        info "For declarative system-wide packages, import: $REPO_DIR/nix/packages.nix"
+        info "Then review and apply with: sudo nixos-rebuild switch"
+        info "The installer never edits /etc/nixos or runs nixos-rebuild automatically."
+    fi
+}
+
 install_packages() {
     local manager package class was
     local -a required optional
     local before="$STATE_DIR/packages-before-$$.tsv"
     manager="$(detect_package_manager)"
-    if [[ "$manager" == nixos ]]; then
-        say "NixOS package integration"
-        info "Configuration links have been installed normally; NixOS package management stays declarative."
-        info "Import these modules from your NixOS configuration:"
-        info "  $REPO_DIR/nix/packages.nix"
-
-        info "Then apply your configuration with: sudo nixos-rebuild switch"
-        info "The module reads manifest/packages.tsv and enables the common Zsh and CLI package set."
-        info "dots never edits /etc/nixos or runs nixos-rebuild automatically."
+    if [[ "$manager" == nixos || "$manager" == nix ]]; then
+        install_nix_packages "$manager"
         return 0
     fi
     if [[ "$manager" == unknown ]]; then
@@ -454,7 +486,6 @@ install_packages() {
     rm -f "$before"
     if ! command -v starship >/dev/null 2>&1 && [[ ! -x "$LOCAL_BIN/starship" ]]; then install_starship_upstream; fi
 }
-
 create_compat_command() {
     local target_command="$1" alias_name="$2" actual_path
     command -v "$alias_name" >/dev/null 2>&1 && return 0
@@ -811,7 +842,7 @@ command_uninstall() {
         elif [[ -e "$target" ]]; then warn "Leaving non-symlink target untouched: $target"; fi
     done < "$STATE_FILE"
     if [[ "$DRY_RUN" != 1 ]]; then
-        local links_tmp="$STATE_FILE.links.$"
+        local links_tmp="$STATE_FILE.links.$$"
         awk -F '\t' '$1 != "link"' "$STATE_FILE" > "$links_tmp"
         mv "$links_tmp" "$STATE_FILE"
     fi
