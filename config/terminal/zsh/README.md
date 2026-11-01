@@ -1,19 +1,37 @@
 # Zsh configuration
 
-The entry point is `dots/zshenv`. It sets XDG paths and `ZDOTDIR=$XDG_CONFIG_HOME/zsh`, so Zsh loads its startup files from this directory rather than directly from `~`. The interactive setup initializes the vendored [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh) framework and keeps Starship as the prompt.
+The entry point is `dots/zshenv`. It sets XDG paths and `ZDOTDIR=$XDG_CONFIG_HOME/zsh`, so Zsh loads its startup files from this directory rather than directly from `~`. The interactive setup uses Oh My Zsh as the framework and plugin loader, while Starship remains the prompt provider.
 
 ## Files
-- `.zshrc` — interactive shell setup, history, options, Oh My Zsh plugins, standalone plugins, Starship, and optional automatic tmux startup.
+- `.zshrc` — interactive shell setup, history, options, Oh My Zsh plugins, completion extensions, Starship, and optional automatic tmux startup.
 - `aliases.zsh` — command aliases and the FZF/Neovim file preview helper.
 - `completion.zsh` — completion matching rules and cache settings; Oh My Zsh runs `compinit` once using an XDG cache file.
 - `prompt.zsh` — initializes Starship; the appearance is configured in `config/starship.toml`.
 - `handlers.zsh` — custom message for unknown commands.
-- `.packages/` — the vendored Oh My Zsh framework, extra completion definitions, and standalone plugins. They are regular tracked files, so a normal clone contains them without initializing Git submodules.
+
+## Oh My Zsh and plugins
+
+Run `./bin/dots install` to install the framework and its external plugins. Third-party repositories are cloned outside the dotfiles checkout, under XDG data paths:
+
+| Component | Source |
+|---|---|
+| Oh My Zsh framework | `$XDG_DATA_HOME/oh-my-zsh` |
+| Custom plugins | `$XDG_DATA_HOME/zsh/custom/plugins/` |
+
+The active plugins are:
+- `git` and `z` — built into Oh My Zsh.
+- `zsh-autosuggestions` — provided by Oh My Zsh itself.
+- `fzf-tab` — installed as an Oh My Zsh custom plugin.
+- `fast-syntax-highlighting` — installed as a custom plugin and loaded last.
+- `zsh-completions` — installed as a custom completion source. Its `src` directory is added to `fpath` before Oh My Zsh runs `compinit`; it must not be loaded as a regular plugin.
+
+The plugin order is intentional: `fzf-tab` must load after `compinit`, but before plugins that wrap ZLE widgets, including autosuggestions and syntax highlighting. Oh My Zsh is not auto-updated at shell startup. Update the framework and custom plugins with `git -C <path> pull --ff-only`.
+
+Downloads can be skipped for offline/config-only setups with `DOTS_SKIP_DOWNLOADS=1`; in that case the shell falls back to native Zsh completion until the framework is installed. The installer preserves existing directories with unknown Git origins rather than overwriting them.
 
 ## Dependencies
-The setup requires `zsh`, Starship, `git`, `fzf`, `bat`, `nvim`, and `tmux`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. The `project` helper is loaded only when `OPEN_PROJECT=1`.
 
-Oh My Zsh's built-in `z` plugin replaces the separate `zsh-z` package. Fast syntax highlighting, autosuggestions, fzf-tab completion, and multi-dot path expansion remain separate plugins because Oh My Zsh does not bundle equivalent implementations. The extra `zsh-completions` definitions are added to `fpath` before `compinit`. Upstream project links are listed in [`resources/upstream-sources.md`](../../resources/upstream-sources.md).
+The setup requires `zsh`, Starship, `git`, `fzf`, `bat`, `nvim`, and `tmux`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. The `project` helper is loaded only when `OPEN_PROJECT=1`.
 
 ## Portability and local settings
 - `dots/zshenv` contains shared defaults only. Keep passwords, API tokens, private keys, and machine-specific credentials out of tracked files.
