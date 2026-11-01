@@ -30,6 +30,7 @@ test -f "$HOME/.tmux/dots-theme.conf"
 
 # Oh My Zsh and its custom plugins are installed outside the checkout.
 # A fake Git executable validates clone paths and idempotency without network access.
+mkdir -p "$TEST_ROOT/bin"
 if command -v zsh >/dev/null 2>&1; then
     cat > "$TEST_ROOT/bin/git" <<'GIT'
 #!/usr/bin/env bash
