@@ -62,14 +62,19 @@ Usage:
   dots --help
 
 Commands:
-  install       Link common configurations and install (optionally) declared packages.
-  list          List manifest components and their installation state.
-  --health      Inspect manifest sources, managed links, generated files and dependencies.
-  backup        Snapshot all managed target paths and personal overrides.
+  install       Link configs, provision Oh My Zsh/plugins, and optionally install packages.
+  list          List manifest components, managed downloads and package receipts.
+  health        Check sources, links, dependencies and installed Zsh framework/plugins.
+  backup        Snapshot managed target paths and personal overrides.
   restore       Restore a snapshot; defaults to the latest snapshot.
-  uninstall     Remove managed links, restore collision backups and remove installer downloads.
+  uninstall     Remove tracked links/downloads and restore collision backups.
   prune         Remove broken/stale managed links and stale installer state.
   --print-repo  Print the checkout path (used by Zsh startup).
+
+Install behavior:
+  Zsh framework/plugins are downloaded even when Zsh is not installed yet.
+  --no-packages skips native package installation, not upstream Git downloads.
+  Re-run 'dots install --no-packages' to repair missing Zsh framework/plugin clones.
 
 Options:
   --packages       Install recommended CLI packages.
@@ -79,6 +84,10 @@ Options:
   --dry-run        Print planned changes without modifying the filesystem.
   --default-shell  Offer to make Zsh the account login shell.
   -h, --help       Show help.
+
+Environment:
+  DOTS_SKIP_DOWNLOADS=1       Skip upstream Git downloads (offline/config-only mode).
+  DOTS_GIT_CLONE_RETRIES=3     Attempts per required Zsh repository clone.
 
 Git operations deliberately remain Git operations:
   git pull, git status, git diff, git log, and so on.
@@ -520,17 +529,27 @@ install_starship_upstream() {
 
 
 install_git_checkout() {
-    local target="$1" url="$2" state_kind="$3" label="$4"
-    local parent stage origin
+    local target="$1" url="$2" state_kind="$3" label="$4" required_path="$5"
+    local parent stage origin attempt retries
+
+    retries="${DOTS_GIT_CLONE_RETRIES:-3}"
+    if [[ ! "$retries" =~ ^[1-9][0-9]*$ ]]; then
+        error "DOTS_GIT_CLONE_RETRIES must be a positive integer (received: $retries)."
+        return 1
+    fi
 
     if [[ -d "$target/.git" ]]; then
         origin="$(git -C "$target" remote get-url origin 2>/dev/null || true)"
         if [[ "$origin" == "$url" ]]; then
-            info "$label already present; leaving it unchanged."
-        else
-            warn "Existing Git checkout at $target has an unexpected origin; leaving it untouched."
+            if [[ -e "$target/$required_path" ]]; then
+                info "$label already present and validated; leaving it unchanged."
+                return 0
+            fi
+            warn "Existing $label checkout is incomplete (missing $required_path): $target"
+            return 1
         fi
-        return 0
+        warn "Existing Git checkout at $target has an unexpected origin; leaving it untouched."
+        return 1
     fi
     [[ -e "$target" || -L "$target" ]] && {
         warn "Existing $target is not a recognised $label checkout; leaving it untouched."
@@ -540,44 +559,66 @@ install_git_checkout() {
 
     parent="$(dirname "$target")"
     mkdir -p "$parent"
-    stage="$(mktemp -d "$parent/.dots-clone.XXXXXX")"
-    if git clone --depth 1 --single-branch "$url" "$stage"; then
-        if [[ -e "$target" || -L "$target" ]]; then
-            rm -rf -- "$stage"
-            warn "$target appeared during installation; leaving it untouched."
-            return 1
+
+    for ((attempt = 1; attempt <= retries; attempt++)); do
+        stage="$(mktemp -d "$parent/.dots-clone.XXXXXX")"
+        if GIT_TERMINAL_PROMPT=0 git clone --depth 1 --single-branch "$url" "$stage"; then
+            if [[ ! -e "$stage/$required_path" ]]; then
+                rm -rf -- "$stage"
+                warn "$label clone completed but the expected path is missing: $required_path"
+                return 1
+            fi
+            if [[ -e "$target" || -L "$target" ]]; then
+                rm -rf -- "$stage"
+                warn "$target appeared during installation; leaving it untouched."
+                return 1
+            fi
+            mv "$stage" "$target"
+            record_state download "$target" "$state_kind"
+            info "Installed $label."
+            return 0
         fi
-        mv "$stage" "$target"
-        record_state download "$target" "$state_kind"
-        info "Installed $label."
-    else
+
         rm -rf -- "$stage"
-        warn "Could not install $label."
-        return 1
-    fi
+        if (( attempt < retries )); then
+            warn "Clone attempt $attempt/$retries failed for $label; retrying."
+            sleep "${DOTS_GIT_CLONE_RETRY_DELAY:-2}"
+        fi
+    done
+
+    warn "Could not install $label after $retries attempts. Check GitHub connectivity, proxy/TLS settings and Git credentials."
+    return 1
 }
 
 install_zsh_upstreams() {
-    command -v zsh >/dev/null 2>&1 || {
-        info "Zsh is absent; skipping Oh My Zsh and plugin installation."
-        return 0
-    }
     command -v git >/dev/null 2>&1 || {
-        warn "Git is absent; cannot install Oh My Zsh or its custom plugins."
-        return 0
+        error "Git is required to install Oh My Zsh and its plugins. Install Git, then rerun: dots install --no-packages"
+        return 1
     }
 
+    # Downloading shell configuration is independent of whether zsh is already
+    # installed or currently available in PATH. This matters on fresh/Nix hosts.
     local custom="$DATA_DIR/zsh/custom/plugins"
+    local failed=0
+
     install_git_checkout "$DATA_DIR/oh-my-zsh" \
-        "https://github.com/ohmyzsh/ohmyzsh.git" "oh-my-zsh-framework" "Oh My Zsh" || true
+        "https://github.com/ohmyzsh/ohmyzsh.git" "oh-my-zsh-framework" "Oh My Zsh" \
+        "oh-my-zsh.sh" || failed=1
     install_git_checkout "$custom/fzf-tab" \
-        "https://github.com/Aloxaf/fzf-tab.git" "oh-my-zsh-plugin-fzf-tab" "fzf-tab" || true
+        "https://github.com/Aloxaf/fzf-tab.git" "oh-my-zsh-plugin-fzf-tab" "fzf-tab" \
+        "fzf-tab.plugin.zsh" || failed=1
     install_git_checkout "$custom/fast-syntax-highlighting" \
         "https://github.com/zdharma-continuum/fast-syntax-highlighting.git" \
-        "oh-my-zsh-plugin-fast-syntax-highlighting" "fast-syntax-highlighting" || true
+        "oh-my-zsh-plugin-fast-syntax-highlighting" "fast-syntax-highlighting" \
+        "fast-syntax-highlighting.plugin.zsh" || failed=1
     install_git_checkout "$custom/zsh-completions" \
         "https://github.com/zsh-users/zsh-completions.git" "oh-my-zsh-plugin-zsh-completions" \
-        "zsh-completions" || true
+        "zsh-completions" "src" || failed=1
+
+    if (( failed )); then
+        error "Zsh framework/plugins are incomplete. Fix the clone errors above and rerun: dots install --no-packages"
+        return 1
+    fi
 }
 
 remove_legacy_zsh_package_links() {
@@ -695,7 +736,9 @@ command_install() {
     if [[ "${DOTS_SKIP_DOWNLOADS:-0}" == 1 ]]; then
         info "Skipping optional upstream downloads (DOTS_SKIP_DOWNLOADS=1)."
     else
-        install_zsh_upstreams
+        if ! install_zsh_upstreams; then
+            info "Zsh provisioning did not finish; correct the reported issue and rerun: dots install --no-packages"
+        fi
         install_tmux_theme
     fi
 
@@ -705,8 +748,14 @@ command_install() {
         create_compat_command fdfind fd
     fi
     [[ "$SET_DEFAULT_SHELL" == 1 ]] && set_default_shell
-    if [[ "$DRY_RUN" == 1 ]]; then info "Dry run complete; no changes made."
-    else info "Installation complete. Start a new shell or run: exec zsh"; fi
+    if [[ "$DRY_RUN" == 1 ]]; then
+        info "Dry run complete; no changes made."
+    elif (( ERRORS > 0 )); then
+        info "Installation finished with $ERRORS error(s) and $WARNINGS warning(s). Resolve the errors and rerun the installer."
+    else
+        info "Installation complete. Start a new shell or run: exec zsh"
+        (( WARNINGS == 0 )) || info "Review the $WARNINGS warning(s) printed above."
+    fi
     (( ERRORS == 0 ))
 }
 
@@ -776,6 +825,18 @@ command_health() {
     for dep in zsh git fzf rg tmux nvim starship; do
         command -v "$dep" >/dev/null 2>&1 || warn "Dependency not found in PATH: $dep"
     done
+
+    [[ -f "$DATA_DIR/oh-my-zsh/oh-my-zsh.sh" ]] && info "Oh My Zsh: present" || \
+        warn "Oh My Zsh is missing: $DATA_DIR/oh-my-zsh (run: dots install --no-packages)"
+    [[ -f "$DATA_DIR/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh" ]] && \
+        info "zsh-autosuggestions: present" || warn "Oh My Zsh autosuggestions plugin is missing."
+    [[ -f "$DATA_DIR/zsh/custom/plugins/fzf-tab/fzf-tab.plugin.zsh" ]] && info "fzf-tab: present" || \
+        warn "fzf-tab is missing: run 'dots install --no-packages'."
+    [[ -f "$DATA_DIR/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" ]] && \
+        info "fast-syntax-highlighting: present" || warn "fast-syntax-highlighting is missing."
+    [[ -d "$DATA_DIR/zsh/custom/plugins/zsh-completions/src" ]] && info "zsh-completions: present" || \
+        warn "zsh-completions is missing."
+
     [[ -e "$CONFIG_DIR/kitty/themes/dots-palette.conf" ]] && info "Generated Kitty palette: present" || warn "Generated Kitty palette is missing."
     [[ -e "$HOME_DIR/.tmux/dots-theme.conf" ]] && info "Generated tmux palette: present" || warn "Generated tmux palette is missing."
     printf '\nHealth summary: %s error(s), %s warning(s)\n' "$ERRORS" "$WARNINGS"
