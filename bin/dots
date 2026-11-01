@@ -550,8 +550,10 @@ install_git_checkout() {
             # Repair only checkouts previously recorded as installer-managed.
             # Preserve the incomplete checkout for manual inspection.
             if [[ -f "$STATE_FILE" ]] && awk -F '\t' -v path="$target" '$1 == "download" && $2 == path { found=1 } END { exit !found }' "$STATE_FILE"; then
-                local quarantine
-                quarantine="$STATE_DIR/backups/incomplete-downloads/$(date +%Y%m%d-%H%M%S)-${BASHPID}/$(basename "$target")"
+                local quarantine_dir quarantine
+                mkdir -p "$STATE_DIR/backups/incomplete-downloads"
+                quarantine_dir="$(mktemp -d "$STATE_DIR/backups/incomplete-downloads/$(date +%Y%m%d-%H%M%S).XXXXXX")"
+                quarantine="$quarantine_dir/$(basename "$target")"
                 if [[ "$DRY_RUN" == 1 ]]; then
                     info "Would move incomplete managed checkout aside and refetch: $target"
                     return 0
