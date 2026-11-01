@@ -28,3 +28,7 @@ These directories are part of this repository's tracked tree. Updating one is th
 ## Design references (not vendored)
 
 - [kianblakley/niri-land](https://github.com/kianblakley/niri-land) — reference for an overview-first Waybar, Rofi app/power/wallpaper menus, and compact Mako volume notifications. The upstream README describes the project as being in maintenance mode. The Niri profile here is an independent implementation in `config/ui/` and `bin/niri-*`; no upstream source files, wallpapers, or screenshot assets are copied. The upstream repository currently has no `LICENSE` file, so its code and bundled assets are not redistributed.
+
+## Runtime-managed Zsh plugin ownership
+
+Oh My Zsh supplies the built-in git, z, and zsh-autosuggestions plugins. The standalone runtime checkouts are fzf-tab, fast-syntax-highlighting, and zsh-completions. The installer validates the expected entrypoint for each checkout and reports clone failures instead of treating them as success.
