@@ -64,7 +64,7 @@ sudo nixos-rebuild build
 sudo nixos-rebuild switch
 ~~~
 
-The module reads the same Nixpkgs entries from manifest/packages.tsv. It enables Zsh and adds available packages to environment.systemPackages; required missing attributes fail evaluation, while optional missing attributes are skipped. Set the account's login shell in your host configuration, for example users.users.<name>.shell = pkgs.zsh.
+The module reads Nixpkgs packages from manifest/packages.tsv. It enables Zsh and adds available CLI packages to environment.systemPackages; required missing attributes fail evaluation, while optional missing attributes are skipped. Entries under the nixpkgs-fonts package-manager key are added to fonts.packages, so NixOS registers them with fontconfig. JetBrainsMono Nerd Font is included as a required system font. Set the account's login shell in your host configuration, for example users.users.<name>.shell = pkgs.zsh.
 
 On an unfamiliar distribution without a supported package manager or Nix, dots install --no-packages still links configurations and provisions Zsh from Git. Install the remaining CLI dependencies with that distribution's package manager.
 
