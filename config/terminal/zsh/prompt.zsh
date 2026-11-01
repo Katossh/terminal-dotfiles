@@ -1,4 +1,4 @@
-# Initialize Starship with the configuration linked by install.sh.
+# Initialize Starship with the configuration linked by dots.
 if command -v starship >/dev/null 2>&1; then
     eval "$(starship init zsh)"
 else

@@ -38,10 +38,10 @@ test -f "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
 test -f "$HOME/.tmux/dots-theme.conf"
 
 # Oh My Zsh and its custom plugins are installed outside the checkout.
-# A fake Git executable validates clone paths and idempotency without network access.
-mkdir -p "$TEST_ROOT/bin"
-if command -v zsh >/dev/null 2>&1; then
-    cat > "$TEST_ROOT/bin/git" <<'GIT'
+# Provisioning must work even when zsh is absent from PATH (fresh/Nix hosts).
+# A fake Git executable validates clone paths, partial failures and idempotency.
+mkdir -p "$TEST_ROOT/bin" "$TEST_ROOT/no-zsh-bin"
+cat > "$TEST_ROOT/bin/git" <<'GIT'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 case "${1:-}" in
@@ -56,6 +56,7 @@ case "${1:-}" in
         url="$1"
         target="$2"
         printf 'clone %s\n' "$url" >> "${GIT_TEST_LOG:?}"
+        if [[ "${GIT_FAIL_URL:-}" == "$url" ]]; then exit 1; fi
         mkdir -p "$target/.git"
         printf '%s\n' "$url" > "$target/.git/test-origin"
         case "$url" in
@@ -86,25 +87,74 @@ case "${1:-}" in
     *) exit 1 ;;
 esac
 GIT
-    chmod +x "$TEST_ROOT/bin/git"
-    export GIT_TEST_LOG="$TEST_ROOT/fake-git.log"
-    PATH="$TEST_ROOT/bin:$PATH" DOTS_SKIP_DOWNLOADS=0 "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install.log"
-    test -f "$XDG_DATA_HOME/oh-my-zsh/oh-my-zsh.sh"
-    test -f "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab/fzf-tab.plugin.zsh"
-    test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
-    test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
-    grep -Fq "plugins+=(fzf-tab)" "$XDG_CONFIG_HOME/zsh/.zshrc"
-    grep -Fq "plugins+=(zsh-autosuggestions)" "$XDG_CONFIG_HOME/zsh/.zshrc"
-    grep -Fq "plugins+=(fast-syntax-highlighting)" "$XDG_CONFIG_HOME/zsh/.zshrc"
-    clone_count="$(wc -l < "$GIT_TEST_LOG")"
-    PATH="$TEST_ROOT/bin:$PATH" DOTS_SKIP_DOWNLOADS=0 "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-2.log"
-    test "$(wc -l < "$GIT_TEST_LOG")" -eq "$clone_count"
-    PATH="$TEST_ROOT/bin:$PATH" DOTS_SKIP_DOWNLOADS=0 "$REPO_DIR/bin/dots" uninstall --yes > "$TEST_ROOT/zsh-uninstall.log"
-    test ! -e "$XDG_DATA_HOME/oh-my-zsh"
-    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
-    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting"
-    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions"
+chmod +x "$TEST_ROOT/bin/git"
+export GIT_TEST_LOG="$TEST_ROOT/fake-git.log"
+
+# Build an isolated PATH with every available executable except zsh. This
+# keeps the test portable across Ubuntu/macOS and avoids relying on a short list
+# of utilities that differs between runner images.
+IFS=: read -r -a original_path_parts <<< "$PATH"
+for path_dir in "${original_path_parts[@]}"; do
+    [[ -d "$path_dir" ]] || continue
+    for executable in "$path_dir"/*; do
+        [[ -f "$executable" && -x "$executable" ]] || continue
+        command_name="${executable##*/}"
+        [[ "$command_name" == zsh || "$command_name" == git ]] && continue
+        [[ -e "$TEST_ROOT/no-zsh-bin/$command_name" || -L "$TEST_ROOT/no-zsh-bin/$command_name" ]] && continue
+        ln -s "$executable" "$TEST_ROOT/no-zsh-bin/$command_name"
+    done
+done
+ln -s "$TEST_ROOT/bin/git" "$TEST_ROOT/no-zsh-bin/git"
+
+if PATH="$TEST_ROOT/no-zsh-bin" command -v zsh >/dev/null 2>&1; then
+    echo "test PATH unexpectedly contains zsh" >&2
+    exit 1
 fi
+
+# A partial failure must be visible and must not prevent remaining clones.
+if PATH="$TEST_ROOT/no-zsh-bin" GIT_FAIL_URL="https://github.com/Aloxaf/fzf-tab.git" \
+    DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-failed.log" 2>&1; then
+    echo "expected Zsh provisioning failure was not reported" >&2
+    exit 1
+fi
+grep -Fq "Zsh framework/plugins are incomplete" "$TEST_ROOT/zsh-install-failed.log"
+test -f "$XDG_DATA_HOME/oh-my-zsh/oh-my-zsh.sh"
+test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
+test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
+
+# A normal rerun fills the missing checkout and validates each payload.
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install.log"
+test -f "$XDG_DATA_HOME/oh-my-zsh/oh-my-zsh.sh"
+test -f "$XDG_DATA_HOME/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh"
+test -f "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab/fzf-tab.plugin.zsh"
+test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
+grep -Fq "plugins+=(fzf-tab)" "$XDG_CONFIG_HOME/zsh/.zshrc"
+grep -Fq "plugins+=(zsh-autosuggestions)" "$XDG_CONFIG_HOME/zsh/.zshrc"
+grep -Fq "plugins+=(fast-syntax-highlighting)" "$XDG_CONFIG_HOME/zsh/.zshrc"
+
+# If an installer-owned clone later loses its required payload, repair it
+# without deleting the old checkout. The backup is retained for inspection.
+rm -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-repair.log"
+test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+test "$(find "$XDG_DATA_HOME/dots/backups/incomplete-downloads" -type d -name fast-syntax-highlighting | wc -l)" -eq 1
+
+clone_count="$(wc -l < "$GIT_TEST_LOG")"
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-2.log"
+test "$(wc -l < "$GIT_TEST_LOG")" -eq "$clone_count"
+
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" uninstall --yes > "$TEST_ROOT/zsh-uninstall.log"
+test ! -e "$XDG_DATA_HOME/oh-my-zsh"
+test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
+test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting"
+test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions"
 
 # NixOS gets the same user configuration links and installs dependencies into
 # the invoking user's Nix profile. A fake nix executable keeps this test safe.

@@ -72,7 +72,7 @@ else
     # A config-only install remains usable when upstream downloads were skipped.
     autoload -Uz compinit
     compinit -d "$ZSH_COMPDUMP"
-    print -u2 -- "dots: Oh My Zsh is missing; run './bin/dots install' to install it."
+    print -u2 -- "dots: Oh My Zsh is missing at '$ZSH'. Run: dots install --no-packages"
 fi
 
 # Modular configuration

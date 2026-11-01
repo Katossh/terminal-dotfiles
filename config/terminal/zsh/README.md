@@ -1,5 +1,6 @@
 # Zsh configuration
 
+The detailed setup and recovery instructions live in [docs/ZSH.md](../../../docs/ZSH.md). Use [docs/TROUBLESHOOTING.md](../../../docs/TROUBLESHOOTING.md) when the framework or a plugin is missing.
 The entry point is `dots/zshenv`. It sets XDG paths and `ZDOTDIR=$XDG_CONFIG_HOME/zsh`, so Zsh loads its startup files from this directory rather than directly from `~`. The interactive setup uses Oh My Zsh as the framework and plugin loader, while Starship remains the prompt provider.
 
 ## Files
