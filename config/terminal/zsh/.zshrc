@@ -64,10 +64,11 @@ source "$ZDOTDIR/handlers.zsh"
 
 # These features are not provided by Oh My Zsh, so they remain standalone plugins.
 # fzf-tab is loaded before autosuggestions; syntax highlighting is loaded last.
+# manydots-magic is intentionally not loaded: it wraps backward-delete-char
+# and has been interfering with normal Backspace behaviour.
 for plugin in \
     "$ZDOTDIR/.packages/fzf-tab/fzf-tab.plugin.zsh" \
     "$ZDOTDIR/.packages/zsh-autosuggestions/zsh-autosuggestions.zsh" \
-    "$ZDOTDIR/.packages/zsh-manydots-magic/manydots-magic" \
     "$ZDOTDIR/.packages/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"; do
     [[ -f "$plugin" ]] && source "$plugin"
 done
