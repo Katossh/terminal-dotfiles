@@ -99,7 +99,7 @@ for path_dir in "${original_path_parts[@]}"; do
     for executable in "$path_dir"/*; do
         [[ -f "$executable" && -x "$executable" ]] || continue
         command_name="${executable##*/}"
-        [[ "$command_name" == zsh ]] && continue
+        [[ "$command_name" == zsh || "$command_name" == git ]] && continue
         [[ -e "$TEST_ROOT/no-zsh-bin/$command_name" || -L "$TEST_ROOT/no-zsh-bin/$command_name" ]] && continue
         ln -s "$executable" "$TEST_ROOT/no-zsh-bin/$command_name"
     done
@@ -135,6 +135,14 @@ test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
 grep -Fq "plugins+=(fzf-tab)" "$XDG_CONFIG_HOME/zsh/.zshrc"
 grep -Fq "plugins+=(zsh-autosuggestions)" "$XDG_CONFIG_HOME/zsh/.zshrc"
 grep -Fq "plugins+=(fast-syntax-highlighting)" "$XDG_CONFIG_HOME/zsh/.zshrc"
+
+# If an installer-owned clone later loses its required payload, repair it
+# without deleting the old checkout. The backup is retained for inspection.
+rm -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-repair.log"
+test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+test "$(find "$XDG_DATA_HOME/dots/backups/incomplete-downloads" -type d -name fast-syntax-highlighting | wc -l)" -eq 1
 
 clone_count="$(wc -l < "$GIT_TEST_LOG")"
 PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
