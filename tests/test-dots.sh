@@ -16,7 +16,16 @@ printf '%s\n' 'user-owned kitty config' > "$XDG_CONFIG_HOME/kitty/kitty.conf"
 printf '%s\n' '# personal kitty override' > "$XDG_CONFIG_HOME/dots/overrides/kitty/kitty.conf"
 
 "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/install-1.log"
+
+# Simulate obsolete file-level links from the previous vendored .packages tree.
+legacy_target="$XDG_CONFIG_HOME/zsh/.packages/old/plugin.zsh"
+legacy_source="$REPO_DIR/config/terminal/zsh/.packages/old/plugin.zsh"
+mkdir -p "$(dirname "$legacy_target")" "$XDG_DATA_HOME/dots"
+ln -s "$legacy_source" "$legacy_target"
+printf 'link\t%s\t%s\n' "$legacy_target" "$legacy_source" >> "$XDG_DATA_HOME/dots/state.tsv"
+
 "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/install-2.log"
+test ! -L "$legacy_target"
 
 test -L "$HOME/.zshenv"
 test -L "$XDG_CONFIG_HOME/zsh/.zshrc"
@@ -90,6 +99,11 @@ GIT
     clone_count="$(wc -l < "$GIT_TEST_LOG")"
     PATH="$TEST_ROOT/bin:$PATH" DOTS_SKIP_DOWNLOADS=0 "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-2.log"
     test "$(wc -l < "$GIT_TEST_LOG")" -eq "$clone_count"
+    PATH="$TEST_ROOT/bin:$PATH" DOTS_SKIP_DOWNLOADS=0 "$REPO_DIR/bin/dots" uninstall --yes > "$TEST_ROOT/zsh-uninstall.log"
+    test ! -e "$XDG_DATA_HOME/oh-my-zsh"
+    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
+    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting"
+    test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions"
 fi
 
 # NixOS gets the same user configuration links and installs dependencies into
