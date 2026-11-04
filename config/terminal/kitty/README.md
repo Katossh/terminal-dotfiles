@@ -9,11 +9,10 @@
 - The scrollback mappings refer to Neovim's `kitty-scrollback.nvim` plugin path; remove or adjust them if that plugin is not installed.
 - `kitty_grab/` is a vendored upstream project; prefer updating it from its source rather than editing upstream code locally.
 
-## Clipboard shortcuts
+## Mouse behavior
 
-- `Ctrl+C` copies selected text; when there is no selection, it sends SIGINT to the foreground process.
-- `Ctrl+V` pastes from the system clipboard.
-- `Ctrl+Shift+C` and `Ctrl+Shift+V` remain available as explicit copy/paste alternatives.
-- The mappings allow fallback for non-Latin keyboard layouts.
+- Middle-click paste from the PRIMARY selection is disabled in Kitty.
+- Other middle-button behavior outside Kitty is left to the application and desktop configuration.
+- The standard `Ctrl+Shift+C` and `Ctrl+Shift+V` clipboard shortcuts are unchanged.
 
 This is a Kitty emulator configuration, not a Windows Terminal settings file. Under WSL, it is relevant only if Kitty itself is running as a Linux GUI application. A Windows-hosted terminal usually needs its own host-side configuration.
