@@ -381,8 +381,14 @@ run-shell 'zsh_path="$(command -v zsh 2>/dev/null)" && [ -x "$zsh_path" ] && tmu
 # increase history size
 set -g history-limit 10000
 
-# start with mouse mode enabled
-#set -g mouse on
+# Keep mouse input under Kitty's control: text selection, scrolling, and paste.
+set -g mouse off
+
+# The base config binds prefix+m to toggle mouse mode; keep it disabled.
+unbind m
+
+# Allow tmux to set Kitty's clipboard without accepting app-originated OSC 52 buffers.
+set -s set-clipboard external
 
 # force Vi mode
 #   really you should export VISUAL or EDITOR environment variable, see manual
