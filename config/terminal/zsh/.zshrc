@@ -82,6 +82,10 @@ source "$ZDOTDIR/handlers.zsh"
 
 bindkey "^O" clear-screen
 
+# Alt+Right accepts the next word of a zsh-autosuggestions suggestion.
+# The plugin wraps forward-word with its partial-accept widget.
+bindkey '^[[1;3C' forward-word
+
 # Ctrl+W removes a shell-style word, respecting path separators.
 autoload -U select-word-style
 select-word-style bash
