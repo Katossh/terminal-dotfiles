@@ -393,6 +393,10 @@ set -s set-clipboard external
 set -g status-keys vi
 set -g mode-keys vi
 
+# Skip tmux's default confirmation prompts for closing panes and windows.
+bind x kill-pane
+bind & kill-window
+
 # replace C-b by C-a instead of using both prefixes
 # set -gu prefix2
 # unbind C-a
