@@ -61,6 +61,15 @@ _dots_command_state_precmd
 setopt errexit
 assert_eq "interrupted command status is captured" "130" "$DOTS_LAST_STATUS"
 
+# A diagnostic function can preserve the failure it is inspecting, even when
+# the user invokes it repeatedly.
+_dots_command_state_preexec "why" "why" "why"
+dots_command_state_preserve_previous
+true
+_dots_command_state_precmd
+assert_eq "diagnostic command does not replace previous command" "sleep 99" "$DOTS_LAST_COMMAND"
+assert_eq "diagnostic command preserves previous status" "130" "$DOTS_LAST_STATUS"
+
 # A prompt redraw without a preceding command must leave the previous record
 # untouched.
 last_command="$DOTS_LAST_COMMAND"
@@ -74,10 +83,14 @@ source "$REPO_DIR/config/terminal/zsh/command-state.zsh"
 typeset -i preexec_count=0
 typeset -i precmd_count=0
 for hook in "${preexec_functions[@]}"; do
-    [[ "$hook" == _dots_command_state_preexec ]] && (( preexec_count += 1 ))
+    if [[ "$hook" == _dots_command_state_preexec ]]; then
+        (( preexec_count += 1 ))
+    fi
 done
 for hook in "${precmd_functions[@]}"; do
-    [[ "$hook" == _dots_command_state_precmd ]] && (( precmd_count += 1 ))
+    if [[ "$hook" == _dots_command_state_precmd ]]; then
+        (( precmd_count += 1 ))
+    fi
 done
 assert_eq "preexec hook is registered once" "1" "$preexec_count"
 assert_eq "precmd hook is registered once" "1" "$precmd_count"
