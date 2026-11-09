@@ -84,7 +84,7 @@ jobs:
 
           assert settings["opener"]["edit"][0]["run"] == "nvim %s"
           assert settings["opener"]["edit"][0]["block"] is True
-          assert theme["syntect_theme"] == "~/.config/yazi/Catppuccin-frappe.tmTheme"
+          assert theme["mgr"]["syntect_theme"] == "~/.config/yazi/Catppuccin-frappe.tmTheme"
           assert theme["mode"]["normal_main"]["bg"] == "#85c1dc"
           assert (config / "Catppuccin-frappe.tmTheme").is_file()
           print("Yazi config is valid: Neovim opener and Catppuccin Frappé Sapphire theme.")
