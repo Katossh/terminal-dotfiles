@@ -4,3 +4,11 @@
 edit = [
   { run = "nvim %s", desc = "Neovim", for = "unix", block = true },
 ]
+bulk-rename = [
+  { run = "nvim -- %s", desc = "Neovim (bulk rename)", block = true },
+]
+
+# Route Yazi's temporary bulk-rename list to the dedicated blocking opener.
+[[open.prepend_rules]]
+url = "bulk-rename.txt"
+use = "bulk-rename"
