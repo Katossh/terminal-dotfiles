@@ -175,7 +175,7 @@ dots_classify_failure() {
 
         if [[ -n "$target" ]] &&
             [[ "$target" != *'$'* ]] &&
-            [[ "$target" != *'\x60'* ]] &&
+            [[ "$target" != *'`'* ]] &&
             [[ "$target" != *'*'* ]] &&
             [[ "$target" != *'?'* ]] &&
             [[ "$target" != *'['* ]]; then
