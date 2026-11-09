@@ -2,7 +2,7 @@
 emulate -LR zsh
 setopt err_return no_unset
 
-REPO_DIR="\${0:A:h:h}"
+REPO_DIR="${0:A:h:h}"
 source "$REPO_DIR/config/terminal/zsh/command-suggestions.zsh"
 
 fail() {
@@ -30,7 +30,7 @@ function dots_suggestion_fixture_got() {
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
 
-first_candidate="\${candidate_output%%$'\n'*}"
+first_candidate="${candidate_output%%$'\n'*}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
 
