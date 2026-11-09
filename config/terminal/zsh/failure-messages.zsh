@@ -37,7 +37,7 @@ dots_failure_message() {
     username="${username//$'\r'/ }"
 
     case "$category" in
-        not_found|permission|missing_path|git|nix|generic) ;;
+        not_found|permission|missing_path|git|nix|network|generic) ;;
         *) category=generic ;;
     esac
 
@@ -186,6 +186,23 @@ dots_failure_message() {
                 "${red}The derivation has rejected the same offering again. Read the trace, ${username}.${reset}"
                 "${red}Nix has made its position clear. Repeating the build is not new information.${reset}"
                 "${red}The store has seen enough. Time to inspect the actual evaluation error.${reset}"
+            )
+            ;;
+        network)
+            messages=(
+                "${cyan}🌐 The network has gone dark while running \"${command}\". Check the route before blaming the matrix.${reset}"
+                "${yellow}📡 No reliable connection for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
+                "${purple}🛰️ Signal lost during \"${command}\". The destination has not answered the call.${reset}"
+            )
+            repeat_messages=(
+                "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
+                "${cyan}Still no signal for \"${command}\". Repeating the request won't repair DNS or routing.${reset}"
+                "${purple}The remote side remains unreachable. Inspect the connection details above.${reset}"
+            )
+            severe_messages=(
+                "${red}The network is still unavailable. Repeating \"${command}\" is not a connectivity test.${reset}"
+                "${red}The signal has failed again. Check DNS, routing, proxy/VPN, and remote availability.${reset}"
+                "${red}${username}, the network is not going to reconnect out of embarrassment.${reset}"
             )
             ;;
         generic)
