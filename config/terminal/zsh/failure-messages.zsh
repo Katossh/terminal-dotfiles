@@ -227,15 +227,15 @@ dots_failure_message() {
     fi
 
     local previous_template="$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE"
-    local selected_template=''
-    local index=0
-    local attempts=0
-    while (( attempts < ${#messages[@]} )); do
-        index=$(( (RANDOM % ${#messages[@]}) + 1 ))
+    local message_count="${#messages[@]}"
+    local index=$(( (RANDOM % message_count) + 1 ))
+    local selected_template="${messages[$index]}"
+    if [[ "$selected_template" == "$previous_template" ]] && (( message_count > 1 )); then
+        # Deterministic fallback guarantees that the previous template is
+        # not repeated, even if RANDOM produces the same index repeatedly.
+        index=$(( (index % message_count) + 1 ))
         selected_template="${messages[$index]}"
-        [[ "$selected_template" != "$previous_template" ]] && break
-        attempts=$((attempts + 1))
-    done
+    fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
     printf '%s\n' "$selected_template"
