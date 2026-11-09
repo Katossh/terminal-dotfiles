@@ -26,6 +26,9 @@ jobs:
             sudo apt-get install -y shellcheck zsh
           else
             brew install shellcheck
+            if ! command -v zsh >/dev/null 2>&1; then
+              brew install zsh
+            fi
           fi
 
       - name: Check shell syntax
@@ -37,9 +40,36 @@ jobs:
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
+          zsh -n config/terminal/zsh/command-state.zsh
+          zsh -n config/terminal/zsh/failure-classifier.zsh
+          zsh -n config/terminal/zsh/failure-messages.zsh
+          zsh -n config/terminal/zsh/command-suggestions.zsh
+          zsh -n config/terminal/zsh/diagnostics.zsh
+          zsh -n config/terminal/zsh/handlers.zsh
+          zsh -n tests/test-command-state.zsh
+          zsh -n tests/test-failure-classifier.zsh
+          zsh -n tests/test-failure-messages.zsh
+          zsh -n tests/test-command-suggestions.zsh
+          zsh -n tests/test-diagnostics.zsh
+          zsh -n tests/test-zsh-failure-integration.zsh
 
       - name: ShellCheck
         run: shellcheck --severity=warning bin/dots tests/test-dots.sh scripts/migrate-terminal-repo.sh
+
+      - name: Zsh unit and integration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_file in \
+            tests/test-command-state.zsh \
+            tests/test-failure-classifier.zsh \
+            tests/test-failure-messages.zsh \
+            tests/test-command-suggestions.zsh \
+            tests/test-diagnostics.zsh \
+            tests/test-zsh-failure-integration.zsh; do
+            printf 'Running %s\\n' "$test_file"
+            zsh "$test_file"
+          done
 
       - name: Validate common profile
         shell: bash

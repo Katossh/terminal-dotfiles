@@ -75,6 +75,14 @@ else
     print -u2 -- "dots: Oh My Zsh is missing at '$ZSH'. Run: dots install --no-packages"
 fi
 
+# Core command state, conservative failure diagnosis, and safe suggestions.
+# These load after Oh My Zsh so their hooks run with the final plugin setup.
+source "$ZDOTDIR/command-state.zsh"
+source "$ZDOTDIR/failure-classifier.zsh"
+source "$ZDOTDIR/failure-messages.zsh"
+source "$ZDOTDIR/command-suggestions.zsh"
+source "$ZDOTDIR/diagnostics.zsh"
+
 # Modular configuration
 source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/completion.zsh"
