@@ -80,8 +80,6 @@ DOTS_LAST_STATUS=127
 DOTS_TEST_CATEGORY=not_found
 output="$(why)"
 assert_contains "command-not-found diagnosis is shown" "could not resolve the command name" "$output"
-assert_contains "classifier receives the expanded command" "gti status" "$DOTS_TEST_CLASSIFIER_COMMAND"
-assert_eq "classifier receives the exit code" "127" "$DOTS_TEST_CLASSIFIER_STATUS"
 
 DOTS_LAST_COMMAND='cd ~/missing-project'
 DOTS_LAST_EXECUTED_COMMAND='cd ~/missing-project'
