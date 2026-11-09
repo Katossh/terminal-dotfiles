@@ -46,14 +46,1691 @@ output="$(dots_failure_message network 'curl https://example.invalid')"
 assert_contains "network category has dedicated messaging" "network" "${output:l}"
 assert_contains "network message includes the command" "curl https://example.invalid" "$output"
 
-# Every C0 control character and DEL must be removed/replaced before the
-# supplied command text is rendered. The output should remain one line.
+# All representable C0 control characters (NUL cannot be stored in a shell
+# variable) and DEL must be replaced before the command text is rendered.
 unsafe_command=$'curl\a\b\t\r\n\x1b\x7fhttps://example.invalid'
 output="$(dots_failure_message network "$unsafe_command")"
 assert_absent "BEL is removed" $'\a' "$output"
 assert_absent "backspace is removed" $'\b' "$output"
-assert_absent "tab is removed" $'\t' "$output"
-assert_absent "carriage return is removed" $'\r' "$output"
+assert_absent "tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail backspace is removed" ( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Adjacent selections cannot repeat the same message template.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+first="$(dots_failure_message generic repeat-check)"
+second="$(dots_failure_message generic repeat-check)"
+[[ "$first" != "$second" ]] || fail "adjacent messages must not repeat"
+print -- "ok - adjacent messages do not repeat"
+
+# Repeated identical failures progress from the normal pool to repeat and
+# severe pools, while still preserving the anti-repeat guarantee.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+export DOTS_FAILURE_MESSAGE_ESCALATION=1
+first="$(dots_failure_message generic escalation-check)"
+second="$(dots_failure_message generic escalation-check)"
+third="$(dots_failure_message generic escalation-check)"
+[[ "$first" != "$second" && "$second" != "$third" ]] ||
+    fail "escalation must not repeat adjacent messages"
+print -- "ok - repeated failures escalate without adjacent repetition"
+
+# A zero display probability suppresses the message but remains a successful
+# rendering operation.
+export DOTS_FAILURE_MESSAGE_CHANCE=0
+output="$(dots_failure_message generic suppressed)"
+[[ -z "$output" ]] || fail "zero message probability must suppress output"
+print -- "ok - zero message probability suppresses output"
+export DOTS_FAILURE_MESSAGE_CHANCE=100
+
+# The message-rendering helper must not return the failed command's status.
+dots_failure_message generic status-check >/dev/null
+[[ "$?" == 0 ]] || fail "message rendering must return success"
+print -- "ok - renderer returns success"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\b' "$output"
+assert_absent "detail tab is removed" ( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "detail vertical tab is removed" ( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "detail form feed is removed" ( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "detail ESC is removed" ( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+remote said\a\b\t\v\f\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\t' "$output"
+assert_absent "vertical tab is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\v' "$output"
+assert_absent "form feed is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\f' "$output"
+assert_absent "carriage return is removed" 
+assert_absent "ESC is removed" $'\e' "$output"
+assert_absent "DEL is removed" $'\x7f' "$output"
+lines=( "${(@f)output}" )
+(( ${#lines[@]} == 1 )) || fail "command control characters must not create extra lines"
+
+# Detail and username are user-influenced values too; neither may inject
+# terminal controls into the rendered output.
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
+output="$(dots_failure_message network 'curl' "$unsafe_detail")"
+assert_absent "detail control characters are removed" $'\a' "$output"
+assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
+
+unsafe_user=$'katossh\a\x1b'
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
+assert_absent "username control characters are removed" $'\a' "$output"
+assert_absent "username ESC is removed" $'\e' "$output"
+
+# Unknown categories degrade to generic rather than causing an empty message
+# pool or an arithmetic failure.
+output="$(dots_failure_message unknown-category 'some-command')"
+assert_contains "unknown category falls back to generic messaging" "some-command" "$output"
+
+print -- "All failure-message tests passed."
+\r' "$output"
 assert_absent "ESC is removed" $'\e' "$output"
 assert_absent "DEL is removed" $'\x7f' "$output"
 lines=( "${(@f)output}" )
