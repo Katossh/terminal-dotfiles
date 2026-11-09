@@ -50,10 +50,18 @@ dots_failure_message() {
     case "$rare_chance" in
         (''|*[!0-9]*) rare_chance=3 ;;
     esac
+    # Strip leading zeroes so values such as 08 remain decimal in arithmetic.
+    while [[ "$chance" == 0* && "$chance" != 0 ]]; do
+        chance="${chance#0}"
+    done
+    while [[ "$rare_chance" == 0* && "$rare_chance" != 0 ]]; do
+        rare_chance="${rare_chance#0}"
+    done
     (( chance > 100 )) && chance=100
     (( rare_chance > 100 )) && rare_chance=100
-    (( chance == 0 )) && return 0
-    (( RANDOM % 100 >= chance )) && return 0
+    if (( chance == 0 || RANDOM % 100 >= chance )); then
+        return 0
+    fi
 
     # Respect NO_COLOR and avoid emitting escape sequences into redirected
     # output, logs, or tests.
@@ -79,7 +87,7 @@ dots_failure_message() {
     fi
 
     local escalation=1
-    case "${DOTS_FAILURE_MESSAGE_ESCALATION:l}" in
+    case "${DOTS_FAILURE_MESSAGE_ESCALATION:-1}" in
         0|false|no|off) escalation=0 ;;
     esac
 
