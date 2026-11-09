@@ -122,7 +122,8 @@ assert_contains "verbose output identifies expanded command" "Expanded:" "$outpu
 assert_contains "Nix diagnosis remains cautious" "cannot distinguish evaluation, build, fetch, or activation" "$output"
 
 # "why" must ask the state hook to preserve the record it is reading.
-assert_eq "previous command preservation requested" "9" "$DOTS_TEST_PRESERVE_CALLS"
+why >/dev/null
+assert_eq "why requests preservation of the previous command" "1" "$DOTS_TEST_PRESERVE_CALLS"
 
 # The module also works before the optional classifier is loaded.
 unfunction dots_classify_failure
