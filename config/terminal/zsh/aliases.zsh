@@ -10,6 +10,9 @@ if [[ "$OSTYPE" == linux* ]] && command -v objdump >/dev/null 2>&1; then
 fi
 alias rm="rm -i"
 
+# Enter the shared Nix programming environment from any directory.
+alias dev='nix develop github:Katossh/shiny-rotary-phone#general'
+
 preview() {
   while true; do
     local file
