@@ -57,8 +57,12 @@ dots_failure_message() {
     while [[ "$rare_chance" == 0* && "$rare_chance" != 0 ]]; do
         rare_chance="${rare_chance#0}"
     done
-    (( chance > 100 )) && chance=100
-    (( rare_chance > 100 )) && rare_chance=100
+    if (( chance > 100 )); then
+        chance=100
+    fi
+    if (( rare_chance > 100 )); then
+        rare_chance=100
+    fi
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
     fi
@@ -87,7 +91,9 @@ dots_failure_message() {
     fi
 
     local escalation=1
-    case "${DOTS_FAILURE_MESSAGE_ESCALATION:-1}" in
+    local escalation_setting="${DOTS_FAILURE_MESSAGE_ESCALATION:-1}"
+    escalation_setting="${escalation_setting:l}"
+    case "$escalation_setting" in
         0|false|no|off) escalation=0 ;;
     esac
 
