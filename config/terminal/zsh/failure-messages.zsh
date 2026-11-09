@@ -199,6 +199,23 @@ dots_failure_message() {
                 "${red}${username}, the network is not going to reconnect out of embarrassment.${reset}"
             )
             ;;
+        network)
+            messages=(
+                "${cyan}🌐 Network connection failed while running \\\"${command}\\\". DNS, routing, or the remote service may be unavailable.${reset}"
+                "${yellow}📡 The network refused to cooperate with \\\"${command}\\\". Check connectivity and DNS.${reset}"
+                "${purple}🛰️ Signal lost during \\\"${command}\\\". The remote endpoint may be unreachable.${reset}"
+            )
+            repeat_messages=(
+                "${yellow}The network is still unavailable. Repeating \\\"${command}\\\" has not improved the signal.${reset}"
+                "${cyan}Another connection failure. Check DNS, proxy, VPN, and the remote service.${reset}"
+                "${purple}The remote endpoint remains unreachable. Inspect the underlying network error.${reset}"
+            )
+            severe_messages=(
+                "${red}The network has rejected the same request again. Stop retrying blindly and inspect the connection.${reset}"
+                "${red}This is now a pattern, not a temporary glitch. Check the route and resolver.${reset}"
+                "${red}The signal is still lost, ${username}. More retries are not a diagnosis.${reset}"
+            )
+            ;;
         generic)
             messages=(
                 "${yellow}⚠️ Command \"${command}\" failed. The terminal expected a different outcome.${reset}"
