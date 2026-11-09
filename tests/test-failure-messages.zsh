@@ -61,13 +61,18 @@ lines=( "${(@f)output}" )
 
 # Detail and username are user-influenced values too; neither may inject
 # terminal controls into the rendered output.
-unsafe_detail=$'remote said\a\b\x1bno'
+unsafe_detail=$'remote said\a\b\x1bno\r\nnext'
 output="$(dots_failure_message network 'curl' "$unsafe_detail")"
 assert_absent "detail control characters are removed" $'\a' "$output"
 assert_absent "detail ESC is removed" $'\e' "$output"
+detail_lines=( "${(@f)output}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail control characters must not create extra lines"
 
 unsafe_user=$'katossh\a\x1b'
-USER="$unsafe_user" output="$(dots_failure_message permission 'chmod')"
+original_user="$USER"
+export USER="$unsafe_user"
+output="$(dots_failure_message permission 'chmod')"
+export USER="$original_user"
 assert_absent "username control characters are removed" $'\a' "$output"
 assert_absent "username ESC is removed" $'\e' "$output"
 
