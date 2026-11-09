@@ -1,0 +1,6 @@
+# Yazi's default "r" binding also renames selected files.
+# Uppercase R is an explicit shortcut for the same bulk-rename workflow.
+[[mgr.prepend_keymap]]
+on = "R"
+run = "rename"
+desc = "Bulk rename selected files in Neovim"
