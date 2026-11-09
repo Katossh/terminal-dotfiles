@@ -24,17 +24,11 @@ dots_failure_message() {
     local detail="${3:-}"
     local username="${USER:-${LOGNAME:-user}}"
 
-    # Keep caller-provided text on one line and prevent it from injecting
-    # terminal control sequences into the message.
-    command="${command//$'\e'/}"
-    command="${command//$'\n'/ }"
-    command="${command//$'\r'/ }"
-    detail="${detail//$'\e'/}"
-    detail="${detail//$'\n'/ }"
-    detail="${detail//$'\r'/ }"
-    username="${username//$'\e'/}"
-    username="${username//$'\n'/ }"
-    username="${username//$'\r'/ }"
+    # Replace every control character (including BEL, backspace, DEL, and
+    # terminal escape bytes) instead of only the common ESC/CR/LF trio.
+    command="${command//[[:cntrl:]]/ }"
+    detail="${detail//[[:cntrl:]]/ }"
+    username="${username//[[:cntrl:]]/ }"
 
     case "$category" in
         not_found|permission|missing_path|git|nix|network|generic) ;;
@@ -191,13 +185,13 @@ dots_failure_message() {
         network)
             messages=(
                 "${cyan}🌐 The network has gone dark while running \"${command}\". Check the route before blaming the matrix.${reset}"
-                "${yellow}📡 No reliable connection for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
-                "${purple}🛰️ Signal lost during \"${command}\". The destination has not answered the call.${reset}"
+                "${yellow}📡 Network route unavailable for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
+                "${purple}🛰️ Network signal lost during \"${command}\". The destination has not answered the call.${reset}"
             )
             repeat_messages=(
                 "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
-                "${cyan}Still no signal for \"${command}\". Repeating the request won't repair DNS or routing.${reset}"
-                "${purple}The remote side remains unreachable. Inspect the connection details above.${reset}"
+                "${cyan}The network still has no signal for \"${command}\". Repeating the request won't repair DNS or routing.${reset}"
+                "${purple}The network remote remains unreachable. Inspect the connection details above.${reset}"
             )
             severe_messages=(
                 "${red}The network is still unavailable. Repeating \"${command}\" is not a connectivity test.${reset}"
