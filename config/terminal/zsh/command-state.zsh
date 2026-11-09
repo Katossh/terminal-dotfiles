@@ -10,6 +10,8 @@
 #   DOTS_LAST_STATUS           Exit status of that command.
 #   DOTS_LAST_CWD              Working directory when it started.
 #   DOTS_LAST_TIMESTAMP        Unix timestamp (seconds) when it finished.
+#   dots_command_state_preserve_previous
+#                               Keep the current record across this command.
 #
 # The public values are updated in precmd, not preexec. While a command such
 # as a future "why" function is running, the values therefore still describe
@@ -31,6 +33,7 @@ typeset -g _DOTS_COMMAND_STATE_PENDING_COMMAND=""
 typeset -g _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND=""
 typeset -g _DOTS_COMMAND_STATE_PENDING_CWD=""
 typeset -gi _DOTS_COMMAND_STATE_PENDING=0
+typeset -gi _DOTS_COMMAND_STATE_PRESERVE_PREVIOUS=0
 
 _dots_command_state_preexec() {
     emulate -L zsh
@@ -50,6 +53,14 @@ _dots_command_state_preexec() {
     return 0
 }
 
+# Diagnostic commands such as "why" can call this from their function body.
+# Their own invocation will then not replace the command record they inspect.
+dots_command_state_preserve_previous() {
+    emulate -L zsh
+    typeset -gi _DOTS_COMMAND_STATE_PRESERVE_PREVIOUS=1
+    return 0
+}
+
 _dots_command_state_precmd() {
     # This must be the first command in the hook: entering the function after
     # the command finishes is the only reliable point to read its exit status.
@@ -58,6 +69,15 @@ _dots_command_state_precmd() {
 
     # precmd also runs for the initial prompt, before any interactive command.
     (( _DOTS_COMMAND_STATE_PENDING )) || return 0
+
+    if (( _DOTS_COMMAND_STATE_PRESERVE_PREVIOUS )); then
+        _DOTS_COMMAND_STATE_PENDING=0
+        _DOTS_COMMAND_STATE_PRESERVE_PREVIOUS=0
+        _DOTS_COMMAND_STATE_PENDING_COMMAND=""
+        _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND=""
+        _DOTS_COMMAND_STATE_PENDING_CWD=""
+        return 0
+    fi
 
     typeset -g DOTS_LAST_COMMAND="$_DOTS_COMMAND_STATE_PENDING_COMMAND"
     typeset -g DOTS_LAST_EXECUTED_COMMAND="$_DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND"
