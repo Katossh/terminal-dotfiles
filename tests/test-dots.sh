@@ -41,6 +41,12 @@ test -L "$XDG_CONFIG_HOME/yazi/theme.toml"
 test -L "$XDG_CONFIG_HOME/yazi/Catppuccin-frappe.tmTheme"
 grep -Fq 'run = "nvim %s"' "$XDG_CONFIG_HOME/yazi/yazi.toml"
 grep -Fq 'syntect_theme = "~/.config/yazi/Catppuccin-frappe.tmTheme"' "$XDG_CONFIG_HOME/yazi/theme.toml"
+grep -Fq 'map ctrl+shift+c copy_or_noop' "$REPO_DIR/config/terminal/kitty/kitty.conf"
+grep -Fq 'map ctrl+shift+v paste_from_clipboard' "$REPO_DIR/config/terminal/kitty/kitty.conf"
+grep -Fq 'set -s extended-keys on' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
+grep -Fq 'set -s extended-keys-format csi-u' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
+grep -Fq "set -as terminal-features ',xterm-kitty:extkeys'" "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
+grep -Fq 'bind -T copy-mode-vi C-S-c send -X copy-selection-and-cancel' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
 
 # Oh My Zsh and its custom plugins are installed outside the checkout.
 # Provisioning must work even when zsh is absent from PATH (fresh/Nix hosts).

@@ -388,10 +388,20 @@ set -g mouse on
 # Allow tmux to set Kitty's clipboard without accepting app-originated OSC 52 buffers.
 set -s set-clipboard external
 
+# Kitty reports Ctrl+Shift+C distinctly; tmux 3.5+ is required for csi-u format.
+# The workstation's pinned Nixpkgs provides tmux 3.8.
+set -s extended-keys on
+set -s extended-keys-format csi-u
+set -as terminal-features ',xterm-kitty:extkeys'
+
 # force Vi mode
 #   really you should export VISUAL or EDITOR environment variable, see manual
 set -g status-keys vi
 set -g mode-keys vi
+
+# In Vim-style copy mode, Ctrl+Shift+C copies the active selection and exits.
+# Kitty's copy_or_noop mapping forwards this key only when Kitty has no selection.
+bind -T copy-mode-vi C-S-c send -X copy-selection-and-cancel
 
 # Skip tmux's default confirmation prompts for closing panes and windows.
 bind x kill-pane
