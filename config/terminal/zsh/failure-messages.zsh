@@ -14,6 +14,13 @@ typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
 typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
 typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
 
+_dots_failure_message_sanitize() {
+    emulate -L zsh
+
+    local value="${1-}"
+    REPLY="${value//[[:cntrl:]]/ }"
+}
+
 dots_failure_message() {
     emulate -L zsh
     setopt localoptions no_aliases
@@ -26,9 +33,12 @@ dots_failure_message() {
 
     # Replace every control character (including BEL, backspace, DEL, and
     # terminal escape bytes) instead of only the common ESC/CR/LF trio.
-    command="${command//[[:cntrl:]]/ }"
-    detail="${detail//[[:cntrl:]]/ }"
-    username="${username//[[:cntrl:]]/ }"
+    _dots_failure_message_sanitize "$command"
+    command="$REPLY"
+    _dots_failure_message_sanitize "$detail"
+    detail="$REPLY"
+    _dots_failure_message_sanitize "$username"
+    username="$REPLY"
 
     case "$category" in
         not_found|permission|missing_path|git|nix|network|generic) ;;
