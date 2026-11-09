@@ -1,0 +1,6 @@
+# Yazi-specific settings. Unspecified options retain Yazi's shipped defaults.
+
+[opener]
+edit = [
+  { run = "nvim %s", desc = "Neovim", for = "unix", block = true },
+]

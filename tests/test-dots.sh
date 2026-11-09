@@ -36,6 +36,11 @@ test -L "$HOME/.local/bin/dots"
 test -L "$HOME/.local/bin/kp"
 test -f "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
 test -f "$HOME/.tmux/dots-theme.conf"
+test -L "$XDG_CONFIG_HOME/yazi/yazi.toml"
+test -L "$XDG_CONFIG_HOME/yazi/theme.toml"
+test -L "$XDG_CONFIG_HOME/yazi/Catppuccin-frappe.tmTheme"
+grep -Fq 'run = "nvim %s"' "$XDG_CONFIG_HOME/yazi/yazi.toml"
+grep -Fq 'syntect_theme = "~/.config/yazi/Catppuccin-frappe.tmTheme"' "$XDG_CONFIG_HOME/yazi/theme.toml"
 
 # Oh My Zsh and its custom plugins are installed outside the checkout.
 # Provisioning must work even when zsh is absent from PATH (fresh/Nix hosts).
