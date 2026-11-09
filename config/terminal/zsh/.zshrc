@@ -78,6 +78,14 @@ fi
 # Modular configuration
 source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/completion.zsh"
+
+# Load failure-handling modules after framework/plugin setup. The command-state
+# hook is registered first; diagnostics and handlers consume its captured state.
+source "$ZDOTDIR/command-state.zsh"
+source "$ZDOTDIR/failure-classifier.zsh"
+source "$ZDOTDIR/failure-messages.zsh"
+source "$ZDOTDIR/command-suggestions.zsh"
+source "$ZDOTDIR/diagnostics.zsh"
 source "$ZDOTDIR/handlers.zsh"
 
 bindkey "^O" clear-screen
