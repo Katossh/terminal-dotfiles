@@ -26,7 +26,7 @@ dots_classify_failure() {
     local exit_status="$2"
 
     # Zsh exit statuses are decimal integers in the range 0..255.
-    if [[ "$exit_status" != <-> ]]; then
+    if [[ "$exit_status" != <-> ]] || (( ${#exit_status} > 3 )); then
         return 2
     fi
 
