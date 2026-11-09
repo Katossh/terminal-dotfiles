@@ -38,6 +38,7 @@ Git and network access to GitHub are required for framework/plugin downloads. Fa
 - [Installation guide](docs/INSTALLATION.md) — prerequisites, install modes, platforms and NixOS.
 - [Command reference](docs/COMMANDS.md) — commands, options, receipts and safety behavior.
 - [Zsh setup](docs/ZSH.md) — framework, plugins, startup order, cache paths and updates.
+- [Yazi setup](docs/YAZI.md) — Neovim opener, Catppuccin theme, config ownership and installation.
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — missing framework, incomplete downloads, PATH and network issues.
 - [Upstream sources](resources/upstream-sources.md) — third-party projects and their runtime locations.
 
@@ -76,7 +77,7 @@ Keep credentials, private keys and machine-specific secrets out of tracked files
 
 ## Repository layout
 
-- config/terminal/ — Zsh, Kitty, tmux and CLI/TUI application settings.
+- config/terminal/ — Zsh, Kitty, tmux, Yazi and CLI/TUI application settings.
 - dots/ — shared shell environment configuration.
 - bin/ — installer and portable helper commands.
 - manifest/ — configuration and package inventories.

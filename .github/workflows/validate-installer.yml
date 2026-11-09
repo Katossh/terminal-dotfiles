@@ -71,6 +71,25 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Yazi TOML and theme defaults
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          config = Path("config/terminal/yazi")
+          settings = tomllib.loads((config / "yazi.toml").read_text())
+          theme = tomllib.loads((config / "theme.toml").read_text())
+
+          assert settings["opener"]["edit"][0]["run"] == "nvim %s"
+          assert settings["opener"]["edit"][0]["block"] is True
+          assert theme["syntect_theme"] == "~/.config/yazi/Catppuccin-frappe.tmTheme"
+          assert theme["mode"]["normal_main"]["bg"] == "#85c1dc"
+          assert (config / "Catppuccin-frappe.tmTheme").is_file()
+          print("Yazi config is valid: Neovim opener and Catppuccin Frappé Sapphire theme.")
+          PY
+
       - name: Help and non-destructive dry run
         run: |
           ./bin/dots --help
