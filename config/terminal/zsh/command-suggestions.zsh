@@ -18,10 +18,10 @@
 _dots_command_suggestion_distance() {
     emulate -L zsh
 
-    local left="\${1-}"
-    local right="\${2-}"
-    local -i left_length=\${#left}
-    local -i right_length=\${#right}
+    local left="${1-}"
+    local right="${2-}"
+    local -i left_length=${#left}
+    local -i right_length=${#right}
     local -i i j cost deletion insertion substitution transposition best
     local -a previous previous_previous current
 
@@ -43,7 +43,7 @@ _dots_command_suggestion_distance() {
         current[1]=$i
 
         for ((j = 1; j <= right_length; j++)); do
-            if [[ "\${left[i]}" == "\${right[j]}" ]]; then
+            if [[ "${left[i]}" == "${right[j]}" ]]; then
                 cost=0
             else
                 cost=1
@@ -58,7 +58,7 @@ _dots_command_suggestion_distance() {
             (( substitution < best )) && best=$substitution
 
             if (( i > 1 && j > 1 )) &&
-                [[ "\${left[i]}" == "\${right[j - 1]}" && "\${left[i - 1]}" == "\${right[j]}" ]]; then
+                [[ "${left[i]}" == "${right[j - 1]}" && "${left[i - 1]}" == "${right[j]}" ]]; then
                 transposition=$((previous_previous[j - 1] + 1))
                 (( transposition < best )) && best=$transposition
             fi
@@ -66,17 +66,17 @@ _dots_command_suggestion_distance() {
             current[$((j + 1))]=$best
         done
 
-        previous_previous=("\${previous[@]}")
-        previous=("\${current[@]}")
+        previous_previous=("${previous[@]}")
+        previous=("${current[@]}")
     done
 
-    REPLY=\${previous[$((right_length + 1))]}
+    REPLY=${previous[$((right_length + 1))]}
 }
 
 _dots_command_suggestion_candidates() {
     emulate -L zsh
 
-    local command="\${1-}"
+    local command="${1-}"
     local entry name kind
     local -i max_distance max_results=5
     local -a names ranked suggestions
@@ -85,7 +85,7 @@ _dots_command_suggestion_candidates() {
     [[ -n "$command" ]] || return 1
     [[ "$command" != */* && "$command" != *[[:space:]]* ]] || return 1
 
-    local -i command_length=\${#command}
+    local -i command_length=${#command}
     (( command_length >= 2 )) || return 1
 
     # Keep short command names conservative; permit two edits only for longer
@@ -100,8 +100,8 @@ _dots_command_suggestion_candidates() {
     # aliases, builtins, external commands, functions, and reserved words.
     # Reserved words and private helper functions are not useful corrections.
     while IFS= read -r entry; do
-        name="\${entry%%: *}"
-        kind="\${entry##*: }"
+        name="${entry%%: *}"
+        kind="${entry##*: }"
 
         [[ -n "$name" ]] || continue
         [[ "$kind" == reserved ]] && continue
@@ -111,33 +111,33 @@ _dots_command_suggestion_candidates() {
 
     typeset -U names
 
-    for name in "\${names[@]}"; do
+    for name in "${names[@]}"; do
         [[ "$name" == "$command" ]] && continue
 
         _dots_command_suggestion_distance "$command" "$name"
         (( REPLY <= max_distance )) || continue
 
-        ranked+=("\${REPLY} $name")
+        ranked+=("${REPLY} $name")
     done
 
-    (( \${#ranked[@]} > 0 )) || return 1
+    (( ${#ranked[@]} > 0 )) || return 1
 
     # Distances are single-digit and precede the candidate, so lexical sorting
     # ranks by distance first and then alphabetically for stable output.
-    ranked=("\${(@o)ranked}")
+    ranked=("${(@o)ranked}")
 
-    for entry in "\${ranked[@]}"; do
-        suggestions+=("\${entry#* }")
-        (( \${#suggestions[@]} >= max_results )) && break
+    for entry in "${ranked[@]}"; do
+        suggestions+=("${entry#* }")
+        (( ${#suggestions[@]} >= max_results )) && break
     done
 
-    print -rl -- "\${suggestions[@]}"
+    print -rl -- "${suggestions[@]}"
 }
 
 dots_suggest_command() {
     emulate -L zsh
 
-    local command="\${1-}"
+    local command="${1-}"
     local selected choice
     local -i index=1
     local -a suggestions
@@ -149,15 +149,15 @@ dots_suggest_command() {
 
     local candidate_output
     candidate_output="$(_dots_command_suggestion_candidates "$command")" || return 1
-    suggestions=("\${(@f)candidate_output}")
+    suggestions=("${(@f)candidate_output}")
 
-    (( \${#suggestions[@]} > 0 )) || return 1
+    (( ${#suggestions[@]} > 0 )) || return 1
 
     # In scripts, pipelines, and non-interactive shells, only print useful
     # suggestions. Never block waiting for input that may not exist.
     if [[ ! -o interactive || ! -r /dev/tty ]]; then
         print -u2 -- "Possible corrections for '$command':"
-        for selected in "\${suggestions[@]}"; do
+        for selected in "${suggestions[@]}"; do
             print -u2 -- "  - $selected"
         done
         return 1
@@ -165,16 +165,16 @@ dots_suggest_command() {
 
     # fzf is optional. Selection only populates REPLY; execution is left to the
     # caller, which must require a separate explicit confirmation.
-    if [[ "\${DOTS_SUGGEST_DISABLE_FZF:-0}" != 1 ]] &&
+    if [[ "${DOTS_SUGGEST_DISABLE_FZF:-0}" != 1 ]] &&
         builtin whence -p fzf >/dev/null 2>&1; then
-        if selected="$(print -rl -- "\${suggestions[@]}" | command fzf \
+        if selected="$(print -rl -- "${suggestions[@]}" | command fzf \
             --no-multi \
             --prompt="Correction > " \
             --height=40% \
             --layout=reverse \
             --border)"; then
             [[ -n "$selected" ]] || return 1
-            for choice in "\${suggestions[@]}"; do
+            for choice in "${suggestions[@]}"; do
                 if [[ "$choice" == "$selected" ]]; then
                     REPLY=$selected
                     return 0
@@ -186,16 +186,16 @@ dots_suggest_command() {
 
     # Dependency-free interactive fallback for systems without fzf.
     print -u2 -- "Possible corrections for '$command':"
-    for selected in "\${suggestions[@]}"; do
+    for selected in "${suggestions[@]}"; do
         print -u2 -- "  $index) $selected"
         ((index++))
     done
 
-    print -u2 -n -- "Select a correction (1-\${#suggestions[@]}) or press Enter to cancel: "
+    print -u2 -n -- "Select a correction (1-${#suggestions[@]}) or press Enter to cancel: "
     IFS= read -r choice </dev/tty || return 1
     [[ "$choice" == <-> ]] || return 1
-    (( choice >= 1 && choice <= \${#suggestions[@]} )) || return 1
+    (( choice >= 1 && choice <= ${#suggestions[@]} )) || return 1
 
-    REPLY="\${suggestions[$choice]}"
+    REPLY="${suggestions[$choice]}"
     return 0
 }
