@@ -37,6 +37,18 @@ jobs:
           zsh -n config/terminal/zsh/.zshrc
           zsh -n config/terminal/zsh/prompt.zsh
           zsh -n themes/adapters/fzf.zsh
+          zsh -n config/terminal/zsh/command-state.zsh
+          zsh -n config/terminal/zsh/failure-messages.zsh
+          zsh -n config/terminal/zsh/failure-classifier.zsh
+          zsh -n config/terminal/zsh/command-suggestions.zsh
+          zsh -n config/terminal/zsh/diagnostics.zsh
+          zsh -n config/terminal/zsh/handlers.zsh
+          zsh -n tests/test-command-state.zsh
+          zsh -n tests/test-failure-messages.zsh
+          zsh -n tests/test-failure-classifier.zsh
+          zsh -n tests/test-command-suggestions.zsh
+          zsh -n tests/test-diagnostics.zsh
+          zsh -n tests/test-failure-integration.zsh
 
       - name: ShellCheck
         run: shellcheck --severity=warning bin/dots tests/test-dots.sh scripts/migrate-terminal-repo.sh
@@ -52,17 +64,17 @@ jobs:
           test ! -d config/ui
           test ! -e install.sh
           grep -Fq 'builtins.readFile ../manifest/packages.tsv' nix/packages.nix
-          awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
+          awk -F '\\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' manifest/packages.tsv
           test -d config/terminal
           test ! -d legacy/ui
           for component in niri waybar mako rofi; do
-            if awk -F '\t' -v component="$component" '$1 == component { found=1 } END { exit !found }' manifest/configs.tsv; then
+            if awk -F '\\t' -v component="$component" '$1 == component { found=1 } END { exit !found }' manifest/configs.tsv; then
               echo "Desktop component unexpectedly included in common manifest: $component"
               exit 1
             fi
           done
-          while IFS=$'\t' read -r component kind source target platforms; do
-            [[ -z "$component" || "$component" == \#* ]] && continue
+          while IFS=$'\\t' read -r component kind source target platforms; do
+            [[ -z "$component" || "$component" == \\#* ]] && continue
             [[ "$kind" == file || "$kind" == tree ]]
             [[ -e "$source" || -L "$source" ]]
           done < manifest/configs.tsv
@@ -101,3 +113,21 @@ jobs:
 
       - name: End-to-end lifecycle tests
         run: bash tests/test-dots.sh
+
+      - name: Zsh failure-handling tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_files=(
+            tests/test-command-state.zsh
+            tests/test-failure-messages.zsh
+            tests/test-failure-classifier.zsh
+            tests/test-command-suggestions.zsh
+            tests/test-diagnostics.zsh
+            tests/test-failure-integration.zsh
+          )
+          for test_file in "${test_files[@]}"; do
+            echo "::group::${test_file}"
+            zsh "${test_file}"
+            echo "::endgroup::"
+          done
