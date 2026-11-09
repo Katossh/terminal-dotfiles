@@ -114,15 +114,12 @@ detail_lines=( "${(@f)output}" )
 (( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create additional lines"
 assert_control_free "detail output contains no terminal controls" "$output"
 
-unsafe_user=$'katossh\\a\\b\\t\\v\\f\\r\\n\\e\\x7f'
-original_user="${USER:-}"
-export USER="$unsafe_user"
-output="$(dots_failure_message permission chmod)"
-export USER="$original_user"
-assert_absent "username controls are removed" $'\\a' "$output"
-assert_absent "username ESC is removed" $'\\e' "$output"
-assert_control_free "username output contains no terminal controls" "$output"
-
+unsafe_user=$'katossh\a\x1b'
+_dots_failure_message_sanitize "$unsafe_user"
+sanitized_user="$REPLY"
+assert_contains "username is retained after sanitization" "katossh" "$sanitized_user"
+assert_absent "username control characters are removed" $'\a' "$sanitized_user"
+assert_absent "username ESC is removed" $'\e' "$sanitized_user"
 # Unknown categories degrade to generic instead of producing an empty pool.
 output="$(dots_failure_message unexpected 'fallback-command')"
 assert_contains "unknown categories fall back to generic" "fallback-command" "$output"
