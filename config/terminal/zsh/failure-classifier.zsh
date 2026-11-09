@@ -23,21 +23,27 @@ dots_classify_failure() {
     fi
 
     local command_text="$1"
-    local status="$2"
+    local exit_status="$2"
 
     # Zsh exit statuses are decimal integers in the range 0..255.
-    if [[ "$status" != <-> ]] || (( status > 255 )); then
+    if [[ "$exit_status" != <-> ]]; then
         return 2
     fi
 
-    if [[ "$status" == 0 ]]; then
+    local -i exit_status_num=$(( 10#$exit_status ))
+
+    if (( exit_status_num > 255 )); then
+        return 2
+    fi
+
+    if (( exit_status_num == 0 )); then
         REPLY=none
         return 0
     fi
 
     # These are conventional shell statuses. A program can deliberately
     # return them too, so they are useful heuristics rather than proof.
-    case "$status" in
+    case "$exit_status_num" in
         126)
             REPLY=permission
             return 0
@@ -195,7 +201,7 @@ dots_classify_failure() {
     # Network-related curl statuses documented by curl:
     # 5 proxy DNS, 6 host DNS, 7 connect, 28 timeout.
     # wget uses status 4 for network failure.
-    case "$command_name:$status" in
+    case "$command_name:$exit_status_num" in
         curl:5|curl:6|curl:7|curl:28|wget:4)
             REPLY=network
             return 0
