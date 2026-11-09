@@ -23,11 +23,11 @@ function dots_suggestion_fixture_git() {
     :
 }
 
-function dots_suggestion_fixture_got() {
+function dots_suggestion_fixture_gut() {
     :
 }
 
-alias dots_suggestion_fixture_alias=":"
+alias dots_suggestion_fixture_got=":"
 
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
