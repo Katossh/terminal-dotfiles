@@ -67,7 +67,7 @@ jobs:
             tests/test-command-suggestions.zsh \
             tests/test-diagnostics.zsh \
             tests/test-zsh-failure-integration.zsh; do
-            printf 'Running %s\\n' "$test_file"
+            echo "Running $test_file"
             zsh "$test_file"
           done
 

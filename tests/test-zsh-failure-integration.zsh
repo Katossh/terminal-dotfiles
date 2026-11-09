@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 setopt errexit nounset
 
-REPO_DIR="\${0:A:h:h}"
+REPO_DIR="${0:A:h:h}"
 ZSH_DIR="$REPO_DIR/config/terminal/zsh"
 
 source "$ZSH_DIR/command-state.zsh"
@@ -44,8 +44,8 @@ false
 _dots_command_state_precmd
 setopt errexit
 
-first_output="$(mktemp "\${TMPDIR:-/tmp}/dots-zsh-integration.XXXXXX")"
-second_output="$(mktemp "\${TMPDIR:-/tmp}/dots-zsh-integration.XXXXXX")"
+first_output="$(mktemp "${TMPDIR:-/tmp}/dots-zsh-integration.XXXXXX")"
+second_output="$(mktemp "${TMPDIR:-/tmp}/dots-zsh-integration.XXXXXX")"
 trap 'rm -f "$first_output" "$second_output"' EXIT
 
 _dots_failure_handler_precmd > "$first_output"

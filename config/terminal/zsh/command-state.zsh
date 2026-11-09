@@ -75,10 +75,10 @@ dots_command_state_note_executed_command() {
     local argument
     local -a quoted_words
     for argument in "$@"; do
-        quoted_words+=( "\${(q)argument}" )
+        quoted_words+=( "${(q)argument}" )
     done
 
-    typeset -g _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND="\${(j: :)quoted_words}"
+    typeset -g _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND="${(j: :)quoted_words}"
     return 0
 }
 
