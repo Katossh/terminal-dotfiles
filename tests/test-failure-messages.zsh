@@ -135,11 +135,63 @@ detail_lines=( "${(@f)output}" )
 (( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra lines"
 assert_control_free "detail output contains no terminal controls" "$output"
 
-unsafe_user=$'katossh\\a\\b\\t\\v\\f\\r\\n\\e\\x7f'
+unsafe_user=
+# Unknown categories degrade to generic instead of producing an empty pool.
+capture_message unexpected 'fallback-command'
+output="$DOTS_TEST_OUTPUT"
+assert_contains "unknown categories fall back to generic" "fallback-command" "$output"
+
+# Adjacent selections cannot repeat, and the state must persist across calls.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+capture_message generic repeated-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic repeated-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$first" != "$second" ]] || fail "adjacent messages must not repeat"
+print -- "ok - adjacent messages do not repeat"
+
+# Repeated identical failures progress through normal, repeat, and severe
+# pools. Assert state as well as distinct output to prove escalation ran.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+export DOTS_FAILURE_MESSAGE_ESCALATION=1
+capture_message generic escalation-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic escalation-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 2 ]] || fail "second failure must increment the streak"
+capture_message generic escalation-command
+third="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 3 ]] || fail "third failure must increment the streak"
+[[ "$first" != "$second" && "$second" != "$third" ]] ||
+    fail "escalation must preserve adjacent anti-repeat behaviour"
+print -- "ok - repeated failures escalate without adjacent repetition"
+
+# Suppression must not turn message rendering into a command failure.
+export DOTS_FAILURE_MESSAGE_CHANCE=0
+capture_message generic suppressed
+[[ -z "$DOTS_TEST_OUTPUT" ]] || fail "zero probability must suppress output"
+print -- "ok - zero probability suppresses output"
+dots_failure_message generic status-check >/dev/null
+[[ "$?" == 0 ]] || fail "renderer must return success"
+print -- "ok - renderer returns success"
+
+print -- "All failure-message tests passed."
+katossh\\a\\b\\t\\v\\f\\r\\n\\e\\x7f'
 _dots_failure_message_sanitize "$unsafe_user"
 sanitized_user="$REPLY"
 assert_contains "username is retained after sanitization" "katossh" "$sanitized_user"
 assert_control_free "username sanitization removes all controls" "$sanitized_user"
+
+original_user="${USER:-}"
+export USER="$unsafe_user"
+capture_message permission chmod
+output="$DOTS_TEST_OUTPUT"
+export USER="$original_user"
+assert_control_free "sanitised username is safe in rendered messages" "$output"
 
 # Unknown categories degrade to generic instead of producing an empty pool.
 capture_message unexpected 'fallback-command'
