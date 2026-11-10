@@ -59,20 +59,13 @@ _dots_failure_message_rainbow() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Never animate redirected logs, CI output, or terminals without cursor
-    # control. The short animation is deliberately capped at four frames.
-    [[ -t 1 && "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+    # Queue the effect for the next ZLE session. The animation itself is
+    # driven asynchronously by failure-animation.zsh; never sleep in precmd.
+    [[ -o interactive && -t 0 && -t 1 &&
+        "${TERM:-dumb}" != dumb &&
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
-    local color="${1-}"
-    local reset="${2-}"
-    local frame
-    local -a frames=( '✧' '✦' '✨' '✦' )
-
-    for frame in "${frames[@]}"; do
-        printf '\r\033[2K%s%s%s  Consulting the machine spirits...' "$color" "$frame" "$reset"
-        command sleep 0.04 2>/dev/null || break
-    done
-    printf '\r\033[2K'
+    typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=1
 }
 
 dots_failure_message() {
@@ -132,16 +125,28 @@ dots_failure_message() {
 
     # Respect NO_COLOR and avoid emitting escape sequences into redirected
     # output, logs, or tests.
-    local red='' green='' yellow='' blue='' magenta='' cyan='' purple='' dim='' reset=''
-    if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-        red=$'\e[31m'
-        green=$'\e[32m'
-        yellow=$'\e[33m'
-        blue=$'\e[34m'
-        magenta=$'\e[35m'
-        cyan=$'\e[36m'
-        purple=$'\e[38;5;141m'
-        dim=$'\e[2m'
+    local red='' green='' yellow='' blue='' magenta='' cyan='' purple='' dim=''
+    local orange='' pink='' rose='' gold='' lime='' teal='' sky='' violet='' lavender='' coral=''
+    local reset=''
+    if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-dumb}" != dumb ]]; then
+        red=$'\e[38;2;248;113;113m'
+        green=$'\e[38;2;134;239;172m'
+        yellow=$'\e[38;2;253;224;71m'
+        blue=$'\e[38;2;147;197;253m'
+        magenta=$'\e[38;2;240;171;252m'
+        cyan=$'\e[38;2;103;232;249m'
+        purple=$'\e[38;2;196;181;253m'
+        dim=$'\e[38;2;161;161;170m'
+        orange=$'\e[38;2;253;186;116m'
+        pink=$'\e[38;2;249;168;212m'
+        rose=$'\e[38;2;253;164;175m'
+        gold=$'\e[38;2;250;204;21m'
+        lime=$'\e[38;2;190;242;100m'
+        teal=$'\e[38;2;94;234;212m'
+        sky=$'\e[38;2;125;211;252m'
+        violet=$'\e[38;2;167;139;250m'
+        lavender=$'\e[38;2;221;214;254m'
+        coral=$'\e[38;2;251;113;133m'
         reset=$'\e[0m'
     fi
 
