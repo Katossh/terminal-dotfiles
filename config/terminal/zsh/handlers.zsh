@@ -70,10 +70,11 @@ command_not_found_handler() {
     return 127
 }
 
-# Preserve other prompt hooks and register this integration hook exactly once.
-# It is appended so command-state's first-position hook publishes status first.
-typeset -ga precmd_functions
-precmd_functions=(
-    ${precmd_functions:#_dots_failure_handler_precmd}
-    _dots_failure_handler_precmd
-)
+# Register only for interactive prompts, after command-state's first hook.
+if [[ -o interactive ]]; then
+    typeset -ga precmd_functions
+    precmd_functions=(
+        ${precmd_functions:#_dots_failure_handler_precmd}
+        _dots_failure_handler_precmd
+    )
+fi

@@ -94,7 +94,8 @@ _dots_command_state_precmd
 assert_eq "empty precmd leaves command untouched" "$last_command" "$DOTS_LAST_COMMAND"
 assert_eq "empty precmd leaves status untouched" "$last_status" "$DOTS_LAST_STATUS"
 
-# Re-sourcing the module must not register duplicate hook functions.
+# Re-sourcing in this non-interactive test process must not register
+# interactive hooks. The interactive .zshrc path is covered by startup wiring.
 source "$REPO_DIR/config/terminal/zsh/command-state.zsh"
 typeset -i preexec_count=0
 typeset -i precmd_count=0
@@ -108,9 +109,7 @@ for hook in "${precmd_functions[@]}"; do
         (( precmd_count += 1 ))
     fi
 done
-assert_eq "preexec hook is registered once" "1" "$preexec_count"
-assert_eq "precmd hook is registered once" "1" "$precmd_count"
-assert_eq "preexec hook runs first" "_dots_command_state_preexec" "${preexec_functions[1]}"
-assert_eq "precmd hook runs first" "_dots_command_state_precmd" "${precmd_functions[1]}"
+assert_eq "preexec hook is not registered in non-interactive shell" "0" "$preexec_count"
+assert_eq "precmd hook is not registered in non-interactive shell" "0" "$precmd_count"
 
 print -- "command state tests passed"

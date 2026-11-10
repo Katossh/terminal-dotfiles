@@ -119,14 +119,18 @@ _dots_command_state_precmd() {
     return 0
 }
 
-# Install each hook exactly once. Prepending the precmd hook captures the
-# original command status before another prompt hook can fail or change state.
-typeset -ga preexec_functions precmd_functions
-preexec_functions=(
-    _dots_command_state_preexec
-    ${preexec_functions:#_dots_command_state_preexec}
-)
-precmd_functions=(
-    _dots_command_state_precmd
-    ${precmd_functions:#_dots_command_state_precmd}
-)
+# This tracker is for interactive command history only. Do not install hooks
+# in scripts or non-interactive shells that merely source the shared config.
+if [[ -o interactive ]]; then
+    # Install each hook exactly once. Prepending precmd captures the original
+    # command status before another prompt hook can fail or change state.
+    typeset -ga preexec_functions precmd_functions
+    preexec_functions=(
+        _dots_command_state_preexec
+        ${preexec_functions:#_dots_command_state_preexec}
+    )
+    precmd_functions=(
+        _dots_command_state_precmd
+        ${precmd_functions:#_dots_command_state_precmd}
+    )
+fi

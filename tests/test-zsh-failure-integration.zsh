@@ -49,10 +49,10 @@ second_output="$(mktemp "${TMPDIR:-/tmp}/dots-zsh-integration.XXXXXX")"
 trap 'rm -f "$first_output" "$second_output"' EXIT
 
 _dots_failure_handler_precmd > "$first_output"
-message="$(<"$first_output")"
+message="$(cat "$first_output")"
 assert_contains "failure message hook renders Git failure" "git status" "$message"
 _dots_failure_handler_precmd > "$second_output"
-assert_eq "failure record is reported once" "" "$(<"$second_output")"
+assert_eq "failure record is reported once" "" "$(cat "$second_output")"
 
 # A second identical failure is a new command record and must be reported.
 _dots_command_state_preexec "git status" "git status" "git status"
@@ -61,13 +61,13 @@ false
 _dots_command_state_precmd
 setopt errexit
 _dots_failure_handler_precmd > "$second_output"
-message="$(<"$second_output")"
+message="$(cat "$second_output")"
 assert_contains "repeated failure receives a new message" "git status" "$message"
 
 # Re-running the prompt hook without a new command must not emit a duplicate.
 : > "$first_output"
 _dots_failure_handler_precmd > "$first_output"
-assert_eq "prompt redraw does not repeat a failure message" "" "$(<"$first_output")"
+assert_eq "prompt redraw does not repeat a failure message" "" "$(cat "$first_output")"
 
 # Success records advance state but never emit a failure message.
 _dots_command_state_preexec "true" "true" "true"
@@ -75,7 +75,7 @@ true
 _dots_command_state_precmd
 : > "$first_output"
 _dots_failure_handler_precmd > "$first_output"
-assert_eq "successful commands do not emit failure messages" "" "$(<"$first_output")"
+assert_eq "successful commands do not emit failure messages" "" "$(cat "$first_output")"
 
 # A corrected command remains distinguishable from the typo the user typed.
 _dots_command_state_preexec "gti status" "gti status" "gti status"
