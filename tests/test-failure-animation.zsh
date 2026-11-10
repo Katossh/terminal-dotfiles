@@ -80,7 +80,25 @@ assert_contains "animation process is active" ACTIVE_1 "$REPLY"
 # Send a shell command after a short animation interval; it writes the final
 # frame count and restored prompt to a file, avoiding PTY echo/output races.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s%s%s\\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" PROMPT_ "$RPROMPT" > "$RESULT_FILE"'$'\\n'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" PROMPT_ "$RPROMPT" > "$RESULT_FILE"'
+
+typeset -i result_attempt=0
+while [[ ! -s "$result_file" ]] && (( result_attempt < 100 )); do
+    command sleep 0.05
+    (( result_attempt += 1 ))
+done
+[[ -s "$result_file" ]] || fail "keyboard input was not processed while animation was active"
+
+typeset animation_result="$(<"$result_file")"
+assert_contains "animation callback rendered at least one frame" "FRAMECOUNT_" "$animation_result"
+[[ "$animation_result" == *FRAMECOUNT_[1-9]* ]] || {
+    print -u2 -r -- "Animation result: $animation_result"
+    fail "no animation frame callback ran before Enter"
+}
+assert_contains "original right prompt was restored after Enter" "PROMPT_BASE_RPROMPT" "$animation_result"
+
+print -- "All non-blocking failure-animation integration tests passed."
+\n'
 
 typeset -i result_attempt=0
 while [[ ! -s "$result_file" ]] && (( result_attempt < 80 )); do
