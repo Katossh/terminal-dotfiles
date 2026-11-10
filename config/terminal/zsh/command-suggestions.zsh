@@ -16,8 +16,6 @@ zmodload zsh/parameter 2>/dev/null || true
 typeset -g _DOTS_COMMAND_SUGGESTION_CACHE_PATH=''
 typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_READY=0
 typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT=-1
-typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT=-1
-typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT=-1
 typeset -ga _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=()
 typeset -ga _DOTS_COMMAND_SUGGESTION_RESULTS=()
 
@@ -58,8 +56,6 @@ _dots_command_suggestion_refresh_cache() {
     _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=( "${names[@]}" )
     _DOTS_COMMAND_SUGGESTION_CACHE_PATH="$PATH"
     _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT=${#functions}
-    _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT=${#commands}
-    _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT=${#builtins}
     _DOTS_COMMAND_SUGGESTION_CACHE_READY=1
 }
 
@@ -188,9 +184,7 @@ _dots_command_suggestion_candidates() {
     # tables is O(1); enumerating them is deferred to this invalidation path.
     if (( ! _DOTS_COMMAND_SUGGESTION_CACHE_READY )) ||
         [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" != "$PATH" ]] ||
-        (( _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT != ${#functions} ||
-           _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT != ${#commands} ||
-           _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT != ${#builtins} )); then
+        (( _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT != ${#functions} )); then
         _dots_command_suggestion_refresh_cache
     fi
 
