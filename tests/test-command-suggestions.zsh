@@ -47,9 +47,18 @@ if _dots_command_suggestion_candidates x; then
 fi
 
 # A non-interactive caller gets printable suggestions, never a blocking prompt.
-if output="$(dots_suggest_command dots_suggestion_fixture_gti 2>&1)"; then
+# Keep the function invocation in this shell so its REPLY contract is observable.
+suggestion_output="$(mktemp "${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
+if dots_suggest_command dots_suggestion_fixture_gti >"$suggestion_output" 2>&1; then
+    rm -f "$suggestion_output"
     fail "non-interactive suggestion lookup must not report a selected command"
+else
+    suggestion_status=$?
 fi
+output="$(<"$suggestion_output")"
+rm -f "$suggestion_output"
+[[ "$suggestion_status" == 1 ]] ||
+    fail "non-interactive suggestion lookup should return status 1"
 [[ "$output" == *dots_suggestion_fixture_git* ]] ||
     fail "non-interactive output should include the best suggestion"
 [[ -z "$REPLY" ]] || fail "no selection should leave REPLY empty"
