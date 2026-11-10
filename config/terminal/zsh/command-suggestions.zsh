@@ -39,8 +39,8 @@ _dots_command_suggestion_refresh_cache() {
         names+=( "$directory"/*(N-*:t) )
     done
 
-    # Snapshot shell-resolvable names too. The count checks below invalidate
-    # this snapshot when functions or command hashes are added dynamically.
+    # Snapshot shell-resolvable names too. The function-count check below
+    # invalidates this snapshot when shell functions are added dynamically.
     if (( ${+commands} )); then
         names+=( "${(@k)commands}" )
     fi
