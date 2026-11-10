@@ -58,7 +58,7 @@ Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, g
 
 The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with `DOTS_FAILURE_STYLE=ecchi`.
 
-Animations now run for 36 frames over about 5 seconds and are enabled on 50% of displayed failures by default. The renderer feeds frames to ZLE through an asynchronous file-descriptor watcher and updates `RPROMPT`, so typing, cursor movement, deletion, and Enter remain responsive while the animation runs. Submitting the line cancels the remaining frames and restores the original right prompt. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
+Animations now run for 36 frames over about 5 seconds and are enabled on 50% of displayed failures by default. The renderer feeds frames to ZLE through an asynchronous file-descriptor watcher and appends a bold, framed motif directly beside the left prompt and command input. Typing, cursor movement, deletion, and Enter remain responsive; submitting the line cancels the remaining frames, restores the original left prompt, and leaves `RPROMPT` untouched. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
 
 Optional overrides:
 

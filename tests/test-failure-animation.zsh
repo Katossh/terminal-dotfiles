@@ -57,9 +57,9 @@ zpty -w "$pty_name" 'source "$ZSH_DIR/failure-animation.zsh"; printf "%s%s\n" AN
 read_until ANIMATIONMODULE_READY
 assert_contains "animation module loaded" ANIMATIONMODULE_READY "$REPLY"
 
-zpty -w "$pty_name" 'RPROMPT="BASE_RPROMPT"; printf "%s%s\n" PROMPT BASE_READY'$'\n'
+zpty -w "$pty_name" 'PROMPT="BASE_PROMPT"; RPROMPT="BASE_RPROMPT"; printf "%s%s\n" PROMPT BASE_READY'$'\n'
 read_until PROMPTBASE_READY
-assert_contains "base right prompt configured" PROMPTBASE_READY "$REPLY"
+assert_contains "base left and right prompts configured" PROMPTBASE_READY "$REPLY"
 
 # Simulate the real failure notification lifecycle: the public renderer is
 # called by precmd after a completed command and before the next ZLE session.
@@ -76,14 +76,17 @@ assert_contains "animation process is active" ACTIVE_1 "$REPLY"
 
 # Wait for the watcher, then type while the five-second animation should run.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES"'$'\n'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" LASTFRAME_PROMPT_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAME_PROMPT" PROMPT_ "$PROMPT" RPROMPT_ "$RPROMPT"'$'\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
 [[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }
+assert_contains "animation is displayed in the left prompt" "✧━━" "$REPLY"
+assert_contains "animation is adjacent to the command prompt" "BASE_PROMPT" "$REPLY"
 
-# The original RPROMPT must be restored after the user submits the line.
-zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "${RPROMPT-}"'$'\n'
-read_until RPROMPT_BASE_RPROMPT
-assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
+# The original left prompt is restored; RPROMPT remains untouched.
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s\n" PROMPT_ "${PROMPT-}" RP ROMPT_ "${RPROMPT-}"'$'\n'
+read_until PROMPT_BASE_PROMPT
+assert_contains "original left prompt restored after Enter" PROMPT_BASE_PROMPT "$REPLY"
+assert_contains "right prompt remains unchanged" RPROMPT_BASE_RPROMPT "$REPLY"
 
 print -- "All non-blocking failure-animation integration tests passed."
