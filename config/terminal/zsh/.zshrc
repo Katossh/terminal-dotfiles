@@ -84,7 +84,6 @@ source "$ZDOTDIR/completion.zsh"
 source "$ZDOTDIR/command-state.zsh"
 source "$ZDOTDIR/failure-classifier.zsh"
 source "$ZDOTDIR/failure-messages.zsh"
-source "$ZDOTDIR/failure-animation.zsh"
 source "$ZDOTDIR/command-suggestions.zsh"
 source "$ZDOTDIR/diagnostics.zsh"
 source "$ZDOTDIR/handlers.zsh"
@@ -102,6 +101,9 @@ fi
 
 # Initialize the prompt after aliases, completions, plugins, and local helpers.
 source "$ZDOTDIR/prompt.zsh"
+
+# Register the animation after Starship so it decorates the freshly built prompt.
+source "$ZDOTDIR/failure-animation.zsh"
 
 # Start tmux automatically for interactive shells, but never nest tmux sessions.
 if command -v tmux >/dev/null 2>&1 && [[ -n "$PS1" ]] &&
