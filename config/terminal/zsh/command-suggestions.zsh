@@ -1,7 +1,7 @@
 # Safe command-name suggestions for the custom Zsh failure handler.
 #
-# This module is intentionally standalone. Source it from .zshrc and call
-# dots_suggest_command "$command_name" from command_not_found_handler.
+# The Rust helper (dots-suggest) performs ranking when installed. A bounded
+# pure-Zsh implementation remains as a portable fallback.
 #
 # Contract:
 #   - Returns 0 only when the user selects a candidate.
@@ -10,49 +10,84 @@
 #     shell is non-interactive.
 #   - Never executes a command. The caller must ask for explicit confirmation
 #     before running REPLY.
-#
-# Runtime dependencies:
-#   - Zsh builtins and globbing for discovery and ranking.
-#   - fzf is optional; a numbered /dev/tty prompt is used without it.
 
-# The parameter module exposes Zsh's command, builtin, and function hash tables.
-# It is part of the standard Zsh distribution; keep discovery functional even
-# on builds where dynamic module loading is unavailable.
 zmodload zsh/parameter 2>/dev/null || true
 
 typeset -g _DOTS_COMMAND_SUGGESTION_CACHE_PATH=''
 typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_READY=0
+typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT=-1
+typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT=-1
+typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT=-1
 typeset -ga _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=()
 typeset -ga _DOTS_COMMAND_SUGGESTION_RESULTS=()
+
+typeset -g _DOTS_COMMAND_SUGGESTION_BINARY=''
+typeset -g _DOTS_COMMAND_SUGGESTION_BINARY_PATH=''
+typeset -g _DOTS_COMMAND_SUGGESTION_BINARY_OVERRIDE=''
+typeset -gi _DOTS_COMMAND_SUGGESTION_BINARY_CHECKED=0
+typeset -g _DOTS_COMMAND_SUGGESTION_LAST_BACKEND=''
 
 _dots_command_suggestion_refresh_cache() {
     emulate -L zsh
 
-    local directory
+    local directory name
     local -aU names
 
-    # Zsh globbing performs PATH discovery in-process. Follow symlinks because
-    # NixOS and many package managers expose executables through symlink farms.
+    # PATH discovery happens once per shell (or when PATH changes). Zsh's
+    # in-process globbing follows symlinks, which matters for Nix store links.
     for directory in "${path[@]}"; do
         [[ -n "$directory" ]] || directory='.'
         [[ -d "$directory" && -r "$directory" ]] || continue
         names+=( "$directory"/*(N-*:t) )
     done
 
-    # Include explicit hash entries and shell builtins. These may not correspond
-    # to files currently visible in PATH.
+    # Snapshot shell-resolvable names too. The count checks below invalidate
+    # this snapshot when functions or command hashes are added dynamically.
     if (( ${+commands} )); then
         names+=( "${(@k)commands}" )
     fi
     if (( ${+builtins} )); then
         names+=( "${(@k)builtins}" )
     fi
+    if (( ${+functions} )); then
+        for name in "${(@k)functions}"; do
+            [[ "$name" == _* ]] || names+=( "$name" )
+        done
+    fi
 
     _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=( "${names[@]}" )
     _DOTS_COMMAND_SUGGESTION_CACHE_PATH="$PATH"
+    _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT=${#functions}
+    _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT=${#commands}
+    _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT=${#builtins}
     _DOTS_COMMAND_SUGGESTION_CACHE_READY=1
 }
 
+_dots_command_suggestion_resolve_binary() {
+    emulate -L zsh
+
+    if (( ! _DOTS_COMMAND_SUGGESTION_BINARY_CHECKED )) ||
+        [[ "$_DOTS_COMMAND_SUGGESTION_BINARY_PATH" != "$PATH" ]] ||
+        [[ "$_DOTS_COMMAND_SUGGESTION_BINARY_OVERRIDE" != "${DOTS_SUGGEST_BIN:-}" ]]; then
+        local binary=''
+        if [[ -n "${DOTS_SUGGEST_BIN:-}" ]]; then
+            [[ -x "$DOTS_SUGGEST_BIN" ]] && binary="$DOTS_SUGGEST_BIN"
+        else
+            binary="$(builtin whence -p dots-suggest 2>/dev/null)"
+        fi
+
+        _DOTS_COMMAND_SUGGESTION_BINARY="$binary"
+        _DOTS_COMMAND_SUGGESTION_BINARY_PATH="$PATH"
+        _DOTS_COMMAND_SUGGESTION_BINARY_OVERRIDE="${DOTS_SUGGEST_BIN:-}"
+        _DOTS_COMMAND_SUGGESTION_BINARY_CHECKED=1
+    fi
+
+    REPLY="$_DOTS_COMMAND_SUGGESTION_BINARY"
+    [[ -n "$REPLY" && -x "$REPLY" ]]
+}
+
+# Banded optimal-string-alignment distance. This fallback avoids external
+# processes and retains the previous transposition-aware behavior.
 _dots_command_suggestion_distance() {
     emulate -L zsh
 
@@ -66,16 +101,11 @@ _dots_command_suggestion_distance() {
     local -i previous_deletion previous_insertion previous_substitution previous_transposition
     local -ai previous previous_previous current
 
-    # The caller only needs to know whether the distance is within its small
-    # threshold. A banded optimal-string-alignment DP computes only 2k+1 cells
-    # per row instead of the full left_length * right_length matrix.
     if (( left_length > right_length + limit || right_length > left_length + limit )); then
         REPLY=$sentinel
         return 0
     fi
 
-    # DP row zero: D[0][j] = j, but cells outside the edit-distance band are
-    # represented by the sentinel (limit + 1).
     previous=()
     for ((j = 0; j <= right_length && j <= limit; j++)); do
         previous[$((j + 1))]=$j
@@ -114,7 +144,6 @@ _dots_command_suggestion_distance() {
             (( insertion < best )) && best=$insertion
             (( substitution < best )) && best=$substitution
 
-            # Count one adjacent transposition as a single edit (e.g. gti -> git).
             if (( i > 1 && j > 1 )) &&
                 [[ "${left[i]}" == "${right[j - 1]}" && "${left[i - 1]}" == "${right[j]}" ]]; then
                 previous_transposition=${previous_previous[$((j - 1))]:-$sentinel}
@@ -135,48 +164,59 @@ _dots_command_suggestion_distance() {
 
 _dots_command_suggestion_candidates() {
     emulate -L zsh
+    setopt localoptions no_aliases
 
     local command="${1-}"
-    local name entry
+    local name entry output
     _DOTS_COMMAND_SUGGESTION_RESULTS=()
-    local -i max_distance max_results=5
-    local -aU names
+    local -i max_distance max_results=5 helper_status
     local -a ranked suggestions
 
-    # Do not guess at paths, multi-word command strings, or empty input.
     [[ -n "$command" ]] || return 1
     [[ "$command" != */* && "$command" != *[[:space:]]* ]] || return 1
 
     local -i command_length=${#command}
     (( command_length >= 2 )) || return 1
 
-    # Keep short command names conservative; permit two edits only for longer
-    # names, where a single typo is less likely to create a misleading match.
     if (( command_length < 6 )); then
         max_distance=1
     else
         max_distance=2
     fi
 
-    # Rebuild only when PATH changes. Functions are added dynamically on every
-    # lookup so interactive helpers defined after startup remain discoverable.
+    # Rebuild only when the inputs actually change. Counting the Zsh hash
+    # tables is O(1); enumerating them is deferred to this invalidation path.
     if (( ! _DOTS_COMMAND_SUGGESTION_CACHE_READY )) ||
-        [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" != "$PATH" ]]; then
+        [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" != "$PATH" ]] ||
+        (( _DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT != ${#functions} ||
+           _DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT != ${#commands} ||
+           _DOTS_COMMAND_SUGGESTION_CACHE_BUILTIN_COUNT != ${#builtins} )); then
         _dots_command_suggestion_refresh_cache
     fi
 
-    names=( "${_DOTS_COMMAND_SUGGESTION_CACHE_NAMES[@]}" )
-    if (( ${+functions} )); then
-        names+=( "${(@k)functions}" )
-    fi
-    if (( ${+commands} )); then
-        names+=( "${(@k)commands}" )
-    fi
-    if (( ${+builtins} )); then
-        names+=( "${(@k)builtins}" )
+    # On NixOS, dots-suggest is installed declaratively by nix/packages.nix.
+    # It reads the cached candidate list from stdin and writes at most five
+    # names. A broken/missing helper falls back to the native Zsh algorithm.
+    if [[ "${DOTS_SUGGEST_DISABLE_RUST:-0}" != 1 ]] &&
+        _dots_command_suggestion_resolve_binary; then
+        if output="$("$_DOTS_COMMAND_SUGGESTION_BINARY" "$command" <<< "${(F)_DOTS_COMMAND_SUGGESTION_CACHE_NAMES[@]}")"; then
+            if [[ -n "$output" ]]; then
+                _DOTS_COMMAND_SUGGESTION_RESULTS=( "${(@f)output}" )
+                _DOTS_COMMAND_SUGGESTION_LAST_BACKEND=rust
+                return 0
+            fi
+            return 1
+        else
+            helper_status=$?
+            # Exit 1 is the helper's normal "no candidates" result. Other
+            # failures disable nothing; the portable fallback remains usable.
+            (( helper_status == 1 )) && return 1
+        fi
     fi
 
-    for name in "${names[@]}"; do
+    # Portable fallback: the candidate list is still cached, so the expensive
+    # Zsh hash enumeration and PATH globbing never run for every typo.
+    for name in "${_DOTS_COMMAND_SUGGESTION_CACHE_NAMES[@]}"; do
         [[ -n "$name" && "$name" != _* && "$name" != "$command" ]] || continue
 
         _dots_command_suggestion_distance "$command" "$name" "$max_distance"
@@ -186,9 +226,6 @@ _dots_command_suggestion_candidates() {
     done
 
     (( ${#ranked[@]} > 0 )) || return 1
-
-    # Distances are single-digit and precede the candidate, so lexical sorting
-    # ranks by distance first and then alphabetically for stable output.
     ranked=("${(@o)ranked}")
 
     for entry in "${ranked[@]}"; do
@@ -197,6 +234,7 @@ _dots_command_suggestion_candidates() {
     done
 
     _DOTS_COMMAND_SUGGESTION_RESULTS=("${suggestions[@]}")
+    _DOTS_COMMAND_SUGGESTION_LAST_BACKEND=zsh
     return 0
 }
 
@@ -218,8 +256,6 @@ dots_suggest_command() {
 
     (( ${#suggestions[@]} > 0 )) || return 1
 
-    # In scripts, pipelines, and non-interactive shells, only print useful
-    # suggestions. Never block waiting for input that may not exist.
     if [[ ! -o interactive || ! -r /dev/tty ]]; then
         print -u2 -- "Possible corrections for '$command':"
         for selected in "${suggestions[@]}"; do
@@ -229,8 +265,6 @@ dots_suggest_command() {
         return 1
     fi
 
-    # fzf is optional. Selection only populates REPLY; execution is left to the
-    # caller, which must require a separate explicit confirmation.
     if [[ "${DOTS_SUGGEST_DISABLE_FZF:-0}" != 1 ]] &&
         builtin whence -p fzf >/dev/null 2>&1; then
         if selected="$(print -rl -- "${suggestions[@]}" | command fzf \
@@ -250,7 +284,6 @@ dots_suggest_command() {
         return 1
     fi
 
-    # Dependency-free interactive fallback for systems without fzf.
     print -u2 -- "Possible corrections for '$command':"
     for selected in "${suggestions[@]}"; do
         print -u2 -- "  $index) $selected"
