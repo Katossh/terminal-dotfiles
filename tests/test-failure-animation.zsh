@@ -49,6 +49,7 @@ done
 
 assert_contains "interactive child shell loaded animation module" "ANIMATION_ARMED" "$captured"
 if [[ "$captured" != *"✦"* && "$captured" != *"🌙"* && "$captured" != *"♡"* ]]; then
+    print -u2 -r -- "Captured terminal output: ${(qqq)captured}"
     fail "ZLE did not render an animation frame in the active input prompt"
 fi
 print -- "ok - animation frame rendered while ZLE was active"
