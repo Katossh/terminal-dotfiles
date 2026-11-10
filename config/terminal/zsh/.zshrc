@@ -78,6 +78,14 @@ fi
 # Modular configuration
 source "$ZDOTDIR/aliases.zsh"
 source "$ZDOTDIR/completion.zsh"
+
+# Command state must be registered before the diagnostics and failure hooks.
+# Load these after Oh My Zsh so all hooks see the final plugin environment.
+source "$ZDOTDIR/command-state.zsh"
+source "$ZDOTDIR/failure-classifier.zsh"
+source "$ZDOTDIR/failure-messages.zsh"
+source "$ZDOTDIR/command-suggestions.zsh"
+source "$ZDOTDIR/diagnostics.zsh"
 source "$ZDOTDIR/handlers.zsh"
 
 bindkey "^O" clear-screen
