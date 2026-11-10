@@ -90,7 +90,10 @@ _dots_failure_animation_apply_prompt() {
     fi
     if [[ -z "${NO_COLOR:-}" && "${TERM:-dumb}" != dumb ]]; then
         color="${colors[color_index]}"
-        reset=="%B%{${color}%}✧━━  ✦ ${_DOTS_FAILURE_ANIMATION_FRAME} ✦  ━━✧%{${reset}%}%b"
+        reset=$'\e[0m'
+    fi
+
+    local motif="%B%{${color}%}✧━━  ✦ ${_DOTS_FAILURE_ANIMATION_FRAME} ✦  ━━✧%{${reset}%}%b"
     local first_line="$base"
     local remaining=''
     if [[ "$base" == *$'\n'* ]]; then
