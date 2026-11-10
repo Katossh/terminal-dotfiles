@@ -44,7 +44,7 @@ The disabled zsh-manydots-magic experiment is not part of the active setup.
 
 ## Command-not-found suggestions
 
-The command-name candidate cache is built once and reused. It is invalidated when PATH changes or the number of registered shell functions, command-hash entries, or built-ins changes. This avoids re-enumerating PATH and Zsh's large function table for every typo.
+The command-name candidate cache is built once and reused. It is invalidated when PATH changes or the number of registered shell functions changes. This avoids re-enumerating PATH and Zsh's large function table for every typo.
 
 On NixOS, `nix/packages.nix` installs the dependency-free Rust `dots-suggest` helper automatically. The helper reads the cached candidate names from stdin, applies the existing one-edit / two-edit threshold and adjacent-transposition-aware optimal-string-alignment distance, then returns at most five candidates sorted by distance and name. The shell starts one small helper process per unknown command rather than running a Zsh function and dynamic-array edit-distance calculation for every candidate.
 
