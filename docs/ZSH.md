@@ -44,11 +44,21 @@ The disabled zsh-manydots-magic experiment is not part of the active setup.
 
 ## Command-not-found suggestions
 
-Suggestions enumerate executable names from PATH with Zsh's native globbing and cache that list for the lifetime of the shell. The cache is rebuilt when PATH changes; enabled shell functions and builtins are included dynamically. Candidate ranking uses a threshold-banded optimal-string-alignment distance, so a typo lookup evaluates only the small edit-distance band needed for the configured one- or two-edit threshold. No external process is started for candidate discovery or ranking. The optional fzf process is started only after suggestions have been prepared and the user is choosing one.
+The command-name candidate cache is built once and reused. It is invalidated when PATH changes or the number of registered shell functions, command-hash entries, or built-ins changes. This avoids re-enumerating PATH and Zsh's large function table for every typo.
+
+On NixOS, `nix/packages.nix` installs the dependency-free Rust `dots-suggest` helper automatically. The helper reads the cached candidate names from stdin, applies the existing one-edit / two-edit threshold and adjacent-transposition-aware optimal-string-alignment distance, then returns at most five candidates sorted by distance and name. The shell starts one small helper process per unknown command rather than running a Zsh function and dynamic-array edit-distance calculation for every candidate.
+
+On other systems, the same cached candidate set is ranked by a pure-Zsh fallback. The Rust helper can also be built manually with:
+
+~~~sh
+cargo build --release --manifest-path rust/dots-suggest/Cargo.toml
+~~~
+
+The optional fzf process is started only after candidates have been prepared and the user is choosing one. A suggested command is never executed without a separate explicit confirmation.
 
 ## Installing or repairing
 
-~~~sh
+~~~
 dots install --no-packages
 dots health
 ~~~
@@ -61,7 +71,7 @@ If the framework is missing when a shell starts, .zshrc uses native compinit as 
 
 Automatic Oh My Zsh updates are disabled at shell startup to keep terminal startup deterministic. Update each runtime checkout explicitly:
 
-~~~sh
+~~~
 git -C "$XDG_DATA_HOME/oh-my-zsh" pull --ff-only
 git -C "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab" pull --ff-only
 git -C "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting" pull --ff-only
@@ -77,7 +87,7 @@ The `dev` alias enters the general-purpose development shell exported by
 works from any current directory and does not require a local clone of that
 repository:
 
-~~~sh
+~~~
 dev
 ~~~
 
@@ -89,7 +99,7 @@ and toolchain from the configured Nix caches.
 
 Do not modify runtime-managed upstream directories to customize the prompt or aliases. Put local configuration in ~/.config/zsh/zprofile.local or use the repository's personal override mechanism:
 
-~~~text
+~~~
 ~/.config/dots/overrides/zsh/aliases.zsh
 ~~~
 
