@@ -9,6 +9,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
+typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
+typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -60,6 +62,7 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_STEP=0
         _DOTS_FAILURE_ANIMATION_ACTIVE=0
         _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
+        _DOTS_FAILURE_ANIMATION_STATE='finished'
         zle -R 2>/dev/null || true
     fi
 }
@@ -98,12 +101,15 @@ _dots_failure_animation_fd_widget() {
     local right_prompt="$_DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT"
     [[ -n "$right_prompt" ]] && right_prompt+=" "
     RPROMPT="${right_prompt}%{${color}%}${frame}%{${reset}%}"
+    (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
+    _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
     zle -R
 }
 
 _dots_failure_animation_line_init() {
     emulate -L zsh
 
+    _DOTS_FAILURE_ANIMATION_STATE='line-init'
     (( _DOTS_FAILURE_ANIMATION_PENDING )) || return 0
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
@@ -114,12 +120,17 @@ _dots_failure_animation_line_init() {
     _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT="${RPROMPT-}"
     _DOTS_FAILURE_ANIMATION_STEP=0
+    _DOTS_FAILURE_ANIMATION_FRAMES=0
+    _DOTS_FAILURE_ANIMATION_STATE='starting'
 
     local variant=$(( (RANDOM % 3) + 1 ))
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$variant")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
-    if ! zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_widget; then
+    if zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_widget; then
+        _DOTS_FAILURE_ANIMATION_STATE='registered'
+    else
+        _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
         _dots_failure_animation_cleanup
     fi
 }
