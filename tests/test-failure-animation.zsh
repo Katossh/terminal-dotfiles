@@ -71,3 +71,100 @@ assert_contains "keyboard input is accepted during the animation" "DOTS_INPUT_AC
 assert_contains "original right prompt is restored after Enter" "BASE_RPROMPT" "$captured"
 
 print -- "All non-blocking failure-animation tests passed."
+\n'
+
+typeset captured='' chunk=''
+typeset -i attempt=0
+while (( attempt < 20 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    if [[ "$captured" == *ANIMATION_ARMED* &&
+          ( "$captured" == *"✦"* || "$captured" == *"🌙"* || "$captured" == *"♡"* ) ]]; then
+        break
+    fi
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+
+assert_contains "interactive child shell loaded animation module" "ANIMATION_ARMED" "$captured"
+if [[ "$captured" != *"✦"* && "$captured" != *"🌙"* && "$captured" != *"♡"* ]]; then
+    fail "ZLE did not render an animation frame in the active input prompt"
+fi
+print -- "ok - animation frame rendered while ZLE was active"
+
+# This input is sent before the 24-frame animation (about 3.36 seconds) ends.
+zpty -w "$pty_name" 'print -r -- "DOTS_INPUT_ACCEPTED:$RPROMPT"'
+
+captured=''
+attempt=0
+while (( attempt < 30 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    [[ "$captured" == *"DOTS_INPUT_ACCEPTED:BASE_RPROMPT"* ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+
+assert_contains "keyboard input is accepted during the animation" "DOTS_INPUT_ACCEPTED" "$captured"
+assert_contains "original right prompt is restored after Enter" "BASE_RPROMPT" "$captured"
+
+print -- "All non-blocking failure-animation tests passed."
+\n'
+
+captured=''
+attempt=0
+while (( attempt < 30 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    [[ "$captured" == *"DOTS_INPUT_ACCEPTED:BASE_RPROMPT"* ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+
+assert_contains "keyboard input is accepted during the animation" "DOTS_INPUT_ACCEPTED" "$captured"
+assert_contains "original right prompt is restored after Enter" "BASE_RPROMPT" "$captured"
+
+print -- "All non-blocking failure-animation tests passed."
+\n'
+
+typeset captured='' chunk=''
+typeset -i attempt=0
+while (( attempt < 20 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    if [[ "$captured" == *ANIMATION_ARMED* &&
+          ( "$captured" == *"✦"* || "$captured" == *"🌙"* || "$captured" == *"♡"* ) ]]; then
+        break
+    fi
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+
+assert_contains "interactive child shell loaded animation module" "ANIMATION_ARMED" "$captured"
+if [[ "$captured" != *"✦"* && "$captured" != *"🌙"* && "$captured" != *"♡"* ]]; then
+    fail "ZLE did not render an animation frame in the active input prompt"
+fi
+print -- "ok - animation frame rendered while ZLE was active"
+
+# This input is sent before the 24-frame animation (about 3.36 seconds) ends.
+zpty -w "$pty_name" 'print -r -- "DOTS_INPUT_ACCEPTED:$RPROMPT"'
+
+captured=''
+attempt=0
+while (( attempt < 30 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    [[ "$captured" == *"DOTS_INPUT_ACCEPTED:BASE_RPROMPT"* ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+
+assert_contains "keyboard input is accepted during the animation" "DOTS_INPUT_ACCEPTED" "$captured"
+assert_contains "original right prompt is restored after Enter" "BASE_RPROMPT" "$captured"
+
+print -- "All non-blocking failure-animation tests passed."
