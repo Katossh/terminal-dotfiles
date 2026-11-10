@@ -2,7 +2,7 @@
 emulate -LR zsh
 setopt err_return no_unset
 
-REPO_DIR="${0:A:h:h}"
+REPO_DIR="\${0:A:h:h}"
 source "$REPO_DIR/config/terminal/zsh/command-suggestions.zsh"
 
 fail() {
@@ -10,14 +10,17 @@ fail() {
     exit 1
 }
 
-_dots_command_suggestion_distance gti git
+_dots_command_suggestion_distance gti git 1
 [[ "$REPLY" == 1 ]] || fail "adjacent transposition should count as one edit"
 
-_dots_command_suggestion_distance gti grit
+_dots_command_suggestion_distance gti grit 2
 [[ "$REPLY" == 2 ]] || fail "insertion should be counted"
 
-_dots_command_suggestion_distance git git
+_dots_command_suggestion_distance git git 1
 [[ "$REPLY" == 0 ]] || fail "identical names should have distance zero"
+
+_dots_command_suggestion_distance abcdefgh xyz 2
+[[ "$REPLY" == 3 ]] || fail "distance above the threshold should be capped at threshold + 1"
 
 function dots_suggestion_fixture_git() {
     :
@@ -32,11 +35,26 @@ alias dots_suggestion_fixture_gat='dots_suggestion_fixture_git'
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
 
-first_candidate="${candidate_output%%$'\n'*}"
+first_candidate="\${candidate_output%%$'\n'*}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
 [[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
     fail "aliases must not be offered as dynamically executed corrections"
+
+# A changed PATH must invalidate the executable-name cache. This also verifies
+# that discovery includes executable symlinks/files without spawning whence.
+test_bin="$(mktemp -d "\${TMPDIR:-/tmp}/dots-suggestion-path.XXXXXX")" ||
+    fail "could not create temporary PATH directory"
+old_path="$PATH"
+trap 'PATH="$old_path"; rm -rf -- "$test_bin"' EXIT
+printf '#!/bin/sh\nexit 0\n' > "$test_bin/dots_suggestion_fixture_new"
+chmod +x "$test_bin/dots_suggestion_fixture_new"
+PATH="$test_bin:$PATH"
+
+candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_nwe)" ||
+    fail "a new executable from the changed PATH should be discoverable"
+[[ "$candidate_output" == *dots_suggestion_fixture_new* ]] ||
+    fail "the PATH cache did not refresh after PATH changed"
 
 if _dots_command_suggestion_candidates "../dots_suggestion_fixture_gti"; then
     fail "path-like command names must not be guessed"
@@ -48,7 +66,7 @@ fi
 
 # A non-interactive caller gets printable suggestions, never a blocking prompt.
 # Keep the function invocation in this shell so its REPLY contract is observable.
-suggestion_output="$(mktemp "${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
+suggestion_output="$(mktemp "\${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
 if dots_suggest_command dots_suggestion_fixture_gti >"$suggestion_output" 2>&1; then
     rm -f "$suggestion_output"
     fail "non-interactive suggestion lookup must not report a selected command"
