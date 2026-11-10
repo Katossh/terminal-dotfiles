@@ -4,6 +4,13 @@ setopt errexit nounset
 REPO_DIR="${0:A:h:h}"
 source "$REPO_DIR/config/terminal/zsh/command-state.zsh"
 
+# These tests call the hook functions directly with synthetic command records.
+# Disable automatic hook dispatch in the non-interactive test shell; otherwise
+# the test runner's own function calls become records between the simulations.
+typeset -ga preexec_functions precmd_functions
+preexec_functions=()
+precmd_functions=()
+
 fail() {
     print -u2 -- "not ok - $1"
     exit 1
