@@ -104,7 +104,9 @@ _dots_command_suggestion_candidates() {
         kind="${entry##*: }"
 
         [[ -n "$name" ]] || continue
-        [[ "$kind" == reserved ]] && continue
+        # Aliases are expanded while Zsh parses literal command text, not a
+        # dynamically selected command name; suggesting one could fail again.
+        [[ "$kind" == reserved || "$kind" == alias ]] && continue
         [[ "$name" == _* ]] && continue
         names+=("$name")
     done < <(builtin whence -wm '*' 2>/dev/null)
