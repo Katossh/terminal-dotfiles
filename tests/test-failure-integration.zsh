@@ -43,6 +43,9 @@ capture_output() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_RARE_CHANCE=0
+export DOTS_FAILURE_RAINBOW_CHANCE=0
+export DOTS_FAILURE_ANIMATION_CHANCE=0
+export DOTS_FAILURE_STYLE=normal
 export DOTS_FAILURE_MESSAGE_ESCALATION=0
 
 # The state hook must precede the failure reporter in every interactive shell.

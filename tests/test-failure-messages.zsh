@@ -63,6 +63,9 @@ capture_message() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_RARE_CHANCE=0
+export DOTS_FAILURE_RAINBOW_CHANCE=0
+export DOTS_FAILURE_ANIMATION_CHANCE=0
+export DOTS_FAILURE_STYLE=normal
 export DOTS_FAILURE_MESSAGE_ESCALATION=0
 
 capture_message not_found gti
@@ -77,6 +80,42 @@ capture_message nix 'nix build'
 assert_contains "Nix category" "nix build" "$DOTS_TEST_OUTPUT"
 capture_message generic 'cargo test'
 assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
+
+
+# Every style can be forced for previews and deterministic testing.
+export DOTS_FAILURE_STYLE=anime
+capture_message not_found anime-style-test
+assert_contains "anime style retains command context" "anime-style-test" "$DOTS_TEST_OUTPUT"
+if [[ "$DOTS_TEST_OUTPUT" != *"💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
+      "$DOTS_TEST_OUTPUT" != *"🜂"* && "$DOTS_TEST_OUTPUT" != *"✨"* &&
+      "$DOTS_TEST_OUTPUT" != *"🐾"* && "$DOTS_TEST_OUTPUT" != *"🌙"* &&
+      "$DOTS_TEST_OUTPUT" != *"🔥"* && "$DOTS_TEST_OUTPUT" != *"🌀"* &&
+      "$DOTS_TEST_OUTPUT" != *"🎴"* && "$DOTS_TEST_OUTPUT" != *"💫"* ]]; then
+    fail "anime style should include a themed emoji"
+fi
+print -- "ok - anime style includes themed emoji"
+
+export DOTS_FAILURE_STYLE=sarcastic
+capture_message generic sarcasm-style-test
+[[ -n "$DOTS_TEST_OUTPUT" ]] || fail "sarcastic style should produce a notice"
+print -- "ok - sarcastic style produces a notice"
+
+export DOTS_FAILURE_STYLE=dramatic
+capture_message generic dramatic-style-test
+assert_contains "dramatic style retains command context" "dramatic-style-test" "$DOTS_TEST_OUTPUT"
+
+export DOTS_FAILURE_STYLE=rainbow
+capture_message generic rainbow-style-test
+assert_contains "rainbow style retains command context" "rainbow-style-test" "$DOTS_TEST_OUTPUT"
+assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
+assert_control_free "rainbow output stays control-free when redirected" "$DOTS_TEST_OUTPUT"
+
+# Animations are never emitted into redirected output, even at a 100% chance.
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_ANIMATION_CHANCE=100
+capture_message generic redirected-animation-test
+assert_absent "animation stays off when output is redirected" "Consulting the machine spirits" "$DOTS_TEST_OUTPUT"
+export DOTS_FAILURE_ANIMATION_CHANCE=0
 
 # Network messages must remain distinct from generic fallback messages.
 integer network_index=0
