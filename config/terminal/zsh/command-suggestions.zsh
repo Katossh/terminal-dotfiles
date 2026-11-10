@@ -98,7 +98,7 @@ _dots_command_suggestion_candidates() {
 
     # whence refreshes the command hash when matching patterns and reports
     # aliases, builtins, external commands, functions, and reserved words.
-    # Reserved words and private helper functions are not useful corrections.
+    # Reserved words, aliases, and private helper functions are not useful corrections.
     while IFS= read -r entry; do
         name="${entry%%: *}"
         kind="${entry##*: }"
