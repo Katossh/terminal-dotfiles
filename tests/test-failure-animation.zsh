@@ -72,6 +72,7 @@ while (( attempt < 60 )); do
 done
 
 assert_contains "keyboard input is accepted during the animation" "DOTS_INPUT_ACCEPTED" "$captured"
+print -u2 -r -- "Animation test capture: ${(qqq)captured}"
 assert_contains "ZLE registered the animation file descriptor" "STATE=finished" "$captured"
 assert_contains "at least one animation frame was handled" "FRAMES=" "$captured"
 if [[ "$captured" != *"FRAMES=0:"* ]]; then
