@@ -64,6 +64,21 @@ git -C "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions" pull --ff-only
 
 zsh-autosuggestions is updated with the Oh My Zsh checkout because it is included there.
 
+## Shared Nix development environment
+
+The `dev` alias enters the general-purpose development shell exported by
+`Katossh/shiny-rotary-phone`. It uses the public `main` branch flake, so it
+works from any current directory and does not require a local clone of that
+repository:
+
+~~~sh
+dev
+~~~
+
+The command starts an interactive Nix development shell. Exit it with
+`exit` or Ctrl-D. The first invocation may need to download the flake source
+and toolchain from the configured Nix caches.
+
 ## Local customization
 
 Do not modify runtime-managed upstream directories to customize the prompt or aliases. Put local configuration in ~/.config/zsh/zprofile.local or use the repository's personal override mechanism:
