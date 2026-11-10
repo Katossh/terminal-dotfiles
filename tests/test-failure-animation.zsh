@@ -23,7 +23,7 @@ zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     "ZSH_DIR=$ZSH_DIR" zsh -f -i
 trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
 
-# Wait until either the ordinary-user (%) or root (#) prompt appears.
+# Wait for either ordinary-user (%) or root (#) prompt.
 typeset captured='' chunk=''
 typeset -i attempt=0
 while (( attempt < 40 )); do
@@ -48,7 +48,7 @@ read_until() {
     REPLY="$output"
 }
 
-# Source the real modules in the PTY shell.
+# Load both real modules.
 zpty -w "$pty_name" 'source "$ZSH_DIR/failure-messages.zsh"; printf "%s%s\n" MESSAGE RENDERER_READY'$'\n'
 read_until MESSAGERENDERER_READY
 assert_contains "message renderer loaded" MESSAGERENDERER_READY "$REPLY"
@@ -61,35 +61,21 @@ zpty -w "$pty_name" 'RPROMPT="BASE_RPROMPT"; printf "%s%s\n" PROMPT BASE_READY'$
 read_until PROMPTBASE_READY
 assert_contains "base right prompt configured" PROMPTBASE_READY "$REPLY"
 
-# Invoke the public renderer and wait for its completion marker. Its output is
-# deliberately not the marker, so PTY command echo cannot satisfy the check.
-zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; printf "%s%s\n" FAILURE CALL_FINISHED'$'\n'
+# Call the public renderer, and prove its pending flag was actually queued.
+zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; printf "%s%s%s%s\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING"'$'\n'
 read_until FAILURECALL_FINISHED
 assert_contains "public failure-message function ran" FAILURECALL_FINISHED "$REPLY"
+assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 
-# Give the ZLE file-descriptor watcher time to deliver frames, then type while
-# the animation is active. The split printf arguments avoid echo false-positives.
+# Let ZLE process fd events. Then submit input before the five-second sequence ends.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'$'\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
 [[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || fail "no animation frame callback ran before Enter"
 
-# Check prompt restoration after line-finish. The expected marker is assembled
-# from separate printf arguments so it cannot be matched in the echoed command.
-zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "$RPROMPT"'$'\n'
-read_until RPROMPT_BASE_RPROMPT
-assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
-
-print -- "All non-blocking failure-animation integration tests passed."
-\n'
-read_until FRAMECOUNT_
-assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
-[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || fail "no animation frame callback ran before Enter"
-
-# Check prompt restoration after line-finish. The expected marker is assembled
-# from separate printf arguments so it cannot be matched in the echoed command.
-zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "$RPROMPT"'$'\n'
+# The line-finish hook must restore the original right prompt after Enter.
+zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "${RPROMPT-}"'$'\n'
 read_until RPROMPT_BASE_RPROMPT
 assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
 
