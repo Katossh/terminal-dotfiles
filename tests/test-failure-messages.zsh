@@ -84,16 +84,48 @@ assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
 
 # Every style can be forced for previews and deterministic testing.
 export DOTS_FAILURE_STYLE=anime
-capture_message not_found anime-style-test
-assert_contains "anime style retains command context" "anime-style-test" "$DOTS_TEST_OUTPUT"
-if [[ "$DOTS_TEST_OUTPUT" != *"💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
-      "$DOTS_TEST_OUTPUT" != *"🜂"* && "$DOTS_TEST_OUTPUT" != *"✨"* &&
-      "$DOTS_TEST_OUTPUT" != *"🐾"* && "$DOTS_TEST_OUTPUT" != *"🌙"* &&
-      "$DOTS_TEST_OUTPUT" != *"🔥"* && "$DOTS_TEST_OUTPUT" != *"🌀"* &&
-      "$DOTS_TEST_OUTPUT" != *"🎴"* && "$DOTS_TEST_OUTPUT" != *"💫"* ]]; then
+integer anime_index=0
+typeset anime_output=''
+while (( anime_index < 30 )); do
+    capture_message not_found anime-style-test
+    anime_output+="$DOTS_TEST_OUTPUT"
+    (( anime_index += 1 ))
+done
+assert_contains "anime style retains command context" "anime-style-test" "$anime_output"
+if [[ "$anime_output" != *"💢"* && "$anime_output" != *"⚡"* &&
+      "$anime_output" != *"🜂"* && "$anime_output" != *"✨"* &&
+      "$anime_output" != *"🐾"* && "$anime_output" != *"🌙"* &&
+      "$anime_output" != *"🔥"* && "$anime_output" != *"🌀"* &&
+      "$anime_output" != *"🎴"* && "$anime_output" != *"💫"* &&
+      "$anime_output" != *"🪽"* && "$anime_output" != *"🔮"* &&
+      "$anime_output" != *"🐉"* && "$anime_output" != *"🎀"* &&
+      "$anime_output" != *"🍡"* && "$anime_output" != *"🌸"* ]]; then
     fail "anime style should include a themed emoji"
 fi
 print -- "ok - anime style includes themed emoji"
+
+export DOTS_FAILURE_STYLE=ecchi
+integer ecchi_index=0
+typeset ecchi_output=''
+while (( ecchi_index < 30 )); do
+    capture_message not_found ecchi-style-test
+    ecchi_output+="$DOTS_TEST_OUTPUT"
+    (( ecchi_index += 1 ))
+done
+assert_contains "ecchi style uses adult-coded message pool" "adult" "$ecchi_output"
+if [[ "$ecchi_output" != *"💋"* && "$ecchi_output" != *"😈"* &&
+      "$ecchi_output" != *"🌹"* && "$ecchi_output" != *"👠"* &&
+      "$ecchi_output" != *"🍷"* && "$ecchi_output" != *"💄"* &&
+      "$ecchi_output" != *"🖤"* && "$ecchi_output" != *"🔥"* &&
+      "$ecchi_output" != *"🦇"* && "$ecchi_output" != *"💗"* &&
+      "$ecchi_output" != *"🥀"* && "$ecchi_output" != *"✨"* &&
+      "$ecchi_output" != *"🧡"* && "$ecchi_output" != *"🕯️"* &&
+      "$ecchi_output" != *"🎀"* && "$ecchi_output" != *"😏"* &&
+      "$ecchi_output" != *"🍑"* && "$ecchi_output" != *"💞"* &&
+      "$ecchi_output" != *"👑"* && "$ecchi_output" != *"🫦"* ]]; then
+    fail "ecchi style should include suggestive anime emoji"
+fi
+print -- "ok - ecchi style includes playful emoji"
 
 export DOTS_FAILURE_STYLE=sarcastic
 capture_message generic sarcasm-style-test
@@ -118,11 +150,14 @@ assert_absent "animation stays off when output is redirected" "Consulting the ma
 export DOTS_FAILURE_ANIMATION_CHANCE=0
 
 # Network messages must remain distinct from generic fallback messages.
-integer network_index=0
+capture_message network 'curl https://example.invalid'
+assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
+assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+
+integer network_index=1
 while (( network_index < 30 )); do
     capture_message network 'curl https://example.invalid'
-    assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
-    assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+    assert_contains "network category survives repeat escalation" "network" "${DOTS_TEST_OUTPUT:l}"
     network_index=$((network_index + 1))
 done
 
@@ -148,8 +183,14 @@ _dots_failure_message_sanitize "$unsafe_user"
 assert_contains "username is retained" "katossh" "$REPLY"
 assert_control_free "username is sanitised" "$REPLY"
 
-capture_message unexpected fallback-command
-assert_contains "unknown categories fall back to generic" "fallback-command" "$DOTS_TEST_OUTPUT"
+integer fallback_index=0
+typeset fallback_output=''
+while (( fallback_index < 30 )); do
+    capture_message unexpected fallback-command
+    fallback_output+="$DOTS_TEST_OUTPUT"
+    (( fallback_index += 1 ))
+done
+assert_contains "unknown categories fall back to generic" "fallback-command" "$fallback_output"
 
 # The renderer's state must survive between calls, and adjacent templates
 # must never repeat.

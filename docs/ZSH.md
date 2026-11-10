@@ -7,7 +7,7 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 1. .zshrc — PATH, history, options, Oh My Zsh and plugin initialization, module loading, Starship, and optional tmux startup.
 2. aliases.zsh and completion.zsh — aliases, interactive helpers, completion matching, and cache styles.
 3. command-state.zsh — records the last completed command, its status, working directory, and expanded form.
-4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command.
+4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command; failure-animation.zsh adds a non-blocking ZLE animation.
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide `why` / `why --verbose` without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
@@ -49,20 +49,22 @@ Failed commands receive a short, randomized notice after the command completes. 
 | Style | Chance |
 |---|---:|
 | Category-aware ordinary message | 48% |
-| Anime-inspired message | 28% |
+| Anime-inspired family (including ecchi) | 28% |
 | Sarcastic / meme message | 14% |
 | Dramatic message | 8% |
 | 24-bit rainbow message | 2% |
 
-Some messages include emoji; the anime pool uses them more heavily. The rainbow style colours individual characters with ANSI truecolor, without depending on `lolcat` or another external program.
+Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, gold, lime, teal, sky blue, violet, and lavender accents. Emoji appear throughout the ordinary category-specific pools as well as the themed styles. The rainbow renderer uses twelve RGB colour stops and does not depend on `lolcat` or another external program.
 
-Animations are a separate 4% event by default. They use four short frames (about 160 ms total) and run only when output is attached to an interactive terminal. They are suppressed for redirected output, CI, and `TERM=dumb`. The animation can also be disabled independently.
+The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with `DOTS_FAILURE_STYLE=ecchi`.
+
+Animations remain a separate 4% event by default, but now run for 24 frames over about 3.3 seconds. The renderer feeds frames to ZLE through an asynchronous file-descriptor watcher and updates `RPROMPT`, so typing, cursor movement, deletion, and Enter remain responsive while the animation runs. Submitting the line cancels the remaining frames and restores the original right prompt. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
 
 Optional overrides:
 
 ~~~sh
 # Force a style while previewing or disable style randomization.
-DOTS_FAILURE_STYLE=anime # auto, normal, anime, sarcastic, dramatic, rainbow
+DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow
 
 # Change probabilities.
 DOTS_FAILURE_RAINBOW_CHANCE=2

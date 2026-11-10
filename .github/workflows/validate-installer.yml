@@ -54,6 +54,7 @@ jobs:
             config/terminal/zsh/diagnostics.zsh \
             config/terminal/zsh/failure-classifier.zsh \
             config/terminal/zsh/failure-messages.zsh \
+            config/terminal/zsh/failure-animation.zsh \
             config/terminal/zsh/handlers.zsh \
             config/terminal/zsh/prompt.zsh \
             themes/adapters/fzf.zsh \
@@ -62,7 +63,8 @@ jobs:
             tests/test-diagnostics.zsh \
             tests/test-failure-classifier.zsh \
             tests/test-failure-messages.zsh \
-            tests/test-failure-integration.zsh; do
+            tests/test-failure-integration.zsh \
+            tests/test-failure-animation.zsh; do
             zsh -n "$script"
           done
 
@@ -75,7 +77,8 @@ jobs:
             tests/test-diagnostics.zsh \
             tests/test-failure-classifier.zsh \
             tests/test-failure-messages.zsh \
-            tests/test-failure-integration.zsh; do
+            tests/test-failure-integration.zsh \
+            tests/test-failure-animation.zsh; do
             zsh "$test"
           done
 

@@ -36,19 +36,26 @@ _dots_failure_message_rainbow() {
         return 0
     fi
 
+    # Twelve RGB stops add pink, teal, indigo, and warm sunset tones.
     local -a characters colors
     characters=( "${(@s::)message}" )
     colors=(
-        $'\e[38;2;255;75;75m'
-        $'\e[38;2;255;165;60m'
-        $'\e[38;2;245;220;75m'
-        $'\e[38;2;90;210;120m'
-        $'\e[38;2;80;170;255m'
-        $'\e[38;2;185;115;255m'
+        $'\e[38;2;255;92;124m'
+        $'\e[38;2;255;146;93m'
+        $'\e[38;2;255;207;102m'
+        $'\e[38;2;190;230;105m'
+        $'\e[38;2;91;218;151m'
+        $'\e[38;2;68;211;205m'
+        $'\e[38;2;92;190;255m'
+        $'\e[38;2;112;145;255m'
+        $'\e[38;2;157;125;255m'
+        $'\e[38;2;206;124;255m'
+        $'\e[38;2;255;122;211m'
+        $'\e[38;2;255;165;190m'
     )
 
     local character
-    local -i index=1
+    local -i index=$(( (RANDOM % ${#colors[@]}) + 1 ))
     for character in "${characters[@]}"; do
         print -rn -- "${colors[index]}${character}"
         (( index = index % ${#colors[@]} + 1 ))
@@ -59,20 +66,13 @@ _dots_failure_message_rainbow() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Never animate redirected logs, CI output, or terminals without cursor
-    # control. The short animation is deliberately capped at four frames.
-    [[ -t 1 && "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+    # Queue the effect for the next ZLE session. The animation itself is
+    # driven asynchronously by failure-animation.zsh; never sleep in precmd.
+    [[ -o interactive && -t 0 && -t 1 &&
+        "${TERM:-dumb}" != dumb &&
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
-    local color="${1-}"
-    local reset="${2-}"
-    local frame
-    local -a frames=( '✧' '✦' '✨' '✦' )
-
-    for frame in "${frames[@]}"; do
-        printf '\r\033[2K%s%s%s  Consulting the machine spirits...' "$color" "$frame" "$reset"
-        command sleep 0.04 2>/dev/null || break
-    done
-    printf '\r\033[2K'
+    typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=1
 }
 
 dots_failure_message() {
@@ -132,16 +132,28 @@ dots_failure_message() {
 
     # Respect NO_COLOR and avoid emitting escape sequences into redirected
     # output, logs, or tests.
-    local red='' green='' yellow='' blue='' magenta='' cyan='' purple='' dim='' reset=''
-    if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-        red=$'\e[31m'
-        green=$'\e[32m'
-        yellow=$'\e[33m'
-        blue=$'\e[34m'
-        magenta=$'\e[35m'
-        cyan=$'\e[36m'
-        purple=$'\e[38;5;141m'
-        dim=$'\e[2m'
+    local red='' green='' yellow='' blue='' magenta='' cyan='' purple='' dim=''
+    local orange='' pink='' rose='' gold='' lime='' teal='' sky='' violet='' lavender='' coral=''
+    local reset=''
+    if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-dumb}" != dumb ]]; then
+        red=$'\e[38;2;248;113;113m'
+        green=$'\e[38;2;134;239;172m'
+        yellow=$'\e[38;2;253;224;71m'
+        blue=$'\e[38;2;147;197;253m'
+        magenta=$'\e[38;2;240;171;252m'
+        cyan=$'\e[38;2;103;232;249m'
+        purple=$'\e[38;2;196;181;253m'
+        dim=$'\e[38;2;161;161;170m'
+        orange=$'\e[38;2;253;186;116m'
+        pink=$'\e[38;2;249;168;212m'
+        rose=$'\e[38;2;253;164;175m'
+        gold=$'\e[38;2;250;204;21m'
+        lime=$'\e[38;2;190;242;100m'
+        teal=$'\e[38;2;94;234;212m'
+        sky=$'\e[38;2;125;211;252m'
+        violet=$'\e[38;2;167;139;250m'
+        lavender=$'\e[38;2;221;214;254m'
+        coral=$'\e[38;2;251;113;133m'
         reset=$'\e[0m'
     fi
 
@@ -173,6 +185,13 @@ dots_failure_message() {
                 "${yellow}🔎 No trace of \"${command}\" could be found. The search party has been dismissed.${reset}"
                 "${blue}🧭 PATH checked. \"${command}\" is still off the map.${reset}"
                 "${magenta}✨ \"${command}\" may exist in another universe, but not this shell.${reset}"
+                "${teal}🧩 The command registry has no entry for \"${command}\". Check spelling and PATH.${reset}"
+                "${orange}🦊 \"${command}\" tried to sneak past PATH. The gatekeeper noticed.${reset}"
+                "${pink}💭 Perhaps \"${command}\" is an alias in another shell. Not this one, though.${reset}"
+                "${sky}🛰️ The shell sent a lookup request for \"${command}\". Space returned silence.${reset}"
+                "${lime}🔍 Searched the executable trail for \"${command}\". No tracks found.${reset}"
+                "${rose}🪄 \"${command}\" has not been summoned. Install it or check your spelling.${reset}"
+                "${gold}📚 The command index has a blank page where \"${command}\" should be.${reset}"
             )
             repeat_messages=(
                 "${yellow}Still looking for \"${command}\"? The matrix insists it is not real.${reset}"
@@ -191,6 +210,11 @@ dots_failure_message() {
                 "${yellow}🔒 The system refused \"${command}\". Your credentials did not impress it.${reset}"
                 "${purple}🚧 Permission denied for \"${command}\". This door is not opening for ${username} today.${reset}"
                 "${red}🛡️ \"${command}\" hit a permission wall. Check the owner and mode bits.${reset}"
+                "${orange}🔑 \"${command}\" needs a key you have not presented.${reset}"
+                "${pink}🚫 The kernel declined \"${command}\". Your enthusiasm is not a capability.${reset}"
+                "${teal}🧰 Check execute bits, ownership, and mount options for \"${command}\".${reset}"
+                "${lavender}🧱 \"${command}\" reached a locked door. The filesystem is enforcing the rules.${reset}"
+                "${gold}🔐 Permission denied for \"${command}\". chmod alone will not fix ownership.${reset}"
             )
             repeat_messages=(
                 "${yellow}The access policy has not changed since your last attempt.${reset}"
@@ -209,6 +233,11 @@ dots_failure_message() {
                 "${cyan}📁 The requested path \"${command}\" has vanished into the filesystem fog.${reset}"
                 "${purple}No such location as \"${command}\". Check the map, explorer.${reset}"
                 "${blue}🧭 The filesystem map has no entry for \"${command}\".${reset}"
+                "${teal}🗂️ \"${command}\" is not in this directory. Verify the relative path.${reset}"
+                "${orange}🧭 The path \"${command}\" led us nowhere. Check every component.${reset}"
+                "${pink}🪟 Looking for \"${command}\" through the filesystem window. No such view exists.${reset}"
+                "${lime}🌱 The requested location \"${command}\" has not sprouted here.${reset}"
+                "${lavender}🧵 One path component is missing from \"${command}\". Follow the trail above.${reset}"
             )
             repeat_messages=(
                 "${yellow}The path \"${command}\" has not materialised on the second attempt.${reset}"
@@ -227,6 +256,11 @@ dots_failure_message() {
                 "${yellow}🧩 The repository disagrees with \"${command}\". Check its current state.${reset}"
                 "${purple}Your branch has entered an existential crisis. Git rejected \"${command}\".${reset}"
                 "${green}🌱 Another Git plot twist while running \"${command}\". Inspect the diff before the next act.${reset}"
+                "${teal}🪴 Git left a note about \"${command}\". Read status before changing anything else.${reset}"
+                "${orange}🦊 The branch is playing hide-and-seek with \"${command}\".${reset}"
+                "${pink}🧵 A loose thread in the repository interrupted \"${command}\". Inspect the diff.${reset}"
+                "${sky}🧭 Git knows where you are; it just disagrees with where \"${command}\" wants to go.${reset}"
+                "${lime}🌿 \"${command}\" stumbled over repository state. Check staged and unstaged changes.${reset}"
             )
             repeat_messages=(
                 "${yellow}The repository has not changed its mind about \"${command}\".${reset}"
@@ -245,6 +279,12 @@ dots_failure_message() {
                 "${cyan}Nix could not complete \"${command}\". The store remains unimpressed.${reset}"
                 "${purple}A flake of uncertainty has interrupted \"${command}\".${reset}"
                 "${blue}🧊 \"${command}\" hit an immutable store and an unhelpful evaluation error.${reset}"
+                "${teal}🧬 Nix evaluated \"${command}\" and found a dependency-shaped paradox.${reset}"
+                "${orange}🦊 A mischievous flake disturbed \"${command}\". Inspect the evaluation trace.${reset}"
+                "${pink}🪄 The derivation for \"${command}\" did not materialise. The store remains immutable.${reset}"
+                "${sky}🧊 \"${command}\" is frozen at evaluation. Read the first meaningful error, not just the last line.${reset}"
+                "${lime}🌱 The build graph for \"${command}\" has a missing branch. Check inputs and outputs.${reset}"
+                "${lavender}📦 The Nix store cannot provide what \"${command}\" requested.${reset}"
             )
             repeat_messages=(
                 "${yellow}The Nix evaluation still disagrees. Check the error above before rebuilding.${reset}"
@@ -263,6 +303,12 @@ dots_failure_message() {
                 "${yellow}📡 Network route unavailable for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
                 "${purple}🛰️ Network signal lost during \"${command}\". The destination has not answered the call.${reset}"
                 "${cyan}🪫 The network connection ran out of answers during \"${command}\". Check DNS and routing.${reset}"
+                "${orange}🦊 Network DNS may be sending \"${command}\" on a wild goose chase.${reset}"
+                "${pink}🪁 The network remote endpoint let go while \"${command}\" was running.${reset}"
+                "${sky}🌧️ A network timeout interrupted \"${command}\". Check latency before retrying.${reset}"
+                "${teal}🧭 Inspect the network DNS, proxy, VPN, and gateway route after \"${command}\" failed.${reset}"
+                "${violet}📶 Network signal dropped during \"${command}\". That host may still be offline.${reset}"
+                "${gold}🛰️ Network request for \"${command}\" left the terminal, but no reply came back.${reset}"
             )
             repeat_messages=(
                 "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
@@ -271,7 +317,7 @@ dots_failure_message() {
             )
             severe_messages=(
                 "${red}The network is still unavailable. Repeating \"${command}\" is not a connectivity test.${reset}"
-                "${red}The signal has failed again. Check DNS, routing, proxy/VPN, and remote availability.${reset}"
+                "${red}The network signal has failed again. Check DNS, routing, proxy/VPN, and remote availability.${reset}"
                 "${red}${username}, the network is not going to reconnect out of embarrassment.${reset}"
             )
             ;;
@@ -283,6 +329,14 @@ dots_failure_message() {
                 "${blue}🛰️ Mission control reports that \"${command}\" did not complete successfully.${reset}"
                 "${yellow}🧯 \"${command}\" needs a rethink, not another identical attempt.${reset}"
                 "${cyan}🧪 The terminal recorded a failed experiment: \"${command}\".${reset}"
+                "${orange}🧯 \"${command}\" needs a diagnosis, not a dramatic reboot.${reset}"
+                "${pink}🧵 Something in \"${command}\" came undone. The error above may show which thread.${reset}"
+                "${teal}🔬 \"${command}\" failed under observation. Inspect its exit status and stderr.${reset}"
+                "${sky}🧭 Wrong turn, \"${command}\". The shell kept the receipt.${reset}"
+                "${lime}🧰 A tool in the workflow is missing, misconfigured, or having a day.${reset}"
+                "${violet}🎲 \"${command}\" rolled a critical failure. The logs contain the actual numbers.${reset}"
+                "${gold}🪄 No amount of terminal magic can replace reading the error above.${reset}"
+                "${coral}🧨 \"${command}\" made an unexpected exit. Let's not make it a tradition.${reset}"
             )
             repeat_messages=(
                 "${yellow}That did not work the first time. The second attempt has not helped.${reset}"
@@ -309,12 +363,14 @@ dots_failure_message() {
     # the useful category-specific wording above; the other pools add personality.
     local selected_style="${DOTS_FAILURE_STYLE:-auto}"
     selected_style="${selected_style:l}"
+    local -i automatic_style=0
     case "$selected_style" in
-        auto|normal|anime|sarcastic|dramatic|rainbow) ;;
+        auto|normal|anime|ecchi|sarcastic|dramatic|rainbow) ;;
         *) selected_style=auto ;;
     esac
 
     if [[ "$selected_style" == auto ]]; then
+        automatic_style=1
         local -i style_roll=$((RANDOM % 100))
         if (( style_roll < rainbow_chance )); then
             selected_style=rainbow
@@ -336,6 +392,12 @@ dots_failure_message() {
         fi
     fi
 
+    # Most automatic anime appearances use the adult, flirty ecchi pool;
+    # traditional anime archetypes remain available as a distinct override.
+    if (( automatic_style )) && [[ "$selected_style" == anime ]] && (( RANDOM % 100 < 65 )); then
+        selected_style=ecchi
+    fi
+
     local -i rainbow_output=0
     local -a style_messages
     case "$selected_style" in
@@ -354,6 +416,41 @@ dots_failure_message() {
                 "${purple}🌀 A space-time anomaly detected: \"${command}\" does not exist here! ${reset}"
                 "${blue}🎴 The PATH card for \"${command}\" has been drawn. It says: \"try another command.\" ${reset}"
                 "${yellow}💫 Senpai, \"${command}\" is not in the command registry. ${reset}"
+                "${sky}🪽 The familiar searched every directory. \"${command}\" is nowhere to be found. ${reset}"
+                "${violet}🔮 The oracle foresaw this typo, but not a command named \"${command}\". ${reset}"
+                "${teal}🐉 \"${command}\" challenged the shell dragon and lost. ${reset}"
+                "${pink}🎀 A little sparkle won't make \"${command}\" executable. Try again, senpai. ${reset}"
+                "${orange}🍡 The command shrine has no offering for \"${command}\". ${reset}"
+                "${lime}🌸 The spell is almost right. The command \"${command}\" is not. ${reset}"
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        ecchi)
+            # Adult-coded, flirtatious anime fan-service humour. Keep it
+            # suggestive and playful; never explicit or school-age themed.
+            style_messages=(
+                "${pink}💋 The adult succubus of PATH blows you a kiss: \"${command}\" still isn't in this realm, darling. ${reset}"
+                "${rose}😈 The glamorous demon queen leans over the console. \"${command}\"? Not in her kingdom. ${reset}"
+                "${coral}🌹 An adult witch gives you a teasing wink: check your PATH before asking for another spell. ${reset}"
+                "${magenta}👠 The adult vampire queen taps one heel. \"${command}\" is missing. How disappointing. ${reset}"
+                "${orange}🍷 The adult anime bartender smiles: \"${command}\" isn't on the menu. Try something executable. ${reset}"
+                "${pink}💄 The adult femme-fatale hacker adjusts her lipstick. Even she can't find \"${command}\". ${reset}"
+                "${purple}🖤 The succubus purrs, \"Darling, your PATH is empty of \"${command}\". Fix that first.\" ${reset}"
+                "${rose}🔥 The adult fire mage winks. \"${command}\" has no power in this dimension. ${reset}"
+                "${violet}🦇 The vampire countess offers a deal: one corrected command for one less embarrassing typo. ${reset}"
+                "${pink}💗 The adult heroine strikes a dramatic pose. \"${command}\" is still not a command, handsome. ${reset}"
+                "${coral}🥀 The adult gothic enchantress sighs. Such a pretty prompt, such a nonexistent command. ${reset}"
+                "${magenta}✨ A glamorous adult spellcaster whispers: \"Check the spelling, then we can talk.\" ${reset}"
+                "${orange}🧡 The adult kitsune hostess gives you a knowing smile. \"${command}\" needs to be installed first. ${reset}"
+                "${rose}💋 The succubus is impressed by your confidence, not by \"${command}\". ${reset}"
+                "${purple}🕯️ The adult night-club sorceress lights a candle for the missing command. It does not appear. ${reset}"
+                "${pink}🎀 An adult anime diva tilts her head: \"Senpai, even I can't make \"${command}\" exist.\" ${reset}"
+                "${coral}😏 The adult demon girl grins. \"I could make a deal, but first you need a valid command.\" ${reset}"
+                "${violet}🍑 The adult fantasy enchantress sends a cheeky wink: \"${command}\" is not in your PATH. ${reset}"
+                "${magenta}💞 The adult succubus offers a heart-shaped warning: stop flirting with typos and check the executable name. ${reset}"
+                "${gold}👑 The adult queen of the terminal grants you one hint: \"${command}\" is not installed. ${reset}"
+                "${rose}🫦 The adult anime antiheroine smiles dangerously. \"Run that again after fixing your PATH.\" ${reset}"
+                "${pink}🌹 The adult enchantress is all dressed up, but your command still failed to arrive. ${reset}"
             )
             messages=("${style_messages[@]}")
             ;;
