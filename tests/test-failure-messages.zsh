@@ -84,8 +84,25 @@ assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
 
 # Every style can be forced for previews and deterministic testing.
 export DOTS_FAILURE_STYLE=anime
-capture_message not_found anime-style-test
-assert_contains "anime style retains command context" "anime-style-test" "$DOTS_TEST_OUTPUT"
+integer anime_index=0
+typeset anime_output=''
+while (( anime_index < 30 )); do
+    capture_message not_found anime-style-test
+    anime_output+="$DOTS_TEST_OUTPUT"
+    (( anime_index += 1 ))
+done
+assert_contains "anime style retains command context" "anime-style-test" "$anime_output"
+if [[ "$anime_output" != *"💢"* && "$anime_output" != *"⚡"* &&
+      "$anime_output" != *"🜂"* && "$anime_output" != *"✨"* &&
+      "$anime_output" != *"🐾"* && "$anime_output" != *"🌙"* &&
+      "$anime_output" != *"🔥"* && "$anime_output" != *"🌀"* &&
+      "$anime_output" != *"🎴"* && "$anime_output" != *"💫"* &&
+      "$anime_output" != *"🪽"* && "$anime_output" != *"🔮"* &&
+      "$anime_output" != *"🐉"* && "$anime_output" != *"🎀"* &&
+      "$anime_output" != *"🍡"* && "$anime_output" != *"🌸"* ]]; then
+    fail "anime style should include a themed emoji"
+fi
+print -- "ok - anime style includes themed emoji"
 
 export DOTS_FAILURE_STYLE=ecchi
 integer ecchi_index=0
@@ -95,16 +112,20 @@ while (( ecchi_index < 30 )); do
     ecchi_output+="$DOTS_TEST_OUTPUT"
     (( ecchi_index += 1 ))
 done
-assert_contains "ecchi style retains its adult-themed message pool" "succubus" "$ecchi_output"
-assert_contains "ecchi style includes playful emoji" "💋" "$ecchi_output"
-if [[ "$DOTS_TEST_OUTPUT" != *"💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
-      "$DOTS_TEST_OUTPUT" != *"🜂"* && "$DOTS_TEST_OUTPUT" != *"✨"* &&
-      "$DOTS_TEST_OUTPUT" != *"🐾"* && "$DOTS_TEST_OUTPUT" != *"🌙"* &&
-      "$DOTS_TEST_OUTPUT" != *"🔥"* && "$DOTS_TEST_OUTPUT" != *"🌀"* &&
-      "$DOTS_TEST_OUTPUT" != *"🎴"* && "$DOTS_TEST_OUTPUT" != *"💫"* ]]; then
-    fail "anime style should include a themed emoji"
+assert_contains "ecchi style uses adult-coded message pool" "adult" "$ecchi_output"
+if [[ "$ecchi_output" != *"💋"* && "$ecchi_output" != *"😈"* &&
+      "$ecchi_output" != *"🌹"* && "$ecchi_output" != *"👠"* &&
+      "$ecchi_output" != *"🍷"* && "$ecchi_output" != *"💄"* &&
+      "$ecchi_output" != *"🖤"* && "$ecchi_output" != *"🔥"* &&
+      "$ecchi_output" != *"🦇"* && "$ecchi_output" != *"💗"* &&
+      "$ecchi_output" != *"🥀"* && "$ecchi_output" != *"✨"* &&
+      "$ecchi_output" != *"🧡"* && "$ecchi_output" != *"🕯️"* &&
+      "$ecchi_output" != *"🎀"* && "$ecchi_output" != *"😏"* &&
+      "$ecchi_output" != *"🍑"* && "$ecchi_output" != *"💞"* &&
+      "$ecchi_output" != *"👑"* && "$ecchi_output" != *"🫦"* ]]; then
+    fail "ecchi style should include suggestive anime emoji"
 fi
-print -- "ok - anime style includes themed emoji"
+print -- "ok - ecchi style includes playful emoji"
 
 export DOTS_FAILURE_STYLE=sarcastic
 capture_message generic sarcasm-style-test
