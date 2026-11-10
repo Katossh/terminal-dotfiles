@@ -317,7 +317,7 @@ dots_failure_message() {
             )
             severe_messages=(
                 "${red}The network is still unavailable. Repeating \"${command}\" is not a connectivity test.${reset}"
-                "${red}The signal has failed again. Check DNS, routing, proxy/VPN, and remote availability.${reset}"
+                "${red}The network signal has failed again. Check DNS, routing, proxy/VPN, and remote availability.${reset}"
                 "${red}${username}, the network is not going to reconnect out of embarrassment.${reset}"
             )
             ;;
