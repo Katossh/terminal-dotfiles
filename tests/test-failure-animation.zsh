@@ -50,7 +50,7 @@ read_until() {
     REPLY="$output"
 }
 
-# Load the real message and animation modules.
+# Load the actual message renderer and animation module.
 zpty -w "$pty_name" 'source "$ZSH_DIR/failure-messages.zsh"; printf "%s%s\n" MESSAGE RENDERER_READY'$'\n'
 read_until MESSAGERENDERER_READY
 assert_contains "message renderer loaded" MESSAGERENDERER_READY "$REPLY"
@@ -63,8 +63,7 @@ zpty -w "$pty_name" 'RPROMPT="BASE_RPROMPT"; printf "%s%s\n" PROMPT BASE_READY'$
 read_until PROMPTBASE_READY
 assert_contains "base right prompt configured" PROMPTBASE_READY "$REPLY"
 
-# Simulate the real failure notification lifecycle: the public renderer is
-# called by precmd after a completed command and before the next ZLE session.
+# Install a precmd notifier to reproduce the real failure-report lifecycle.
 zpty -w "$pty_name" 'typeset -gi DOTS_TEST_TRIGGER_FAILURE=0; _dots_test_queue_failure_precmd() { (( DOTS_TEST_TRIGGER_FAILURE )) || return 0; DOTS_TEST_TRIGGER_FAILURE=0; dots_failure_message generic animation-integration-test; printf "%s%s%s%s%s%s%s%s\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING" ACTIVE_ "$_DOTS_FAILURE_ANIMATION_ACTIVE" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"; }; typeset -ga precmd_functions; precmd_functions+=(_dots_test_queue_failure_precmd); printf "%s%s\n" PRECMD HOOK_READY'$'\n'
 read_until PRECMDHOOK_READY
 assert_contains "failure precmd hook was installed" PRECMDHOOK_READY "$REPLY"
@@ -76,36 +75,22 @@ assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 assert_contains "animation FD was registered before ZLE starts" STATE_registered "$REPLY"
 assert_contains "animation process is active" ACTIVE_1 "$REPLY"
 
-# The ZLE event loop should receive frames while the next line is being edited.
-# Send a shell command after a short animation interval; it writes the final
-# frame count and restored prompt to a file, avoiding PTY echo/output races.
+# Wait for several asynchronous frames, then submit a shell command while ZLE is active.
 command sleep 0.45
 zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" PROMPT_ "$RPROMPT" > "$RESULT_FILE"'$'\n'
 
+# Drain PTY output while waiting for the child command to write its state.
 typeset -i result_attempt=0
 while [[ ! -s "$result_file" ]] && (( result_attempt < 100 )); do
+    if zpty -r -t "$pty_name" chunk; then captured+="$chunk"; fi
     command sleep 0.05
     (( result_attempt += 1 ))
 done
 [[ -s "$result_file" ]] || fail "keyboard input was not processed while animation was active"
 
 typeset animation_result="$(<"$result_file")"
-assert_contains "animation callback rendered at least one frame" "FRAMECOUNT_" "$animation_result"
-[[ "$animation_result" == *FRAMECOUNT_[1-9]* ]] || {
-    print -u2 -r -- "Animation result: $animation_result"
-    fail "no animation frame callback ran before Enter"
-}
-assert_contains "original right prompt was restored after Enter" "PROMPT_BASE_RPROMPT" "$animation_result"
-
-print -- "All non-blocking failure-animation integration tests passed."
-\n'
-
-
-assert_contains "animation callback rendered at least one frame" "FRAMECOUNT_" "$animation_result"
-[[ "$animation_result" == *FRAMECOUNT_[1-9]* ]] || {
-    print -u2 -r -- "Animation result: $animation_result"
-    fail "no animation frame callback ran before Enter"
-}
-assert_contains "original right prompt was restored after Enter" "PROMPT_BASE_RPROMPT" "$animation_result"
+assert_contains "animation callback rendered at least one frame" FRAMECOUNT_ "$animation_result"
+[[ "$animation_result" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation result: $animation_result"; fail "no animation frame callback ran before Enter"; }
+assert_contains "original right prompt was restored after Enter" PROMPT_BASE_RPROMPT "$animation_result"
 
 print -- "All non-blocking failure-animation integration tests passed."
