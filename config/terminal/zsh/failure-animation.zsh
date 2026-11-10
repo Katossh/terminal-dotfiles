@@ -8,8 +8,9 @@ typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
-typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
+typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
+typeset -g _DOTS_FAILURE_ANIMATION_LAST_FRAME_PROMPT=''
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
@@ -63,11 +64,11 @@ _dots_failure_animation_cleanup() {
         zle -F "$fd" 2>/dev/null || true
         { exec {fd}<&- } 2>/dev/null || true
 
-        RPROMPT="$_DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT"
+        PROMPT="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
         _DOTS_FAILURE_ANIMATION_FD=-1
         _DOTS_FAILURE_ANIMATION_STEP=0
         _DOTS_FAILURE_ANIMATION_ACTIVE=0
-        _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
+        _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT=''
         _DOTS_FAILURE_ANIMATION_STATE='finished'
 
         if (( redraw )) && zle; then
@@ -109,9 +110,11 @@ _dots_failure_animation_fd_handler() {
         reset=$'\e[0m'
     fi
 
-    local right_prompt="$_DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT"
-    [[ -n "$right_prompt" ]] && right_prompt+=" "
-    RPROMPT="${right_prompt}%{${color}%}${frame}%{${reset}%}"
+    # Render next to the command input, not at the far right edge.
+    # A bold, framed motif makes each small frame visible at a glance.
+    local motif="✧━━  ✦ ${frame} ✦  ━━✧"
+    PROMPT="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}%B%{${color}%}  ${motif}  %{${reset}%}%b  "
+    _DOTS_FAILURE_ANIMATION_LAST_FRAME_PROMPT="$PROMPT"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -131,7 +134,7 @@ _dots_failure_animation_start() {
 
     _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_PENDING=1
-    _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT="${RPROMPT-}"
+    _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="${PROMPT-}"
     _DOTS_FAILURE_ANIMATION_STEP=0
     _DOTS_FAILURE_ANIMATION_FRAMES=0
     _DOTS_FAILURE_ANIMATION_STATE='starting'
