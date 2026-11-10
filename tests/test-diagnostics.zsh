@@ -72,7 +72,7 @@ DOTS_LAST_CWD='/tmp/project'
 DOTS_LAST_TIMESTAMP=''
 output="$(why)"
 assert_contains "successful command is identified" "completed successfully" "$output"
-assert_contains "successful command does not claim failure" "No failure to diagnose" "$output"
+assert_contains "successful command does not claim failure" "no failure to diagnose" "${output:l}"
 
 DOTS_LAST_COMMAND='gti status'
 DOTS_LAST_EXECUTED_COMMAND='gti status'
