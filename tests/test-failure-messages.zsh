@@ -106,7 +106,161 @@ export DOTS_FAILURE_STYLE=rainbow
 capture_message generic rainbow-style-test
 assert_contains "rainbow style retains command context" "rainbow-style-test" "$DOTS_TEST_OUTPUT"
 assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
-assert_absent "rainbow style respects NO_COLOR and redirected output" 
+[[ "$DOTS_TEST_OUTPUT" != *
+integer network_index=0
+while (( network_index < 30 )); do
+    capture_message network 'curl https://example.invalid'
+    assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
+    assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+    network_index=$((network_index + 1))
+done
+
+# NUL cannot be held in a shell variable. Test every other C0 control and DEL.
+unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
+capture_message network "$unsafe_command"
+# Check the entire output against the POSIX control-character class rather
+# than glob-matching individual control bytes as shell pattern fragments.
+command_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+(( ${#command_lines[@]} == 1 )) || fail "command controls must not create extra terminal lines"
+assert_control_free "command rendering has no control characters" "$DOTS_TEST_OUTPUT"
+
+unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
+capture_message network curl "$unsafe_detail"
+# The same complete control-byte check applies to optional detail output.
+detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra terminal lines"
+assert_control_free "detail rendering has no control characters" "$DOTS_TEST_OUTPUT"
+
+# The same helper sanitises the username before it is interpolated.
+unsafe_user=$'katossh\a\b\t\v\f\r\n\e\x7f'
+_dots_failure_message_sanitize "$unsafe_user"
+assert_contains "username is retained" "katossh" "$REPLY"
+assert_control_free "username is sanitised" "$REPLY"
+
+capture_message unexpected fallback-command
+assert_contains "unknown categories fall back to generic" "fallback-command" "$DOTS_TEST_OUTPUT"
+
+# The renderer's state must survive between calls, and adjacent templates
+# must never repeat.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+capture_message generic repeated-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic repeated-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$first" != "$second" ]] || fail "adjacent messages must not repeat"
+print -- "ok - adjacent messages do not repeat"
+
+# The second and third identical failures advance the escalation counter.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+export DOTS_FAILURE_MESSAGE_ESCALATION=1
+capture_message generic escalation-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic escalation-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 2 ]] || fail "second failure increments streak"
+capture_message generic escalation-command
+third="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 3 ]] || fail "third failure increments streak"
+[[ "$first" != "$second" && "$second" != "$third" ]] || fail "escalation avoids adjacent repeats"
+print -- "ok - escalation state and anti-repeat"
+
+export DOTS_FAILURE_MESSAGE_CHANCE=0
+capture_message generic suppressed
+[[ -z "$DOTS_TEST_OUTPUT" ]] || fail "zero chance suppresses output"
+print -- "ok - zero chance suppresses output"
+
+dots_failure_message generic status-check >/dev/null
+[[ "$?" == 0 ]] || fail "renderer must return success"
+print -- "ok - renderer returns success"
+
+print -- "All failure-message tests passed."
+\e' "$DOTS_TEST_OUTPUT"
+
+# Animations are never emitted into redirected output, even at a 100% chance.
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_ANIMATION_CHANCE=100
+capture_message generic redirected-animation-test
+assert_absent "animation stays off when output is redirected" "Consulting the machine spirits" "$DOTS_TEST_OUTPUT"
+export DOTS_FAILURE_ANIMATION_CHANCE=0
+
+# Network messages must remain distinct from generic fallback messages.
+integer network_index=0
+while (( network_index < 30 )); do
+    capture_message network 'curl https://example.invalid'
+    assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
+    assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+    network_index=$((network_index + 1))
+done
+
+# NUL cannot be held in a shell variable. Test every other C0 control and DEL.
+unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
+capture_message network "$unsafe_command"
+# Check the entire output against the POSIX control-character class rather
+# than glob-matching individual control bytes as shell pattern fragments.
+command_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+(( ${#command_lines[@]} == 1 )) || fail "command controls must not create extra terminal lines"
+assert_control_free "command rendering has no control characters" "$DOTS_TEST_OUTPUT"
+
+unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
+capture_message network curl "$unsafe_detail"
+# The same complete control-byte check applies to optional detail output.
+detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+(( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra terminal lines"
+assert_control_free "detail rendering has no control characters" "$DOTS_TEST_OUTPUT"
+
+# The same helper sanitises the username before it is interpolated.
+unsafe_user=$'katossh\a\b\t\v\f\r\n\e\x7f'
+_dots_failure_message_sanitize "$unsafe_user"
+assert_contains "username is retained" "katossh" "$REPLY"
+assert_control_free "username is sanitised" "$REPLY"
+
+capture_message unexpected fallback-command
+assert_contains "unknown categories fall back to generic" "fallback-command" "$DOTS_TEST_OUTPUT"
+
+# The renderer's state must survive between calls, and adjacent templates
+# must never repeat.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+capture_message generic repeated-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic repeated-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$first" != "$second" ]] || fail "adjacent messages must not repeat"
+print -- "ok - adjacent messages do not repeat"
+
+# The second and third identical failures advance the escalation counter.
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
+export DOTS_FAILURE_MESSAGE_ESCALATION=1
+capture_message generic escalation-command
+first="$DOTS_TEST_OUTPUT"
+capture_message generic escalation-command
+second="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 2 ]] || fail "second failure increments streak"
+capture_message generic escalation-command
+third="$DOTS_TEST_OUTPUT"
+[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 3 ]] || fail "third failure increments streak"
+[[ "$first" != "$second" && "$second" != "$third" ]] || fail "escalation avoids adjacent repeats"
+print -- "ok - escalation state and anti-repeat"
+
+export DOTS_FAILURE_MESSAGE_CHANCE=0
+capture_message generic suppressed
+[[ -z "$DOTS_TEST_OUTPUT" ]] || fail "zero chance suppresses output"
+print -- "ok - zero chance suppresses output"
+
+dots_failure_message generic status-check >/dev/null
+[[ "$?" == 0 ]] || fail "renderer must return success"
+print -- "ok - renderer returns success"
+
+print -- "All failure-message tests passed."
+\x1b'* ]] || fail "rainbow style must not emit ANSI into redirected output"
+
 integer network_index=0
 while (( network_index < 30 )); do
     capture_message network 'curl https://example.invalid'
