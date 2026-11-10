@@ -72,7 +72,7 @@ command sleep 0.45
 zpty -w "$pty_name" 'printf "%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'$'\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
-[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || fail "no animation frame callback ran before Enter"
+[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }
 
 # The line-finish hook must restore the original right prompt after Enter.
 zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "${RPROMPT-}"'$'\n'
