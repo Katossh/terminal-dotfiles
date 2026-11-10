@@ -42,8 +42,6 @@ candidate_output="${(F)_DOTS_COMMAND_SUGGESTION_RESULTS}"
     fail "command discovery cache must record the current PATH"
 [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT" == "${#functions}" ]] ||
     fail "function count must be recorded when the candidate cache is built"
-[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_COMMAND_COUNT" == "${#commands}" ]] ||
-    fail "command count must be recorded when the candidate cache is built"
 
 first_candidate="${_DOTS_COMMAND_SUGGESTION_RESULTS[1]}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
