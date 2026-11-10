@@ -88,18 +88,15 @@ done
 # NUL cannot be held in a shell variable. Test every other C0 control and DEL.
 unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
 capture_message network "$unsafe_command"
-for control in $'\a' $'\b' $'\t' $'\v' $'\f' $'\r' $'\e' $'\x7f'; do
-    assert_absent "command controls are sanitised" "$control" "$DOTS_TEST_OUTPUT"
-done
+# Check the entire output against the POSIX control-character class rather
+# than glob-matching individual control bytes as shell pattern fragments.
 command_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
 (( ${#command_lines[@]} == 1 )) || fail "command controls must not create extra terminal lines"
 assert_control_free "command rendering has no control characters" "$DOTS_TEST_OUTPUT"
 
 unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
 capture_message network curl "$unsafe_detail"
-for control in $'\a' $'\b' $'\t' $'\v' $'\f' $'\r' $'\e' $'\x7f'; do
-    assert_absent "detail controls are sanitised" "$control" "$DOTS_TEST_OUTPUT"
-done
+# The same complete control-byte check applies to optional detail output.
 detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
 (( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra terminal lines"
 assert_control_free "detail rendering has no control characters" "$DOTS_TEST_OUTPUT"
