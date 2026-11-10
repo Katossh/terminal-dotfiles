@@ -69,7 +69,18 @@ assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 
 # Let ZLE process fd events. Then submit input before the five-second sequence ends.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES"; print -r -- "$_DOTS_FAILURE_ANIMATION_LAST_HANDLERS"'$'\n'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" FD_HANDLER_ "${_DOTS_FAILURE_ANIMATION_LAST_HANDLERS//'$'\n'
+read_until FRAMECOUNT_
+assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
+[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }
+
+# The line-finish hook must restore the original right prompt after Enter.
+zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "${RPROMPT-}"'$'\n'
+read_until RPROMPT_BASE_RPROMPT
+assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
+
+print -- "All non-blocking failure-animation integration tests passed."
+\n'/;}"'$'\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
 [[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }

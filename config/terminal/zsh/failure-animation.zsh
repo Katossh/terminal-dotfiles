@@ -138,7 +138,7 @@ _dots_failure_animation_line_init() {
 
     if zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_widget; then
         _DOTS_FAILURE_ANIMATION_STATE='registered'
-        _DOTS_FAILURE_ANIMATION_HANDLERS="$(zle -F -L 2>&1)"
+        _DOTS_FAILURE_ANIMATION_HANDLERS="$(zle -F -L "$_DOTS_FAILURE_ANIMATION_FD" 2>&1)"
     else
         _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
         _dots_failure_animation_cleanup
