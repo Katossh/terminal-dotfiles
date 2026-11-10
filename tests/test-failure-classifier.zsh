@@ -54,7 +54,7 @@ trap 'rm -rf "$test_root"' EXIT
 missing_dir="$test_root/path with spaces"
 
 expect_category missing_path "cd '$missing_dir'" 1
-expect_category generic "cd '$HOME/dots-classifier-do-not-expand'" 1
+expect_category generic 'cd "$HOME/dots-classifier-do-not-expand"' 1
 expect_category generic "cd -" 1
 expect_category generic "cd '$test_root'" 1
 
