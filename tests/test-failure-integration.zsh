@@ -102,8 +102,10 @@ _dots_command_state_precmd
 setopt errexit
 assert_eq "typed typo remains visible" "gti status" "$DOTS_LAST_COMMAND"
 assert_eq "executed command is corrected" "git status" "$DOTS_LAST_EXECUTED_COMMAND"
+dots_classify_failure "$DOTS_LAST_EXECUTED_COMMAND" "$DOTS_LAST_STATUS"
+assert_eq "corrected command is classified as Git" "git" "$REPLY"
 capture_output _dots_failure_notice_precmd
-assert_contains "corrected command is classified as Git" "git status" "$DOTS_TEST_CAPTURE"
+assert_contains "failure notice retains the typed typo" "gti status" "$DOTS_TEST_CAPTURE"
 _dots_command_state_preexec "why" "why" "why"
 capture_output why
 assert_contains "why explains the corrected command" "Diagnosis (git)" "$DOTS_TEST_CAPTURE"
