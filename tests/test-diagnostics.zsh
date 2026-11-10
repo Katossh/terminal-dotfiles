@@ -110,7 +110,7 @@ output="$(why)"
 assert_contains "Ctrl+C status is identified" "interrupted by SIGINT" "$output"
 
 DOTS_LAST_COMMAND='nix build .#workstation'
-DOTS_LAST_EXECUTED_COMMAND='nix build .#workstation'
+DOTS_LAST_EXECUTED_COMMAND='command nix build .#workstation'
 DOTS_LAST_STATUS=1
 DOTS_LAST_CWD='/tmp/nix-project'
 DOTS_TEST_CATEGORY=nix
