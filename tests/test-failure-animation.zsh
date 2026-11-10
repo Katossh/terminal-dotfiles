@@ -58,13 +58,24 @@ read_until() {
     REPLY="$output"
 }
 
+drain_for() {
+    local -i rounds="$1"
+    local output='' data=''
+    while (( rounds > 0 )); do
+        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        command sleep 0.02
+        (( rounds -= 1 ))
+    done
+    REPLY="$output"
+}
+
 # Startup animation must happen at the first prompt, without a failed command.
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "first interactive prompt starts the animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
 assert_contains "animation occupies the path line before line_break" "LAYOUT_1" "$REPLY"
 
 # Let the 36-frame startup animation complete and inspect the persistent state.
-command sleep 0.75
+drain_for 60
 zpty -w "$PTY_NAME" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"'$'\n'
 read_until STARTUP_FINISHED
 assert_contains "startup animation completes all frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
