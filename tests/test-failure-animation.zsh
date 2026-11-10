@@ -69,7 +69,7 @@ assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 
 # Let ZLE process fd events. Then submit input before the five-second sequence ends.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'$'\n'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES"'$'\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
 [[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }

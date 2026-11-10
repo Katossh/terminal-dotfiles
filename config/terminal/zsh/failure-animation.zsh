@@ -11,6 +11,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
+typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
+typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -52,6 +54,10 @@ _dots_failure_animation_cleanup() {
     emulate -L zsh
 
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
+        # Preserve the completed animation state for diagnostics and tests.
+        _DOTS_FAILURE_ANIMATION_LAST_STATE="$_DOTS_FAILURE_ANIMATION_STATE"
+        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
+
         local fd="$_DOTS_FAILURE_ANIMATION_FD"
         zle -F "$fd" 2>/dev/null || true
         exec {fd}<&- 2>/dev/null || true
