@@ -13,6 +13,8 @@ typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
+typeset -g _DOTS_FAILURE_ANIMATION_HANDLERS=''
+typeset -g _DOTS_FAILURE_ANIMATION_LAST_HANDLERS=''
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -57,6 +59,7 @@ _dots_failure_animation_cleanup() {
         # Preserve the completed animation state for diagnostics and tests.
         _DOTS_FAILURE_ANIMATION_LAST_STATE="$_DOTS_FAILURE_ANIMATION_STATE"
         _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
+        _DOTS_FAILURE_ANIMATION_LAST_HANDLERS="$_DOTS_FAILURE_ANIMATION_HANDLERS"
 
         local fd="$_DOTS_FAILURE_ANIMATION_FD"
         zle -F "$fd" 2>/dev/null || true
@@ -135,6 +138,7 @@ _dots_failure_animation_line_init() {
 
     if zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_widget; then
         _DOTS_FAILURE_ANIMATION_STATE='registered'
+        _DOTS_FAILURE_ANIMATION_HANDLERS="$(zle -F -L 2>&1)"
     else
         _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
         _dots_failure_animation_cleanup
