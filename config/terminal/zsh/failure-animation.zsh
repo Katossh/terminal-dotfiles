@@ -237,7 +237,7 @@ _dots_failure_animation_line_finish() {
 }
 
 if [[ -o interactive ]]; then
-    autoload -Uz add-zsh-hook
+    autoload -Uz add-zsh-hook add-zle-hook-widget
     add-zsh-hook precmd _dots_failure_animation_precmd
-    add-zsh-hook zle-line-finish _dots_failure_animation_line_finish
+    add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
