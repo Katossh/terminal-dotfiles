@@ -226,7 +226,7 @@ dots_failure_message() {
                 "${green}🌿 Git has encountered a plot twist while running \"${command}\".${reset}"
                 "${yellow}🧩 The repository disagrees with \"${command}\". Check its current state.${reset}"
                 "${purple}Your branch has entered an existential crisis. Git rejected \"${command}\".${reset}"
-                "${green}🌱 Another Git plot twist. Inspect the diff before the next act.${reset}"
+                "${green}🌱 Another Git plot twist while running \"${command}\". Inspect the diff before the next act.${reset}"
             )
             repeat_messages=(
                 "${yellow}The repository has not changed its mind about \"${command}\".${reset}"
@@ -244,7 +244,7 @@ dots_failure_message() {
                 "${blue}❄️ The derivation has rejected your offering: \"${command}\".${reset}"
                 "${cyan}Nix could not complete \"${command}\". The store remains unimpressed.${reset}"
                 "${purple}A flake of uncertainty has interrupted \"${command}\".${reset}"
-                "${blue}🧊 The Nix store remains immutable. The evaluation error, unfortunately, does too.${reset}"
+                "${blue}🧊 \"${command}\" hit an immutable store and an unhelpful evaluation error.${reset}"
             )
             repeat_messages=(
                 "${yellow}The Nix evaluation still disagrees. Check the error above before rebuilding.${reset}"
@@ -281,7 +281,7 @@ dots_failure_message() {
                 "${purple}💥 Something went sideways while running \"${command}\".${reset}"
                 "${cyan}The operation \"${command}\" did not go according to plan.${reset}"
                 "${blue}🛰️ Mission control reports that \"${command}\" did not complete successfully.${reset}"
-                "${yellow}🧯 That command needs a rethink, not another identical attempt.${reset}"
+                "${yellow}🧯 \"${command}\" needs a rethink, not another identical attempt.${reset}"
                 "${cyan}🧪 The terminal recorded a failed experiment: \"${command}\".${reset}"
             )
             repeat_messages=(
