@@ -183,19 +183,20 @@ mod tests {
     #[test]
     fn results_are_deduplicated_and_sorted_by_distance_then_name() {
         let names = [
-            "grit",
-            "git",
-            "git",
-            "tig",
-            "_git_internal",
-            "path/git",
-            "git tool",
+            "abcxefg",
+            "abcdefh",
+            "abcde",
+            "abxyefg",
+            "abcxefg",
+            "_abcdefg_internal",
+            "path/abcdefg",
+            "abc defg",
         ];
 
-        let ranked = rank_candidates("gti", names);
+        let ranked = rank_candidates("abcdefg", names);
         let names: Vec<_> = ranked.into_iter().map(|candidate| candidate.name).collect();
 
-        assert_eq!(names, ["git", "grit", "tig"]);
+        assert_eq!(names, ["abcdefh", "abcxefg", "abcde", "abxyefg"]);
     }
 
     #[test]
