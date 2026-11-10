@@ -22,23 +22,22 @@ _dots_failure_animation_stream() {
     case "$variant" in
         2)
             frames=(
-                '🌙' '✨' '💫' '✧' '🌙' '⋆' '✨' '💫'
-                '🌙' '✧' '✨' '⋆' '💫' '🌙' '✨' '✧'
-                '💫' '⋆' '🌙' '✨' '✧' '💫' '🌙' '✨'
+                '🌙' '✨' '💫' '✧' '🌙' '⋆' '✨' '💫' '🌙' '✧' '✨' '⋆' '💫' '🌙' '✨' '✧' '💫' '⋆' '🌙' '✨' '✧' '💫' '🌙' '✨' '⋆' '🌙' '💫' '✧' '✨' '🌙' '⋆' '💫' '✨' '✧' '🌙' '✨'
             )
             ;;
         3)
             frames=(
-                '♡' '♥' '♡' '💗' '💖' '💞' '♡' '♥'
-                '💗' '♡' '💘' '💞' '♥' '♡' '💖' '💗'
-                '♡' '💞' '♥' '💘' '♡' '💗' '💖' '♡'
+                '♡' '♥' '♡' '💗' '💖' '💞' '♡' '♥' '💗' '♡' '💘' '💞' '♥' '♡' '💖' '💗' '♡' '💞' '♥' '💘' '♡' '💗' '💖' '♡' '💞' '💗' '♥' '♡' '💘' '💖' '♡' '💗' '💞' '♥' '♡' '💖'
+            )
+            ;;
+        4)
+            frames=(
+                '🦋' '✦' '🐈‍⬛' '✨' '🦋' '⋆' '💫' '🐈‍⬛' '✧' '🦋' '✨' '⋆' '🐈‍⬛' '💫' '✦' '🦋' '✧' '🐈‍⬛' '✨' '🦋' '⋆' '💫' '✦' '🐈‍⬛' '🦋' '✨' '✧' '⋆' '🐈‍⬛' '💫' '🦋' '✦' '✨' '🐈‍⬛' '⋆' '🦋'
             )
             ;;
         *)
             frames=(
-                '✦' '✧' '⋆' '✧' '✨' '✦' '✧' '⋆'
-                '✦' '✨' '✧' '✦' '⋆' '✧' '✨' '✦'
-                '✧' '⋆' '✦' '✨' '✧' '⋆' '✦' '✧'
+                '✦' '✧' '⋆' '✧' '✨' '✦' '✧' '⋆' '✦' '✨' '✧' '✦' '⋆' '✧' '✨' '✦' '✧' '⋆' '✦' '✨' '✧' '⋆' '✦' '✧' '✨' '⋆' '✧' '✦' '✨' '⋆' '✧' '✦' '💫' '✧' '⋆' '✨'
             )
             ;;
     esac
@@ -113,8 +112,9 @@ _dots_failure_animation_line_init() {
     (( _DOTS_FAILURE_ANIMATION_PENDING )) || return 0
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
+    # This hook is installed only in interactive shells and runs only
+    # while ZLE owns the terminal. Rechecking -t here is unreliable.
+    [[ "${TERM:-dumb}" != dumb &&
         "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
     _dots_failure_animation_cleanup
@@ -123,7 +123,7 @@ _dots_failure_animation_line_init() {
     _DOTS_FAILURE_ANIMATION_FRAMES=0
     _DOTS_FAILURE_ANIMATION_STATE='starting'
 
-    local variant=$(( (RANDOM % 3) + 1 ))
+    local variant=$(( (RANDOM % 4) + 1 ))
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$variant")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 

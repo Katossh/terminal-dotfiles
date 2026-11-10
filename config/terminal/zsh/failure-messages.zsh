@@ -6,9 +6,9 @@
 #
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
-#   DOTS_FAILURE_STYLE=auto              # normal|anime|sarcastic|dramatic|rainbow
+#   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow
 #   DOTS_FAILURE_RAINBOW_CHANCE=2         # 0..100; DOTS_FAILURE_RARE_CHANCE remains an alias
-#   DOTS_FAILURE_ANIMATION_CHANCE=4       # 0..100; animations require an interactive TTY
+#   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; animations require an interactive TTY
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
@@ -66,11 +66,10 @@ _dots_failure_message_rainbow() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Queue the effect for the next ZLE session. The animation itself is
-    # driven asynchronously by failure-animation.zsh; never sleep in precmd.
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+    # Queue the effect for the next ZLE session. This module is loaded
+    # from the interactive shell configuration; TTY checks belong in ZLE.
+    # The animation itself is asynchronous and never sleeps in precmd.
+    [[ "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
     typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=1
 }
@@ -103,7 +102,7 @@ dots_failure_message() {
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
     # DOTS_FAILURE_RARE_CHANCE is retained as a backwards-compatible alias.
     local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
-    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-4}"
+    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
@@ -111,7 +110,7 @@ dots_failure_message() {
         (''|*[!0-9]*) rainbow_chance=2 ;;
     esac
     case "$animation_chance" in
-        (''|*[!0-9]*) animation_chance=4 ;;
+        (''|*[!0-9]*) animation_chance=50 ;;
     esac
     # Strip leading zeroes so values such as 08 remain decimal in arithmetic.
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
@@ -426,31 +425,45 @@ dots_failure_message() {
             messages=("${style_messages[@]}")
             ;;
         ecchi)
-            # Adult-coded, flirtatious anime fan-service humour. Keep it
-            # suggestive and playful; never explicit or school-age themed.
+            # Adult-coded anime humour with deliberately varied voices and openings.
+            # Keep it playful and suggestive, without explicit content or school-age characters.
             style_messages=(
-                "${pink}💋 The adult succubus of PATH blows you a kiss: \"${command}\" still isn't in this realm, darling. ${reset}"
-                "${rose}😈 The glamorous demon queen leans over the console. \"${command}\"? Not in her kingdom. ${reset}"
-                "${coral}🌹 An adult witch gives you a teasing wink: check your PATH before asking for another spell. ${reset}"
-                "${magenta}👠 The adult vampire queen taps one heel. \"${command}\" is missing. How disappointing. ${reset}"
-                "${orange}🍷 The adult anime bartender smiles: \"${command}\" isn't on the menu. Try something executable. ${reset}"
-                "${pink}💄 The adult femme-fatale hacker adjusts her lipstick. Even she can't find \"${command}\". ${reset}"
-                "${purple}🖤 The succubus purrs, \"Darling, your PATH is empty of \"${command}\". Fix that first.\" ${reset}"
-                "${rose}🔥 The adult fire mage winks. \"${command}\" has no power in this dimension. ${reset}"
-                "${violet}🦇 The vampire countess offers a deal: one corrected command for one less embarrassing typo. ${reset}"
-                "${pink}💗 The adult heroine strikes a dramatic pose. \"${command}\" is still not a command, handsome. ${reset}"
-                "${coral}🥀 The adult gothic enchantress sighs. Such a pretty prompt, such a nonexistent command. ${reset}"
-                "${magenta}✨ A glamorous adult spellcaster whispers: \"Check the spelling, then we can talk.\" ${reset}"
-                "${orange}🧡 The adult kitsune hostess gives you a knowing smile. \"${command}\" needs to be installed first. ${reset}"
-                "${rose}💋 The succubus is impressed by your confidence, not by \"${command}\". ${reset}"
-                "${purple}🕯️ The adult night-club sorceress lights a candle for the missing command. It does not appear. ${reset}"
-                "${pink}🎀 An adult anime diva tilts her head: \"Senpai, even I can't make \"${command}\" exist.\" ${reset}"
-                "${coral}😏 The adult demon girl grins. \"I could make a deal, but first you need a valid command.\" ${reset}"
-                "${violet}🍑 The adult fantasy enchantress sends a cheeky wink: \"${command}\" is not in your PATH. ${reset}"
-                "${magenta}💞 The adult succubus offers a heart-shaped warning: stop flirting with typos and check the executable name. ${reset}"
-                "${gold}👑 The adult queen of the terminal grants you one hint: \"${command}\" is not installed. ${reset}"
-                "${rose}🫦 The adult anime antiheroine smiles dangerously. \"Run that again after fixing your PATH.\" ${reset}"
-                "${pink}🌹 The adult enchantress is all dressed up, but your command still failed to arrive. ${reset}"
+                "${pink}🐾 Nyaa~ \"${command}\" face-planted in front of the whole terminal. Check stderr, senpai. ${reset}"
+                "${rose}Well, well... that was quite an entrance. Too bad \"${command}\" forgot to stick the landing. ${reset}"
+                "${coral}💋 Darling, a non-zero exit code is hardly a love letter. Read the error above. ${reset}"
+                "${magenta}A velvet-gloved hand points at stderr. \"Start there, sweetheart.\" ${reset}"
+                "${yellow}Oh? That was your grand finale? The terminal seems unconvinced. ${reset}"
+                "${violet}👠 The vampire countess taps one heel: \"Try that again after reading the logs.\" ${reset}"
+                "${pink}\"Mmm... ambitious.\" The adult catgirl folds her arms. \"Now fix the command, nyaa~\" ${reset}"
+                "${teal}😼 Purrhaps inspect the flags before sending \"${command}\" back into battle. ${reset}"
+                "${purple}A succubus has reviewed the output. Her verdict: less confidence, more debugging. ${reset}"
+                "${orange}🍷 \"${command}\" is off tonight's menu, darling. Check the failure details first. ${reset}"
+                "${lime}🦊 The kitsune hostess fans herself with nine tails. \"That error is entirely yours, senpai.\" ${reset}"
+                "${gold}\"Senpai, senpai...\" The adult anime diva sighs. \"Even I cannot flirt with that exit code.\" ${reset}"
+                "${rose}The night-club sorceress dims the lights. The error message remains painfully readable. ${reset}"
+                "${coral}🥀 Such elegance, such confidence, such a spectacularly unhelpful result. Inspect the output. ${reset}"
+                "${lavender}🔮 The oracle has seen your next move: reading the first error instead of retrying blindly. ${reset}"
+                "${pink}With a lazy smile, the gothic enchantress asks: \"Did you really expect that to work?\" ${reset}"
+                "${purple}🖤 The succubus is on strike until somebody checks the logs. ${reset}"
+                "${rose}🫦 \"Careful, darling. The terminal remembers every failed attempt.\" ${reset}"
+                "${sky}\"Try again?\" The mature witch raises an eyebrow. \"Try understanding it first.\" ${reset}"
+                "${orange}A mature kitsune gives one tail a flick: \"Check the arguments, then come back.\" ${reset}"
+                "${gold}⚡ The demon queen snaps her fingers. Nothing happens. \"Well? Read the error.\" ${reset}"
+                "${magenta}💄 The femme-fatale hacker fixes her lipstick. \"The bug is still there, darling.\" ${reset}"
+                "${cyan}Nocturnal verdict: \"${command}\" needs attention. The eyeliner, at least, is flawless. ${reset}"
+                "${pink}🎀 A wink, a smirk, and a reminder: the useful clue is probably in stderr. ${reset}"
+                "${teal}\"That flag was a choice, sweetheart.\" The adult enchantress gestures toward the usage text. ${reset}"
+                "${red}🔥 The fire mage's spell fizzles. \"Even magic cannot replace a proper backtrace.\" ${reset}"
+                "${violet}Another failed incantation. The adult sorceress suggests checking the first error line. ${reset}"
+                "${coral}The demon queen looks over your shoulder. \"You did read the output, didn't you?\" ${reset}"
+                "${pink}💞 Nyaa~ even my nine tails can't untangle this one. Let's inspect the logs together. ${reset}"
+                "${green}You brought the confidence; the terminal brought the evidence. Guess which one won? ${reset}"
+                "${rose}A rose falls onto the keyboard. The error remains. How stubbornly unromantic. ${reset}"
+                "${magenta}\"Darling, the answer is above us.\" The vampire countess points at the terminal output. ${reset}"
+                "${blue}🦇 The countess has no reflection, but this failure is staring right back at you. ${reset}"
+                "${orange}A knowing wink from the adult kitsune: \"One careful diagnosis, then another attempt.\" ${reset}"
+                "${lavender}The prompt is not your accomplice, sweetheart. Check the command and its arguments. ${reset}"
+                "${cyan}Nyaa~ the terminal hissed, the cursor blinked, and your command still needs debugging. ${reset}"
             )
             messages=("${style_messages[@]}")
             ;;
