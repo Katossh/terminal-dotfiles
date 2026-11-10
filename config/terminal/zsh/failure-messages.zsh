@@ -262,7 +262,7 @@ dots_failure_message() {
                 "${cyan}🌐 The network has gone dark while running \"${command}\". Check the route before blaming the matrix.${reset}"
                 "${yellow}📡 Network route unavailable for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
                 "${purple}🛰️ Network signal lost during \"${command}\". The destination has not answered the call.${reset}"
-                "${cyan}🪫 The connection ran out of answers. Check DNS and routing.${reset}"
+                "${cyan}🪫 The connection ran out of answers during \"${command}\". Check DNS and routing.${reset}"
             )
             repeat_messages=(
                 "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
