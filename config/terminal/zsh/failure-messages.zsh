@@ -6,7 +6,10 @@
 #
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
-#   DOTS_FAILURE_RARE_CHANCE=3            # 0..100; chance of a rare message
+#   DOTS_FAILURE_STYLE=auto              # normal|anime|sarcastic|dramatic|rainbow
+#   DOTS_FAILURE_RAINBOW_CHANCE=2         # 0..100; DOTS_FAILURE_RARE_CHANCE remains an alias
+#   DOTS_FAILURE_ANIMATION_CHANCE=4       # 0..100; animations require an interactive TTY
+#   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
 
@@ -19,6 +22,57 @@ _dots_failure_message_sanitize() {
 
     local value="${1-}"
     REPLY="${value//[[:cntrl:]]/ }"
+}
+
+
+_dots_failure_message_rainbow() {
+    emulate -L zsh
+
+    local message="\${1-}"
+    # Rainbow ANSI output is useful only on a colour-capable interactive
+    # terminal. Redirected output and NO_COLOR stay plain and copyable.
+    if [[ ! -t 1 || -n "\${NO_COLOR:-}" || "\${TERM:-dumb}" == dumb ]]; then
+        print -r -- "$message"
+        return 0
+    fi
+
+    local -a characters colors
+    characters=( "\${(@s::)message}" )
+    colors=(
+        $'\e[38;2;255;75;75m'
+        $'\e[38;2;255;165;60m'
+        $'\e[38;2;245;220;75m'
+        $'\e[38;2;90;210;120m'
+        $'\e[38;2;80;170;255m'
+        $'\e[38;2;185;115;255m'
+    )
+
+    local character
+    local -i index=1
+    for character in "\${characters[@]}"; do
+        print -rn -- "\${colors[index]}\${character}"
+        (( index = index % \${#colors[@]} + 1 ))
+    done
+    print -r -- $'\e[0m'
+}
+
+_dots_failure_message_animate() {
+    emulate -L zsh
+
+    # Never animate redirected logs, CI output, or terminals without cursor
+    # control. The short animation is deliberately capped at four frames.
+    [[ -t 1 && "\${TERM:-dumb}" != dumb && "\${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+
+    local color="\${1-}"
+    local reset="\${2-}"
+    local frame
+    local -a frames=( '✧' '✦' '✨' '✦' )
+
+    for frame in "\${frames[@]}"; do
+        printf '\r\033[2K%s%s%s  Consulting the machine spirits...' "$color" "$frame" "$reset"
+        command sleep 0.04 2>/dev/null || break
+    done
+    printf '\r\033[2K'
 }
 
 dots_failure_message() {
@@ -47,26 +101,31 @@ dots_failure_message() {
 
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
-    local rare_chance="${DOTS_FAILURE_RARE_CHANCE:-3}"
+    # DOTS_FAILURE_RARE_CHANCE is retained as a backwards-compatible alias.
+    local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
+    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-4}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
-    case "$rare_chance" in
-        (''|*[!0-9]*) rare_chance=3 ;;
+    case "$rainbow_chance" in
+        (''|*[!0-9]*) rainbow_chance=2 ;;
+    esac
+    case "$animation_chance" in
+        (''|*[!0-9]*) animation_chance=4 ;;
     esac
     # Strip leading zeroes so values such as 08 remain decimal in arithmetic.
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
         chance="${chance#0}"
     done
-    while [[ "$rare_chance" == 0* && "$rare_chance" != 0 ]]; do
-        rare_chance="${rare_chance#0}"
+    while [[ "$rainbow_chance" == 0* && "$rainbow_chance" != 0 ]]; do
+        rainbow_chance="${rainbow_chance#0}"
     done
-    if (( chance > 100 )); then
-        chance=100
-    fi
-    if (( rare_chance > 100 )); then
-        rare_chance=100
-    fi
+    while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do
+        animation_chance="${animation_chance#0}"
+    done
+    (( chance > 100 )) && chance=100
+    (( rainbow_chance > 100 )) && rainbow_chance=100
+    (( animation_chance > 100 )) && animation_chance=100
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
     fi
@@ -112,6 +171,8 @@ dots_failure_message() {
                 "${cyan}📡 Signal lost: \"${command}\" does not exist in this shell's reality.${reset}"
                 "${purple}🛸 Command \"${command}\" was not found. Perhaps it escaped the simulation.${reset}"
                 "${yellow}🔎 No trace of \"${command}\" could be found. The search party has been dismissed.${reset}"
+                "${blue}🧭 PATH checked. \"${command}\" is still off the map.${reset}"
+                "${magenta}✨ \"${command}\" may exist in another universe, but not this shell.${reset}"
             )
             repeat_messages=(
                 "${yellow}Still looking for \"${command}\"? The matrix insists it is not real.${reset}"
@@ -129,6 +190,7 @@ dots_failure_message() {
                 "${red}⛔ Access denied. \"${command}\" is beyond your current clearance.${reset}"
                 "${yellow}🔒 The system refused \"${command}\". Your credentials did not impress it.${reset}"
                 "${purple}🚧 Permission denied for \"${command}\". This door is not opening for ${username} today.${reset}"
+                "${red}🛡️ \"${command}\" hit a permission wall. Check the owner and mode bits.${reset}"
             )
             repeat_messages=(
                 "${yellow}The access policy has not changed since your last attempt.${reset}"
@@ -146,6 +208,7 @@ dots_failure_message() {
                 "${yellow}🗺️ Destination not found: \"${command}\" appears to exist only in your imagination.${reset}"
                 "${cyan}📁 The requested path \"${command}\" has vanished into the filesystem fog.${reset}"
                 "${purple}No such location as \"${command}\". Check the map, explorer.${reset}"
+                "${blue}🧭 The filesystem map has no entry for \"${command}\".${reset}"
             )
             repeat_messages=(
                 "${yellow}The path \"${command}\" has not materialised on the second attempt.${reset}"
@@ -163,6 +226,7 @@ dots_failure_message() {
                 "${green}🌿 Git has encountered a plot twist while running \"${command}\".${reset}"
                 "${yellow}🧩 The repository disagrees with \"${command}\". Check its current state.${reset}"
                 "${purple}Your branch has entered an existential crisis. Git rejected \"${command}\".${reset}"
+                "${green}🌱 Another Git plot twist. Inspect the diff before the next act.${reset}"
             )
             repeat_messages=(
                 "${yellow}The repository has not changed its mind about \"${command}\".${reset}"
@@ -180,6 +244,7 @@ dots_failure_message() {
                 "${blue}❄️ The derivation has rejected your offering: \"${command}\".${reset}"
                 "${cyan}Nix could not complete \"${command}\". The store remains unimpressed.${reset}"
                 "${purple}A flake of uncertainty has interrupted \"${command}\".${reset}"
+                "${blue}🧊 The Nix store remains immutable. The evaluation error, unfortunately, does too.${reset}"
             )
             repeat_messages=(
                 "${yellow}The Nix evaluation still disagrees. Check the error above before rebuilding.${reset}"
@@ -197,6 +262,7 @@ dots_failure_message() {
                 "${cyan}🌐 The network has gone dark while running \"${command}\". Check the route before blaming the matrix.${reset}"
                 "${yellow}📡 Network route unavailable for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
                 "${purple}🛰️ Network signal lost during \"${command}\". The destination has not answered the call.${reset}"
+                "${cyan}🪫 The connection ran out of answers. Check DNS and routing.${reset}"
             )
             repeat_messages=(
                 "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
@@ -215,6 +281,8 @@ dots_failure_message() {
                 "${purple}💥 Something went sideways while running \"${command}\".${reset}"
                 "${cyan}The operation \"${command}\" did not go according to plan.${reset}"
                 "${blue}🛰️ Mission control reports that \"${command}\" did not complete successfully.${reset}"
+                "${yellow}🧯 That command needs a rethink, not another identical attempt.${reset}"
+                "${cyan}🧪 The terminal recorded a failed experiment: \"${command}\".${reset}"
             )
             repeat_messages=(
                 "${yellow}That did not work the first time. The second attempt has not helped.${reset}"
@@ -237,15 +305,97 @@ dots_failure_message() {
         fi
     fi
 
-    # Rare lines are deliberately infrequent and category-neutral.
-    local -a rare_messages=(
-        "${purple}🛰️ Unusual telemetry detected. The matrix has logged this incident for further entertainment.${reset}"
-        "${cyan}📼 A corrupted transmission reads: \"Have you tried reading the error above?\"${reset}"
-        "${yellow}👁️ Something in the terminal is watching this failure counter. Probably just a shell script.${reset}"
-    )
-    if (( rare_chance > 0 && RANDOM % 100 < rare_chance )); then
-        messages=("${rare_messages[@]}")
+    # Pick a style independently of the failure category. The normal pool keeps
+    # the useful category-specific wording above; the other pools add personality.
+    local selected_style="${DOTS_FAILURE_STYLE:-auto}"
+    selected_style="${selected_style:l}"
+    case "$selected_style" in
+        auto|normal|anime|sarcastic|dramatic|rainbow) ;;
+        *) selected_style=auto ;;
+    esac
+
+    if [[ "$selected_style" == auto ]]; then
+        local -i style_roll=$((RANDOM % 100))
+        if (( style_roll < rainbow_chance )); then
+            selected_style=rainbow
+        elif (( rainbow_chance >= 100 )); then
+            selected_style=rainbow
+        else
+            # Reserve the configured rainbow share, then distribute the rest
+            # across the exact 48/28/14/8 proportions.
+            style_roll=$(( (style_roll - rainbow_chance) * 98 / (100 - rainbow_chance) ))
+            if (( style_roll < 48 )); then
+                selected_style=normal
+            elif (( style_roll < 76 )); then
+                selected_style=anime
+            elif (( style_roll < 90 )); then
+                selected_style=sarcastic
+            else
+                selected_style=dramatic
+            fi
+        fi
     fi
+
+    local -i rainbow_output=0
+    local -a style_messages
+    case "$selected_style" in
+        normal)
+            # Keep the existing category-aware messages and escalation pools.
+            ;;
+        anime)
+            style_messages=(
+                "${magenta}💢 B-baka! \\"${command}\\" isn't a command! It's not like I wanted you to type something else! ${username}, honestly! ${reset}"
+                "${cyan}⚡ \\"${command}\\" has not awakened its true form. Check the spellbook above! ${reset}"
+                "${purple}🜂 The forbidden incantation \\"${command}\\" has no place in this realm. ${reset}"
+                "${yellow}✨ By the power of PATH, I reject \\"${command}\\"! ${reset}"
+                "${magenta}🐾 Nyaa~ \\"${command}\\" is missing. Did you summon the wrong familiar? ${reset}"
+                "${cyan}🌙 Even the stars cannot resolve \\"${command}\\" in this timeline. ${reset}"
+                "${red}🔥 \\"${command}\\" has reached its final form: not executable. ${reset}"
+                "${purple}🌀 A space-time anomaly detected: \\"${command}\\" does not exist here! ${reset}"
+                "${blue}🎴 The PATH card has been drawn. It says: \\"try another command.\\" ${reset}"
+                "${yellow}💫 Senpai, \\"${command}\\" is not in the command registry. ${reset}"
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        sarcastic)
+            style_messages=(
+                "${yellow}🫠 \\"${command}\\" failed. Bold strategy. Let's see if reading the error helps. ${reset}"
+                "${dim}I would explain the error, but the terminal already did that above. ${reset}"
+                "${purple}I've seen more convincing commands on a broken keyboard. ${reset}"
+                "${cyan}☕ \\"${command}\\" has once again chosen the difficult path. ${reset}"
+                "${yellow}404: command not found. Your confidence, however, remains available. ${reset}"
+                "${magenta}🤷 The command was so creative that even PATH couldn't recognize it. ${reset}"
+                "${blue}Perhaps try a command from this dimension next time. ${reset}"
+                "${red}🧯 Repeating the same failed command is not what we call troubleshooting. ${reset}"
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        dramatic)
+            style_messages=(
+                "${red}☠️ The PATH has spoken. It says no to \\"${command}\\". ${reset}"
+                "${purple}A darkness has fallen upon your PATH. One command is missing. ${reset}"
+                "${red}⚔️ \\"${command}\\" has fallen before the shell. Its quest ends here. ${reset}"
+                "${magenta}The terminal searched every corner of this realm. Nothing answered. ${reset}"
+                "${yellow}🎭 Thus concludes the tragic tale of \\"${command}\\". ${reset}"
+                "${cyan}The error was foretold. The output above contains the prophecy. ${reset}"
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        rainbow)
+            rainbow_output=1
+            style_messages=(
+                "🌈 \\"${command}\\" has entered its fabulous failure era. ✨"
+                "🌈 The PATH is a spectrum. \\"${command}\\" is still missing. 🦄"
+                "✨ This failure is brought to you in glorious 24-bit colour. 🌈"
+            )
+            messages=("${style_messages[@]}")
+            ;;
+    esac
+
+    if (( rainbow_output )); then
+        _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+    fi
+
 
     local previous_template="$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE"
     local message_count="${#messages[@]}"
@@ -259,7 +409,15 @@ dots_failure_message() {
     fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
-    printf '%s\n' "$selected_template"
+    if (( RANDOM % 100 < animation_chance )); then
+        _dots_failure_message_animate "$cyan" "$reset"
+    fi
+
+    if (( rainbow_output )); then
+        _dots_failure_message_rainbow "$selected_template"
+    else
+        printf '%s\n' "$selected_template"
+    fi
     if [[ -n "$detail" ]]; then
         printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
     fi
