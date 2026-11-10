@@ -29,6 +29,8 @@ assert_absent() {
 
     [[ "$haystack" != *"$needle"* ]] || {
         print -u2 -- "not ok - $label (unexpected control character)"
+        print -u2 -r -- "  offending character: ${(qqq)needle}"
+        print -u2 -r -- "  rendered output: ${(qqq)haystack}"
         exit 1
     }
     print -- "ok - $label"
