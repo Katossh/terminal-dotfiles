@@ -42,6 +42,41 @@ The order in .zshrc is intentional:
 
 The disabled zsh-manydots-magic experiment is not part of the active setup.
 
+## Failure message styles
+
+Failed commands receive a short, randomized notice after the command completes. The default style weights are:
+
+| Style | Chance |
+|---|---:|
+| Category-aware ordinary message | 48% |
+| Anime-inspired message | 28% |
+| Sarcastic / meme message | 14% |
+| Dramatic message | 8% |
+| 24-bit rainbow message | 2% |
+
+Some messages include emoji; the anime pool uses them more heavily. The rainbow style colours individual characters with ANSI truecolor, without depending on `lolcat` or another external program.
+
+Animations are a separate 4% event by default. They use four short frames (about 160 ms total) and run only when output is attached to an interactive terminal. They are suppressed for redirected output, CI, and `TERM=dumb`. The animation can also be disabled independently.
+
+Optional overrides:
+
+~~~sh
+# Force a style while previewing or disable style randomization.
+DOTS_FAILURE_STYLE=anime # auto, normal, anime, sarcastic, dramatic, rainbow
+
+# Change probabilities.
+DOTS_FAILURE_RAINBOW_CHANCE=2
+DOTS_FAILURE_ANIMATION_CHANCE=4
+
+# Disable animation without disabling messages.
+DOTS_FAILURE_ANIMATION=0
+
+# Respect NO_COLOR; redirected output is plain regardless.
+NO_COLOR=1
+~~~
+
+`DOTS_FAILURE_RARE_CHANCE` remains supported as a backwards-compatible alias for `DOTS_FAILURE_RAINBOW_CHANCE`. `DOTS_FAILURE_MESSAGE_CHANCE` still controls whether a notice is shown at all, and repeat escalation remains independently configurable through `DOTS_FAILURE_MESSAGE_ESCALATION`.
+
 ## Command-not-found suggestions
 
 The command-name candidate cache is built once and reused. It is invalidated when PATH changes or the number of registered shell functions changes. This avoids re-enumerating PATH and Zsh's large function table for every typo.
