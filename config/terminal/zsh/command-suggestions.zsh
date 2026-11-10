@@ -23,6 +23,7 @@ zmodload zsh/parameter 2>/dev/null || true
 typeset -g _DOTS_COMMAND_SUGGESTION_CACHE_PATH=''
 typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_READY=0
 typeset -ga _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=()
+typeset -ga _DOTS_COMMAND_SUGGESTION_RESULTS=()
 
 _dots_command_suggestion_refresh_cache() {
     emulate -L zsh
@@ -137,6 +138,7 @@ _dots_command_suggestion_candidates() {
 
     local command="${1-}"
     local name entry
+    _DOTS_COMMAND_SUGGESTION_RESULTS=()
     local -i max_distance max_results=5
     local -aU names
     local -a ranked suggestions
@@ -194,7 +196,8 @@ _dots_command_suggestion_candidates() {
         (( ${#suggestions[@]} >= max_results )) && break
     done
 
-    print -rl -- "${suggestions[@]}"
+    _DOTS_COMMAND_SUGGESTION_RESULTS=("${suggestions[@]}")
+    return 0
 }
 
 dots_suggest_command() {
@@ -210,9 +213,8 @@ dots_suggest_command() {
     (( $# == 1 )) || return 1
     [[ -n "$command" ]] || return 1
 
-    local candidate_output
-    candidate_output="$(_dots_command_suggestion_candidates "$command")" || return 1
-    suggestions=("${(@f)candidate_output}")
+    _dots_command_suggestion_candidates "$command" || return 1
+    suggestions=("${_DOTS_COMMAND_SUGGESTION_RESULTS[@]}")
 
     (( ${#suggestions[@]} > 0 )) || return 1
 
