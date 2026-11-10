@@ -2,7 +2,7 @@
 emulate -LR zsh
 setopt err_return no_unset
 
-REPO_DIR="\${0:A:h:h}"
+REPO_DIR="${0:A:h:h}"
 source "$REPO_DIR/config/terminal/zsh/command-suggestions.zsh"
 
 fail() {
@@ -35,7 +35,7 @@ alias dots_suggestion_fixture_gat='dots_suggestion_fixture_git'
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
 
-first_candidate="\${candidate_output%%$'\n'*}"
+first_candidate="${candidate_output%%$'\n'*}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
 [[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
@@ -43,7 +43,7 @@ first_candidate="\${candidate_output%%$'\n'*}"
 
 # A changed PATH must invalidate the executable-name cache. This also verifies
 # that discovery includes executable symlinks/files without spawning whence.
-test_bin="$(mktemp -d "\${TMPDIR:-/tmp}/dots-suggestion-path.XXXXXX")" ||
+test_bin="$(mktemp -d "${TMPDIR:-/tmp}/dots-suggestion-path.XXXXXX")" ||
     fail "could not create temporary PATH directory"
 old_path="$PATH"
 trap 'PATH="$old_path"; rm -rf -- "$test_bin"' EXIT
@@ -66,7 +66,7 @@ fi
 
 # A non-interactive caller gets printable suggestions, never a blocking prompt.
 # Keep the function invocation in this shell so its REPLY contract is observable.
-suggestion_output="$(mktemp "\${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
+suggestion_output="$(mktemp "${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
 if dots_suggest_command dots_suggestion_fixture_gti >"$suggestion_output" 2>&1; then
     rm -f "$suggestion_output"
     fail "non-interactive suggestion lookup must not report a selected command"
