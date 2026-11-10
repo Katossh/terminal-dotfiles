@@ -62,13 +62,19 @@ assert_contains "public failure-message function ran" "animation-integration-tes
 
 # Let the asynchronous watcher render several frames, then submit a command.
 command sleep 0.45
-zpty -w "$pty_name" 'print -r -- "FRAMECOUNT=$_DOTS_FAILURE_ANIMATION_FRAMES"'$'\n'
-read_until FRAMECOUNT=
-assert_contains "keyboard input is accepted during animation" "FRAMECOUNT=" "$REPLY"
-[[ "$REPLY" != *"FRAMECOUNT=0"* ]] || fail "no animation frame callback ran before input"
+zpty -w "$pty_name" 'printf "%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES"'
 
-zpty -w "$pty_name" 'print -r -- "RPROMPT=$RPROMPT"'$'\n'
-read_until RPROMPT=
-assert_contains "original right prompt is restored after Enter" "RPROMPT=BASE_RPROMPT" "$REPLY"
+print -- "All non-blocking failure-animation integration tests passed."
+\n'
+read_until FRAMECOUNT_
+assert_contains "keyboard input is accepted during animation" "FRAMECOUNT_" "$REPLY"
+[[ "$REPLY" =~ "FRAMECOUNT_[1-9][0-9]*" ]] || fail "no animation frame callback ran before input"
+
+zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "$RPROMPT"'
+
+print -- "All non-blocking failure-animation integration tests passed."
+\n'
+read_until RPROMPT_BASE_RPROMPT
+assert_contains "original right prompt is restored after Enter" "RPROMPT_BASE_RPROMPT" "$REPLY"
 
 print -- "All non-blocking failure-animation integration tests passed."
