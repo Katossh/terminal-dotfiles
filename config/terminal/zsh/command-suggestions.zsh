@@ -12,54 +12,113 @@
 #     before running REPLY.
 #
 # Runtime dependencies:
-#   - Zsh builtins only for discovery and ranking.
+#   - Zsh builtins and globbing for discovery and ranking.
 #   - fzf is optional; a numbered /dev/tty prompt is used without it.
+
+# The parameter module exposes Zsh's command, builtin, and function hash tables.
+# It is part of the standard Zsh distribution; keep discovery functional even
+# on builds where dynamic module loading is unavailable.
+zmodload zsh/parameter 2>/dev/null || true
+
+typeset -g _DOTS_COMMAND_SUGGESTION_CACHE_PATH=''
+typeset -gi _DOTS_COMMAND_SUGGESTION_CACHE_READY=0
+typeset -ga _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=()
+
+_dots_command_suggestion_refresh_cache() {
+    emulate -L zsh
+
+    local directory
+    local -aU names
+
+    # Zsh globbing performs PATH discovery in-process. Follow symlinks because
+    # NixOS and many package managers expose executables through symlink farms.
+    for directory in "${path[@]}"; do
+        [[ -n "$directory" ]] || directory='.'
+        [[ -d "$directory" && -r "$directory" ]] || continue
+        names+=( "$directory"/*(N-*:t) )
+    done
+
+    # Include explicit hash entries and shell builtins. These may not correspond
+    # to files currently visible in PATH.
+    if (( ${+commands} )); then
+        names+=( "${(@k)commands}" )
+    fi
+    if (( ${+builtins} )); then
+        names+=( "${(@k)builtins}" )
+    fi
+
+    _DOTS_COMMAND_SUGGESTION_CACHE_NAMES=( "${names[@]}" )
+    _DOTS_COMMAND_SUGGESTION_CACHE_PATH="$PATH"
+    _DOTS_COMMAND_SUGGESTION_CACHE_READY=1
+}
 
 _dots_command_suggestion_distance() {
     emulate -L zsh
 
     local left="${1-}"
     local right="${2-}"
+    local -i limit=${3:-2}
     local -i left_length=${#left}
     local -i right_length=${#right}
-    local -i i j cost deletion insertion substitution transposition best
-    local -a previous previous_previous current
+    local -i sentinel=$((limit + 1))
+    local -i i j start end cost deletion insertion substitution transposition best
+    local -i previous_deletion previous_insertion previous_substitution previous_transposition
+    local -ai previous previous_previous current
 
-    # A larger length difference cannot pass the caller's edit-distance limit.
-    if (( left_length > right_length + 2 || right_length > left_length + 2 )); then
-        REPLY=99
+    # The caller only needs to know whether the distance is within its small
+    # threshold. A banded optimal-string-alignment DP computes only 2k+1 cells
+    # per row instead of the full left_length * right_length matrix.
+    if (( left_length > right_length + limit || right_length > left_length + limit )); then
+        REPLY=$sentinel
         return 0
     fi
 
-    # Optimal String Alignment distance: ordinary Levenshtein edits plus one
-    # adjacent transposition. This makes common typos such as "gti" -> "git"
-    # count as one edit instead of two.
-    for ((j = 0; j <= right_length; j++)); do
+    # DP row zero: D[0][j] = j, but cells outside the edit-distance band are
+    # represented by the sentinel (limit + 1).
+    previous=()
+    for ((j = 0; j <= right_length && j <= limit; j++)); do
         previous[$((j + 1))]=$j
     done
+    previous_previous=()
 
     for ((i = 1; i <= left_length; i++)); do
         current=()
-        current[1]=$i
+        current[1]=$(( i <= limit ? i : sentinel ))
 
-        for ((j = 1; j <= right_length; j++)); do
+        start=$((i - limit))
+        (( start < 1 )) && start=1
+        end=$((i + limit))
+        (( end > right_length )) && end=$right_length
+
+        for ((j = start; j <= end; j++)); do
             if [[ "${left[i]}" == "${right[j]}" ]]; then
                 cost=0
             else
                 cost=1
             fi
 
-            deletion=$((previous[j + 1] + 1))
-            insertion=$((current[j] + 1))
-            substitution=$((previous[j] + cost))
+            previous_deletion=${previous[$((j + 1))]:-$sentinel}
+            previous_insertion=${current[$j]:-$sentinel}
+            previous_substitution=${previous[$j]:-$sentinel}
+
+            deletion=$((previous_deletion + 1))
+            insertion=$((previous_insertion + 1))
+            substitution=$((previous_substitution + cost))
+
+            (( deletion > sentinel )) && deletion=$sentinel
+            (( insertion > sentinel )) && insertion=$sentinel
+            (( substitution > sentinel )) && substitution=$sentinel
 
             best=$deletion
             (( insertion < best )) && best=$insertion
             (( substitution < best )) && best=$substitution
 
+            # Count one adjacent transposition as a single edit (e.g. gti -> git).
             if (( i > 1 && j > 1 )) &&
                 [[ "${left[i]}" == "${right[j - 1]}" && "${left[i - 1]}" == "${right[j]}" ]]; then
-                transposition=$((previous_previous[j - 1] + 1))
+                previous_transposition=${previous_previous[$((j - 1))]:-$sentinel}
+                transposition=$((previous_transposition + 1))
+                (( transposition > sentinel )) && transposition=$sentinel
                 (( transposition < best )) && best=$transposition
             fi
 
@@ -70,16 +129,17 @@ _dots_command_suggestion_distance() {
         previous=("${current[@]}")
     done
 
-    REPLY=${previous[$((right_length + 1))]}
+    REPLY=${previous[$((right_length + 1))]:-$sentinel}
 }
 
 _dots_command_suggestion_candidates() {
     emulate -L zsh
 
     local command="${1-}"
-    local entry name kind
+    local name entry
     local -i max_distance max_results=5
-    local -a names ranked suggestions
+    local -aU names
+    local -a ranked suggestions
 
     # Do not guess at paths, multi-word command strings, or empty input.
     [[ -n "$command" ]] || return 1
@@ -96,27 +156,28 @@ _dots_command_suggestion_candidates() {
         max_distance=2
     fi
 
-    # whence refreshes the command hash when matching patterns and reports
-    # aliases, builtins, external commands, functions, and reserved words.
-    # Reserved words, aliases, and private helper functions are not useful corrections.
-    while IFS= read -r entry; do
-        name="${entry%%: *}"
-        kind="${entry##*: }"
+    # Rebuild only when PATH changes. Functions are added dynamically on every
+    # lookup so interactive helpers defined after startup remain discoverable.
+    if (( ! _DOTS_COMMAND_SUGGESTION_CACHE_READY )) ||
+        [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" != "$PATH" ]]; then
+        _dots_command_suggestion_refresh_cache
+    fi
 
-        [[ -n "$name" ]] || continue
-        # Aliases are expanded while Zsh parses literal command text, not a
-        # dynamically selected command name; suggesting one could fail again.
-        [[ "$kind" == reserved || "$kind" == alias ]] && continue
-        [[ "$name" == _* ]] && continue
-        names+=("$name")
-    done < <(builtin whence -wm '*' 2>/dev/null)
-
-    typeset -U names
+    names=( "${_DOTS_COMMAND_SUGGESTION_CACHE_NAMES[@]}" )
+    if (( ${+functions} )); then
+        names+=( "${(@k)functions}" )
+    fi
+    if (( ${+commands} )); then
+        names+=( "${(@k)commands}" )
+    fi
+    if (( ${+builtins} )); then
+        names+=( "${(@k)builtins}" )
+    fi
 
     for name in "${names[@]}"; do
-        [[ "$name" == "$command" ]] && continue
+        [[ -n "$name" && "$name" != _* && "$name" != "$command" ]] || continue
 
-        _dots_command_suggestion_distance "$command" "$name"
+        _dots_command_suggestion_distance "$command" "$name" "$max_distance"
         (( REPLY <= max_distance )) || continue
 
         ranked+=("${REPLY} $name")
@@ -162,7 +223,6 @@ dots_suggest_command() {
         for selected in "${suggestions[@]}"; do
             print -u2 -- "  - $selected"
         done
-        # Never leak a candidate through REPLY when no selection was made.
         REPLY=""
         return 1
     fi
