@@ -10,6 +10,12 @@ source "$REPO_DIR/config/terminal/zsh/command-state.zsh"
 typeset -ga preexec_functions precmd_functions
 preexec_functions=()
 precmd_functions=()
+# The command that disables preexec was itself seen by the previous hook.
+_DOTS_COMMAND_STATE_PENDING=0
+_DOTS_COMMAND_STATE_PENDING_COMMAND=''
+_DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND=''
+_DOTS_COMMAND_STATE_PENDING_CWD=''
+_DOTS_COMMAND_STATE_PRESERVE_PREVIOUS=0
 # The assignment above can itself be observed by the still-active preexec
 # hook. Discard that setup command before beginning synthetic test cases.
 _DOTS_COMMAND_STATE_PENDING=0
