@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::env;
-use std::io::{self, BufRead};
+use std::io::{self, Read};
 use std::process::ExitCode;
 
 const MAX_RESULTS: usize = 5;
@@ -26,7 +26,11 @@ fn edit_distance_with_limit(left: &str, right: &str, limit: usize) -> Option<usi
     // Three rows are sufficient for optimal-string-alignment distance:
     // previous_previous is needed only for adjacent transpositions.
     let mut previous = vec![sentinel; right_len + 1];
-    for (column, cell) in previous.iter_mut().enumerate().take(limit.min(right_len) + 1) {
+    for (column, cell) in previous
+        .iter_mut()
+        .enumerate()
+        .take(limit.min(right_len) + 1)
+    {
         *cell = column;
     }
     let mut previous_previous = vec![sentinel; right_len + 1];
@@ -42,7 +46,11 @@ fn edit_distance_with_limit(left: &str, right: &str, limit: usize) -> Option<usi
 
         if start <= end {
             for column in start..=end {
-                let substitution_cost = usize::from(left[row - 1] != right[column - 1]);
+                let substitution_cost = if left[row - 1] == right[column - 1] {
+                    0
+                } else {
+                    1
+                };
 
                 let deletion = previous[column].saturating_add(1).min(sentinel);
                 let insertion = current[column - 1].saturating_add(1).min(sentinel);
@@ -83,7 +91,10 @@ fn is_candidate_name(name: &str, query: &str) -> bool {
         && !name.chars().any(char::is_whitespace)
 }
 
-fn rank_candidates(query: &str, names: impl IntoIterator<Item = String>) -> Vec<Candidate> {
+fn rank_candidates<'a>(
+    query: &str,
+    names: impl IntoIterator<Item = &'a str>,
+) -> Vec<Candidate> {
     let query_len = query.chars().count();
     if query_len < 2 || query.contains('/') || query.chars().any(char::is_whitespace) {
         return Vec::new();
@@ -94,12 +105,15 @@ fn rank_candidates(query: &str, names: impl IntoIterator<Item = String>) -> Vec<
     let mut ranked = Vec::new();
 
     for name in names {
-        if !is_candidate_name(&name, query) || !seen.insert(name.clone()) {
+        if !is_candidate_name(name, query) || !seen.insert(name) {
             continue;
         }
 
-        if let Some(distance) = edit_distance_with_limit(query, &name, limit) {
-            ranked.push(Candidate { distance, name });
+        if let Some(distance) = edit_distance_with_limit(query, name, limit) {
+            ranked.push(Candidate {
+                distance,
+                name: name.to_owned(),
+            });
         }
     }
 
@@ -123,13 +137,10 @@ fn run() -> io::Result<bool> {
         return Ok(false);
     }
 
-    let stdin = io::stdin();
-    let names = stdin
-        .lock()
-        .lines()
-        .collect::<io::Result<Vec<String>>>()?;
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input)?;
 
-    let suggestions = rank_candidates(&query, names);
+    let suggestions = rank_candidates(&query, input.lines());
     for candidate in &suggestions {
         println!("{}", candidate.name);
     }
@@ -175,17 +186,20 @@ mod tests {
     #[test]
     fn results_are_deduplicated_and_sorted_by_distance_then_name() {
         let names = [
-            "grit".to_owned(),
-            "git".to_owned(),
-            "git".to_owned(),
-            "tig".to_owned(),
-            "_git_internal".to_owned(),
-            "path/git".to_owned(),
-            "git tool".to_owned(),
+            "grit",
+            "git",
+            "git",
+            "tig",
+            "_git_internal",
+            "path/git",
+            "git tool",
         ];
 
         let ranked = rank_candidates("gti", names);
-        let names: Vec<_> = ranked.into_iter().map(|candidate| candidate.name).collect();
+        let names: Vec<_> = ranked
+            .into_iter()
+            .map(|candidate| candidate.name)
+            .collect();
 
         assert_eq!(names, ["git", "grit", "tig"]);
     }
@@ -197,7 +211,7 @@ mod tests {
 
     #[test]
     fn short_and_path_like_queries_are_ignored() {
-        assert!(rank_candidates("x", ["git".to_owned()]).is_empty());
-        assert!(rank_candidates("../gti", ["git".to_owned()]).is_empty());
+        assert!(rank_candidates("x", ["git"]).is_empty());
+        assert!(rank_candidates("../gti", ["git"]).is_empty());
     }
 }
