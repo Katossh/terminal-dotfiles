@@ -34,9 +34,36 @@ jobs:
           bash -n tests/test-dots.sh
           bash -n scripts/migrate-terminal-repo.sh
           zsh -n dots/zshenv
-          zsh -n config/terminal/zsh/.zshrc
-          zsh -n config/terminal/zsh/prompt.zsh
-          zsh -n themes/adapters/fzf.zsh
+          for script in \
+            config/terminal/zsh/.zshrc \
+            config/terminal/zsh/command-state.zsh \
+            config/terminal/zsh/command-suggestions.zsh \
+            config/terminal/zsh/diagnostics.zsh \
+            config/terminal/zsh/failure-classifier.zsh \
+            config/terminal/zsh/failure-messages.zsh \
+            config/terminal/zsh/handlers.zsh \
+            config/terminal/zsh/prompt.zsh \
+            themes/adapters/fzf.zsh \
+            tests/test-command-state.zsh \
+            tests/test-command-suggestions.zsh \
+            tests/test-diagnostics.zsh \
+            tests/test-failure-classifier.zsh \
+            tests/test-failure-messages.zsh \
+            tests/test-failure-integration.zsh; do
+            zsh -n "$script"
+          done
+
+      - name: Zsh module tests
+        run: |
+          for test in \
+            tests/test-command-state.zsh \
+            tests/test-command-suggestions.zsh \
+            tests/test-diagnostics.zsh \
+            tests/test-failure-classifier.zsh \
+            tests/test-failure-messages.zsh \
+            tests/test-failure-integration.zsh; do
+            zsh "$test"
+          done
 
       - name: ShellCheck
         run: shellcheck --severity=warning bin/dots tests/test-dots.sh scripts/migrate-terminal-repo.sh
