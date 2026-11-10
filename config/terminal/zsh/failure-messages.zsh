@@ -128,7 +128,7 @@ dots_failure_message() {
             messages=(
                 "${red}⛔ Access denied. \"${command}\" is beyond your current clearance.${reset}"
                 "${yellow}🔒 The system refused \"${command}\". Your credentials did not impress it.${reset}"
-                "${purple}🚧 Permission denied. This door is not opening for ${username} today.${reset}"
+                "${purple}🚧 Permission denied for \"${command}\". This door is not opening for ${username} today.${reset}"
             )
             repeat_messages=(
                 "${yellow}The access policy has not changed since your last attempt.${reset}"
