@@ -306,7 +306,7 @@ dots_failure_message() {
                 "${orange}🦊 Network DNS may be sending \"${command}\" on a wild goose chase.${reset}"
                 "${pink}🪁 The network remote endpoint let go while \"${command}\" was running.${reset}"
                 "${sky}🌧️ A network timeout interrupted \"${command}\". Check latency before retrying.${reset}"
-                "${teal}🧭 Inspect network DNS, proxy, VPN, and gateway settings for this route.${reset}"
+                "${teal}🧭 Inspect the network DNS, proxy, VPN, and gateway route after \"${command}\" failed.${reset}"
                 "${violet}📶 Network signal dropped during \"${command}\". That host may still be offline.${reset}"
                 "${gold}🛰️ Network request for \"${command}\" left the terminal, but no reply came back.${reset}"
             )
