@@ -55,12 +55,13 @@ if dots_suggest_command dots_suggestion_fixture_gti >"$suggestion_output" 2>&1; 
 else
     suggestion_status=$?
 fi
+suggestion_reply="$REPLY"
 output="$(<"$suggestion_output")"
 rm -f "$suggestion_output"
 [[ "$suggestion_status" == 1 ]] ||
     fail "non-interactive suggestion lookup should return status 1"
 [[ "$output" == *dots_suggestion_fixture_git* ]] ||
     fail "non-interactive output should include the best suggestion"
-[[ -z "$REPLY" ]] || fail "no selection should leave REPLY empty"
+[[ -z "$suggestion_reply" ]] || fail "no selection should leave REPLY empty (got: '$suggestion_reply')"
 
 print -- "command suggestion tests passed"
