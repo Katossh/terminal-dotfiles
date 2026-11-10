@@ -91,10 +91,7 @@ fn is_candidate_name(name: &str, query: &str) -> bool {
         && !name.chars().any(char::is_whitespace)
 }
 
-fn rank_candidates<'a>(
-    query: &str,
-    names: impl IntoIterator<Item = &'a str>,
-) -> Vec<Candidate> {
+fn rank_candidates<'a>(query: &str, names: impl IntoIterator<Item = &'a str>) -> Vec<Candidate> {
     let query_len = query.chars().count();
     if query_len < 2 || query.contains('/') || query.chars().any(char::is_whitespace) {
         return Vec::new();
@@ -196,10 +193,7 @@ mod tests {
         ];
 
         let ranked = rank_candidates("gti", names);
-        let names: Vec<_> = ranked
-            .into_iter()
-            .map(|candidate| candidate.name)
-            .collect();
+        let names: Vec<_> = ranked.into_iter().map(|candidate| candidate.name).collect();
 
         assert_eq!(names, ["git", "grit", "tig"]);
     }
