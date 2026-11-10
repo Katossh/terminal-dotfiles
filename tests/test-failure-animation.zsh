@@ -61,10 +61,15 @@ zpty -w "$pty_name" 'RPROMPT="BASE_RPROMPT"; printf "%s%s\n" PROMPT BASE_READY'$
 read_until PROMPTBASE_READY
 assert_contains "base right prompt configured" PROMPTBASE_READY "$REPLY"
 
-# Call the public renderer and prove it queues an animation.
-zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; printf "%s%s%s%s%s%s%s%s\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING" ACTIVE_ "$_DOTS_FAILURE_ANIMATION_ACTIVE" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'$'\n'
+# Simulate the real failure notification lifecycle: the public renderer is
+# called by precmd after a completed command and before the next ZLE session.
+zpty -w "$pty_name" 'typeset -gi DOTS_TEST_TRIGGER_FAILURE=0; _dots_test_queue_failure_precmd() { (( DOTS_TEST_TRIGGER_FAILURE )) || return 0; DOTS_TEST_TRIGGER_FAILURE=0; dots_failure_message generic animation-integration-test; printf "%s%s%s%s%s%s%s%s\\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING" ACTIVE_ "$_DOTS_FAILURE_ANIMATION_ACTIVE" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"; }; typeset -ga precmd_functions; precmd_functions+=(_dots_test_queue_failure_precmd); print -r -- PRECMD_HOOK_READY'$'\\n'
+read_until PRECMD_HOOK_READY
+assert_contains "failure precmd hook was installed" PRECMD_HOOK_READY "$REPLY"
+
+zpty -w "$pty_name" 'DOTS_TEST_TRIGGER_FAILURE=1; print -r -- TRIGGER_COMMAND_DONE'$'\\n'
 read_until FAILURECALL_FINISHED
-assert_contains "public failure-message function ran" FAILURECALL_FINISHED "$REPLY"
+assert_contains "precmd invoked the public failure-message function" FAILURECALL_FINISHED "$REPLY"
 assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 assert_contains "animation FD was registered before ZLE starts" STATE_registered "$REPLY"
 assert_contains "animation process is active" ACTIVE_1 "$REPLY"
