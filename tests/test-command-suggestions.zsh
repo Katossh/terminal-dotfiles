@@ -27,12 +27,16 @@ function dots_suggestion_fixture_got() {
     :
 }
 
+alias dots_suggestion_fixture_gat='dots_suggestion_fixture_git'
+
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
 
 first_candidate="${candidate_output%%$'\n'*}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
+[[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
+    fail "aliases must not be offered as dynamically executed corrections"
 
 if _dots_command_suggestion_candidates "../dots_suggestion_fixture_gti"; then
     fail "path-like command names must not be guessed"
@@ -43,11 +47,21 @@ if _dots_command_suggestion_candidates x; then
 fi
 
 # A non-interactive caller gets printable suggestions, never a blocking prompt.
-if output="$(dots_suggest_command dots_suggestion_fixture_gti 2>&1)"; then
+# Keep the function invocation in this shell so its REPLY contract is observable.
+suggestion_output="$(mktemp "${TMPDIR:-/tmp}/dots-command-suggestions.XXXXXX")"
+if dots_suggest_command dots_suggestion_fixture_gti >"$suggestion_output" 2>&1; then
+    rm -f "$suggestion_output"
     fail "non-interactive suggestion lookup must not report a selected command"
+else
+    suggestion_status=$?
 fi
+suggestion_reply="$REPLY"
+output="$(<"$suggestion_output")"
+rm -f "$suggestion_output"
+[[ "$suggestion_status" == 1 ]] ||
+    fail "non-interactive suggestion lookup should return status 1"
 [[ "$output" == *dots_suggestion_fixture_git* ]] ||
     fail "non-interactive output should include the best suggestion"
-[[ -z "$REPLY" ]] || fail "no selection should leave REPLY empty"
+[[ -z "$suggestion_reply" ]] || fail "no selection should leave REPLY empty (got: '$suggestion_reply')"
 
 print -- "command suggestion tests passed"

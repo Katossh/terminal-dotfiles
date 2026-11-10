@@ -57,7 +57,9 @@ dots_classify_failure() {
     # (z) performs shell-word parsing only; it does not evaluate expansions,
     # substitutions, redirections, or command substitutions.
     local -a words
-    words=( "${(@z)command_text}" )
+    # z splits shell words but retains syntactic quotes; Q removes one quote
+    # layer without evaluating substitutions, variables, globs, or commands.
+    words=( "${(@Q)${(@z)command_text}}" )
 
     if (( ${#words} == 0 )); then
         REPLY=generic

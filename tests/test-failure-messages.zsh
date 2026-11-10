@@ -29,6 +29,8 @@ assert_absent() {
 
     [[ "$haystack" != *"$needle"* ]] || {
         print -u2 -- "not ok - $label (unexpected control character)"
+        print -u2 -r -- "  offending character: ${(qqq)needle}"
+        print -u2 -r -- "  rendered output: ${(qqq)haystack}"
         exit 1
     }
     print -- "ok - $label"
@@ -38,7 +40,7 @@ assert_control_free() {
     local label="$1"
     local value="$2"
     # A single LF between the primary message and optional detail is deliberate.
-    value="${value//$'\\n'/}"
+    value="${value//$'\n'/}"
     [[ "$value" != *[[:cntrl:]]* ]] || {
         print -u2 -- "not ok - $label (control character remained)"
         exit 1
@@ -86,26 +88,23 @@ while (( network_index < 30 )); do
 done
 
 # NUL cannot be held in a shell variable. Test every other C0 control and DEL.
-unsafe_command=$'curl\\a\\b\\t\\v\\f\\r\\n\\e\\x7fhttps://example.invalid'
+unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
 capture_message network "$unsafe_command"
-for control in $'\\a' $'\\b' $'\\t' $'\\v' $'\\f' $'\\r' $'\\e' $'\\x7f'; do
-    assert_absent "command controls are sanitised" "$control" "$DOTS_TEST_OUTPUT"
-done
+# Check the entire output against the POSIX control-character class rather
+# than glob-matching individual control bytes as shell pattern fragments.
 command_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
 (( ${#command_lines[@]} == 1 )) || fail "command controls must not create extra terminal lines"
 assert_control_free "command rendering has no control characters" "$DOTS_TEST_OUTPUT"
 
-unsafe_detail=$'detail\\a\\b\\t\\v\\f\\r\\n\\e\\x7ftext'
+unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
 capture_message network curl "$unsafe_detail"
-for control in $'\\a' $'\\b' $'\\t' $'\\v' $'\\f' $'\\r' $'\\e' $'\\x7f'; do
-    assert_absent "detail controls are sanitised" "$control" "$DOTS_TEST_OUTPUT"
-done
+# The same complete control-byte check applies to optional detail output.
 detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
 (( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra terminal lines"
 assert_control_free "detail rendering has no control characters" "$DOTS_TEST_OUTPUT"
 
 # The same helper sanitises the username before it is interpolated.
-unsafe_user=$'katossh\\a\\b\\t\\v\\f\\r\\n\\e\\x7f'
+unsafe_user=$'katossh\a\b\t\v\f\r\n\e\x7f'
 _dots_failure_message_sanitize "$unsafe_user"
 assert_contains "username is retained" "katossh" "$REPLY"
 assert_control_free "username is sanitised" "$REPLY"

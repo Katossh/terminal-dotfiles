@@ -4,11 +4,13 @@
 
 The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_CONFIG_HOME/zsh, and discovers the dotfiles checkout. Interactive startup then reads:
 
-1. .zshrc — PATH, history, options, Oh My Zsh and plugin initialization, custom modules, Starship, and optional tmux startup.
-2. aliases.zsh — aliases and small interactive helpers.
-3. completion.zsh — completion matching and cache styles.
-4. handlers.zsh — the custom command-not-found handler.
-5. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
+1. .zshrc — PATH, history, options, Oh My Zsh and plugin initialization, module loading, Starship, and optional tmux startup.
+2. aliases.zsh and completion.zsh — aliases, interactive helpers, completion matching, and cache styles.
+3. command-state.zsh — records the last completed command, its status, working directory, and expanded form.
+4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command.
+5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide `why` / `why --verbose` without rerunning the previous command.
+6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
+7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 

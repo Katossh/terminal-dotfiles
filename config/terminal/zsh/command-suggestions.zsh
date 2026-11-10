@@ -98,13 +98,15 @@ _dots_command_suggestion_candidates() {
 
     # whence refreshes the command hash when matching patterns and reports
     # aliases, builtins, external commands, functions, and reserved words.
-    # Reserved words and private helper functions are not useful corrections.
+    # Reserved words, aliases, and private helper functions are not useful corrections.
     while IFS= read -r entry; do
         name="${entry%%: *}"
         kind="${entry##*: }"
 
         [[ -n "$name" ]] || continue
-        [[ "$kind" == reserved ]] && continue
+        # Aliases are expanded while Zsh parses literal command text, not a
+        # dynamically selected command name; suggesting one could fail again.
+        [[ "$kind" == reserved || "$kind" == alias ]] && continue
         [[ "$name" == _* ]] && continue
         names+=("$name")
     done < <(builtin whence -wm '*' 2>/dev/null)
@@ -160,6 +162,8 @@ dots_suggest_command() {
         for selected in "${suggestions[@]}"; do
             print -u2 -- "  - $selected"
         done
+        # Never leak a candidate through REPLY when no selection was made.
+        REPLY=""
         return 1
     fi
 

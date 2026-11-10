@@ -10,8 +10,11 @@
 #   DOTS_LAST_STATUS           Exit status of that command.
 #   DOTS_LAST_CWD              Working directory when it started.
 #   DOTS_LAST_TIMESTAMP        Unix timestamp (seconds) when it finished.
+#   DOTS_LAST_SEQUENCE         Monotonic number for each completed command.
 #   dots_command_state_preserve_previous
 #                               Keep the current record across this command.
+#   dots_command_state_note_executed_command
+#                               Record an explicitly confirmed command correction.
 #
 # The public values are updated in precmd, not preexec. While a command such
 # as a future "why" function is running, the values therefore still describe
@@ -27,6 +30,7 @@ typeset -g DOTS_LAST_EXECUTED_COMMAND="${DOTS_LAST_EXECUTED_COMMAND-}"
 typeset -gi DOTS_LAST_STATUS=${DOTS_LAST_STATUS:-0}
 typeset -g DOTS_LAST_CWD="${DOTS_LAST_CWD-}"
 typeset -g DOTS_LAST_TIMESTAMP="${DOTS_LAST_TIMESTAMP-}"
+typeset -gi DOTS_LAST_SEQUENCE=${DOTS_LAST_SEQUENCE:-0}
 
 # These pending values are intentionally separate from the public state.
 typeset -g _DOTS_COMMAND_STATE_PENDING_COMMAND=""
@@ -50,6 +54,25 @@ _dots_command_state_preexec() {
     typeset -g _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND="$executed_command"
     typeset -g _DOTS_COMMAND_STATE_PENDING_CWD="$PWD"
     typeset -gi _DOTS_COMMAND_STATE_PENDING=1
+    return 0
+}
+
+# A command-not-found correction is executed only after explicit user
+# confirmation. Replace the expanded command saved by preexec so "why"
+# diagnoses the command that actually ran while retaining the original typo
+# in DOTS_LAST_COMMAND.
+dots_command_state_note_executed_command() {
+    emulate -L zsh
+
+    (( $# > 0 && _DOTS_COMMAND_STATE_PENDING )) || return 1
+
+    local argument
+    local -a quoted_arguments
+    for argument in "$@"; do
+        quoted_arguments+=( "${(q)argument}" )
+    done
+
+    typeset -g _DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND="${(j: :)quoted_arguments}"
     return 0
 }
 
@@ -83,6 +106,7 @@ _dots_command_state_precmd() {
     typeset -g DOTS_LAST_EXECUTED_COMMAND="$_DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND"
     typeset -gi DOTS_LAST_STATUS=$command_status
     typeset -g DOTS_LAST_CWD="$_DOTS_COMMAND_STATE_PENDING_CWD"
+    typeset -gi DOTS_LAST_SEQUENCE=$(( DOTS_LAST_SEQUENCE + 1 ))
 
     if (( ${+EPOCHSECONDS} )); then
         typeset -g DOTS_LAST_TIMESTAMP="$EPOCHSECONDS"

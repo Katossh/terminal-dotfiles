@@ -72,7 +72,7 @@ DOTS_LAST_CWD='/tmp/project'
 DOTS_LAST_TIMESTAMP=''
 output="$(why)"
 assert_contains "successful command is identified" "completed successfully" "$output"
-assert_contains "successful command does not claim failure" "No failure to diagnose" "$output"
+assert_contains "successful command does not claim failure" "no failure to diagnose" "${output:l}"
 
 DOTS_LAST_COMMAND='gti status'
 DOTS_LAST_EXECUTED_COMMAND='gti status'
@@ -110,7 +110,7 @@ output="$(why)"
 assert_contains "Ctrl+C status is identified" "interrupted by SIGINT" "$output"
 
 DOTS_LAST_COMMAND='nix build .#workstation'
-DOTS_LAST_EXECUTED_COMMAND='nix build .#workstation'
+DOTS_LAST_EXECUTED_COMMAND='command nix build .#workstation'
 DOTS_LAST_STATUS=1
 DOTS_LAST_CWD='/tmp/nix-project'
 DOTS_TEST_CATEGORY=nix
