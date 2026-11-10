@@ -25,7 +25,7 @@ source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 
 # Keep the production code path while making the integration test fast.
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.01
+_DOTS_FAILURE_ANIMATION_INTERVAL=0.001
 
 _dots_test_prompt_report() {
     local first="${PROMPT%%$'\n'*}"
@@ -37,12 +37,13 @@ _dots_test_prompt_report() {
 }
 typeset -ga precmd_functions
 precmd_functions+=(_dots_test_prompt_report)
+print -r -- DOTS_TEST_ZSHRC_LOADED
 ZSHRC
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    "ZSH_DIR=$ZSH_DIR" "ZDOTDIR=$TEST_ZDOTDIR" zsh -i
+    "ZSH_DIR=$ZSH_DIR" "HOME=$TEST_ZDOTDIR" "ZDOTDIR=$TEST_ZDOTDIR" zsh -i
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -rf "$TEST_ZDOTDIR"' EXIT
 
 read_until() {
@@ -64,12 +65,14 @@ drain_for() {
     while (( rounds > 0 )); do
         if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
         command sleep 0.02
-        (( rounds -= 1 ))
+        rounds=$(( rounds - 1 ))
     done
     REPLY="$output"
 }
 
 # Startup animation must happen at the first prompt, without a failed command.
+read_until "DOTS_TEST_ZSHRC_LOADED"
+assert_contains "temporary startup file was loaded" "DOTS_TEST_ZSHRC_LOADED" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "first interactive prompt starts the animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
 assert_contains "animation occupies the path line before line_break" "LAYOUT_1" "$REPLY"
