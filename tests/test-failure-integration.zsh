@@ -49,6 +49,11 @@ export DOTS_FAILURE_MESSAGE_ESCALATION=0
 assert_eq "state hook is first" "_dots_command_state_precmd" "${precmd_functions[1]}"
 assert_eq "failure reporter is registered after state" "_dots_failure_notice_precmd" "${precmd_functions[-1]}"
 
+# The test drives hooks manually with synthetic completed commands. Prevent
+# the shell from treating test-runner commands as additional interactive input.
+preexec_functions=()
+precmd_functions=()
+
 # A failed command is published, classified, and reported once.
 _dots_command_state_preexec "git status" "git status" "git status"
 setopt no_errexit
