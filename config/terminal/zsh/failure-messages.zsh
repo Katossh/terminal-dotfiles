@@ -36,19 +36,26 @@ _dots_failure_message_rainbow() {
         return 0
     fi
 
+    # Twelve RGB stops add pink, teal, indigo, and warm sunset tones.
     local -a characters colors
     characters=( "${(@s::)message}" )
     colors=(
-        $'\e[38;2;255;75;75m'
-        $'\e[38;2;255;165;60m'
-        $'\e[38;2;245;220;75m'
-        $'\e[38;2;90;210;120m'
-        $'\e[38;2;80;170;255m'
-        $'\e[38;2;185;115;255m'
+        $'\e[38;2;255;92;124m'
+        $'\e[38;2;255;146;93m'
+        $'\e[38;2;255;207;102m'
+        $'\e[38;2;190;230;105m'
+        $'\e[38;2;91;218;151m'
+        $'\e[38;2;68;211;205m'
+        $'\e[38;2;92;190;255m'
+        $'\e[38;2;112;145;255m'
+        $'\e[38;2;157;125;255m'
+        $'\e[38;2;206;124;255m'
+        $'\e[38;2;255;122;211m'
+        $'\e[38;2;255;165;190m'
     )
 
     local character
-    local -i index=1
+    local -i index=$(( (RANDOM % ${#colors[@]}) + 1 ))
     for character in "${characters[@]}"; do
         print -rn -- "${colors[index]}${character}"
         (( index = index % ${#colors[@]} + 1 ))
