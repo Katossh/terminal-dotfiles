@@ -25,16 +25,16 @@ zmodload zsh/zpty 2>/dev/null || {
     exit 0
 }
 
-local pty_name="dots_failure_animation_test"
-zpty -b "$pty_name" zsh -f -i
+typeset pty_name="dots_failure_animation_test"
+zpty -b "$pty_name" env TERM=xterm-256color zsh -f -i
 trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
 
 command sleep 0.2
-local init_command="source ${(q)ZSH_DIR}/failure-animation.zsh; RPROMPT='BASE_RPROMPT'; _DOTS_FAILURE_ANIMATION_PENDING=1; print -r -- ANIMATION_ARMED"
+typeset init_command="source ${(q)ZSH_DIR}/failure-animation.zsh; RPROMPT='BASE_RPROMPT'; _DOTS_FAILURE_ANIMATION_PENDING=1; print -r -- ANIMATION_ARMED"
 zpty -w "$pty_name" "$init_command"
 
-local captured='' chunk=''
-local -i attempt=0
+typeset captured='' chunk=''
+typeset -i attempt=0
 while (( attempt < 20 )); do
     if zpty -r -t "$pty_name" chunk; then
         captured+="$chunk"
