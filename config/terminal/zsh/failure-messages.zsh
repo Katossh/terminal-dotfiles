@@ -303,12 +303,12 @@ dots_failure_message() {
                 "${yellow}📡 Network route unavailable for \"${command}\". DNS, proxy, VPN, or the remote service may be responsible.${reset}"
                 "${purple}🛰️ Network signal lost during \"${command}\". The destination has not answered the call.${reset}"
                 "${cyan}🪫 The network connection ran out of answers during \"${command}\". Check DNS and routing.${reset}"
-                "${orange}🦊 DNS may be sending \"${command}\" on a wild goose chase.${reset}"
-                "${pink}🪁 The remote endpoint let go while \"${command}\" was running.${reset}"
-                "${sky}🌧️ A timeout interrupted \"${command}\". Check latency before retrying.${reset}"
-                "${teal}🧭 Inspect DNS, proxy, VPN, and gateway settings for this route.${reset}"
-                "${violet}📶 \"${command}\" lost its signal. The network may be up while that host is not.${reset}"
-                "${gold}🛰️ The request for \"${command}\" left the terminal, but no reply came back.${reset}"
+                "${orange}🦊 Network DNS may be sending \"${command}\" on a wild goose chase.${reset}"
+                "${pink}🪁 The network remote endpoint let go while \"${command}\" was running.${reset}"
+                "${sky}🌧️ A network timeout interrupted \"${command}\". Check latency before retrying.${reset}"
+                "${teal}🧭 Inspect network DNS, proxy, VPN, and gateway settings for this route.${reset}"
+                "${violet}📶 Network signal dropped during \"${command}\". That host may still be offline.${reset}"
+                "${gold}🛰️ Network request for \"${command}\" left the terminal, but no reply came back.${reset}"
             )
             repeat_messages=(
                 "${yellow}The network has not recovered since the last attempt. Check connectivity before retrying.${reset}"
