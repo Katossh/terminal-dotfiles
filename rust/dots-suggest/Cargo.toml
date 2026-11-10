@@ -1,0 +1,10 @@
+[package]
+name = "dots-suggest"
+version = "0.1.0"
+edition = "2021"
+description = "Fast command-name suggestions for terminal-dotfiles"
+license = "MIT"
+
+[[bin]]
+name = "dots-suggest"
+path = "src/main.rs"
