@@ -25,6 +25,7 @@ assert_eq() {
 _dots_command_state_precmd
 assert_eq "initial command is empty" "" "$DOTS_LAST_COMMAND"
 assert_eq "initial status is zero" "0" "$DOTS_LAST_STATUS"
+assert_eq "initial sequence is zero" "0" "$DOTS_LAST_SEQUENCE"
 
 # Simulate a failed interactive command. preexec records pending data, while
 # the public state remains unchanged until precmd runs after command completion.
@@ -41,6 +42,7 @@ assert_eq "typed command is retained" "false" "$DOTS_LAST_COMMAND"
 assert_eq "executed command is retained" "false" "$DOTS_LAST_EXECUTED_COMMAND"
 assert_eq "non-zero status is captured" "1" "$DOTS_LAST_STATUS"
 assert_eq "starting directory is captured" "$original_cwd" "$DOTS_LAST_CWD"
+assert_eq "first completed command advances sequence" "1" "$DOTS_LAST_SEQUENCE"
 [[ "$DOTS_LAST_TIMESTAMP" == <-> ]] || fail "completion timestamp is not an epoch integer"
 print -- "ok - completion timestamp is an epoch integer"
 
@@ -52,6 +54,7 @@ _dots_command_state_precmd
 assert_eq "typed alias is retained" "gco" "$DOTS_LAST_COMMAND"
 assert_eq "full expanded command is retained" "git checkout main" "$DOTS_LAST_EXECUTED_COMMAND"
 assert_eq "successful status is captured" "0" "$DOTS_LAST_STATUS"
+assert_eq "second completed command advances sequence" "2" "$DOTS_LAST_SEQUENCE"
 
 # Interrupt-style statuses are captured just like ordinary exit codes.
 _dots_command_state_preexec "sleep 99" "sleep 99" "sleep 99"
@@ -60,6 +63,7 @@ setopt no_errexit
 _dots_command_state_precmd
 setopt errexit
 assert_eq "interrupted command status is captured" "130" "$DOTS_LAST_STATUS"
+assert_eq "third completed command advances sequence" "3" "$DOTS_LAST_SEQUENCE"
 
 # A diagnostic function can preserve the failure it is inspecting, even when
 # the user invokes it repeatedly.
@@ -69,6 +73,7 @@ true
 _dots_command_state_precmd
 assert_eq "diagnostic command does not replace previous command" "sleep 99" "$DOTS_LAST_COMMAND"
 assert_eq "diagnostic command preserves previous status" "130" "$DOTS_LAST_STATUS"
+assert_eq "diagnostic command does not advance sequence" "3" "$DOTS_LAST_SEQUENCE"
 
 # A prompt redraw without a preceding command must leave the previous record
 # untouched.
@@ -77,6 +82,19 @@ last_status="$DOTS_LAST_STATUS"
 _dots_command_state_precmd
 assert_eq "empty precmd leaves command untouched" "$last_command" "$DOTS_LAST_COMMAND"
 assert_eq "empty precmd leaves status untouched" "$last_status" "$DOTS_LAST_STATUS"
+
+# A confirmed command correction replaces only the expanded command record.
+_dots_command_state_preexec "gti status --message 'hello world'" "gti status" "gti status"
+assert_eq "correction starts with the typed command preserved" "gti status --message 'hello world'" "$_DOTS_COMMAND_STATE_PENDING_COMMAND"
+dots_command_state_note_executed_command git status --message "hello world"
+setopt no_errexit
+( exit 1 )
+_dots_command_state_precmd
+setopt errexit
+assert_eq "the original typo remains available" "gti status --message 'hello world'" "$DOTS_LAST_COMMAND"
+[[ "$DOTS_LAST_EXECUTED_COMMAND" == git\ status\ --message\ hello\\\ world ]] ||
+    fail "the corrected command and safely quoted arguments must be retained"
+assert_eq "confirmed correction advances sequence" "4" "$DOTS_LAST_SEQUENCE"
 
 # Re-sourcing the module must not register duplicate hook functions.
 source "$REPO_DIR/config/terminal/zsh/command-state.zsh"
