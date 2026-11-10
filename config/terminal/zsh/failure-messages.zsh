@@ -352,7 +352,7 @@ dots_failure_message() {
                 "${cyan}🌙 Even the stars cannot resolve \"${command}\" in this timeline. ${reset}"
                 "${red}🔥 \"${command}\" has reached its final form: not executable. ${reset}"
                 "${purple}🌀 A space-time anomaly detected: \"${command}\" does not exist here! ${reset}"
-                "${blue}🎴 The PATH card for "${command}" has been drawn. It says: \"try another command.\" ${reset}"
+                "${blue}🎴 The PATH card for \"${command}\" has been drawn. It says: \"try another command.\" ${reset}"
                 "${yellow}💫 Senpai, \"${command}\" is not in the command registry. ${reset}"
             )
             messages=("${style_messages[@]}")
@@ -360,24 +360,24 @@ dots_failure_message() {
         sarcastic)
             style_messages=(
                 "${yellow}🫠 \"${command}\" failed. Bold strategy. Let's see if reading the error helps. ${reset}"
-                "${dim}I would explain why "${command}" failed, but the terminal already did that above. ${reset}"
-                "${purple}I've seen more convincing attempts than "${command}" on a broken keyboard. ${reset}"
+                "${dim}I would explain why \"${command}\" failed, but the terminal already did that above. ${reset}"
+                "${purple}I've seen more convincing attempts than \"${command}\" on a broken keyboard. ${reset}"
                 "${cyan}☕ \"${command}\" has once again chosen the difficult path. ${reset}"
                 "${yellow}404: command not found. Your confidence, however, remains available. ${reset}"
-                "${magenta}🤷 The command was so creative that even PATH couldn't recognize it. ${reset}"
-                "${blue}Perhaps try a command other than "${command}" from this dimension next time. ${reset}"
-                "${red}🧯 Repeating the same failed command is not what we call troubleshooting. ${reset}"
+                "${magenta}🤷 The command was so creative that even PATH couldn't recognize \"${command}\". ${reset}"
+                "${blue}Perhaps try a command other than \"${command}\" from this dimension next time. ${reset}"
+                "${red}🧯 Repeating the same failed command \"${command}\" is not what we call troubleshooting. ${reset}"
             )
             messages=("${style_messages[@]}")
             ;;
         dramatic)
             style_messages=(
                 "${red}☠️ The PATH has spoken. It says no to \"${command}\". ${reset}"
-                "${purple}A darkness has fallen upon your PATH. "${command}" is missing. ${reset}"
+                "${purple}A darkness has fallen upon your PATH. \"${command}\" is missing. ${reset}"
                 "${red}⚔️ \"${command}\" has fallen before the shell. Its quest ends here. ${reset}"
-                "${magenta}The terminal searched every corner for "${command}". Nothing answered. ${reset}"
+                "${magenta}The terminal searched every corner for \"${command}\". Nothing answered. ${reset}"
                 "${yellow}🎭 Thus concludes the tragic tale of \"${command}\". ${reset}"
-                "${cyan}The failure of "${command}" was foretold. The output above contains the prophecy. ${reset}"
+                "${cyan}The failure of \"${command}\" was foretold. The output above contains the prophecy. ${reset}"
             )
             messages=("${style_messages[@]}")
             ;;
@@ -386,7 +386,7 @@ dots_failure_message() {
             style_messages=(
                 "🌈 \"${command}\" has entered its fabulous failure era. ✨"
                 "🌈 The PATH is a spectrum. \"${command}\" is still missing. 🦄"
-                "✨ The failure of "${command}" is brought to you in glorious 24-bit colour. 🌈"
+                "✨ The failure of \"${command}\" is brought to you in glorious 24-bit colour. 🌈"
             )
             messages=("${style_messages[@]}")
             ;;
