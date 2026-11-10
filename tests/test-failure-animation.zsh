@@ -3,8 +3,6 @@ setopt errexit nounset
 
 REPO_DIR="${0:A:h:h}"
 ZSH_DIR="$REPO_DIR/config/terminal/zsh"
-TEST_ZDOTDIR="$(mktemp -d)"
-PTY_NAME="dots_failure_animation_test"
 
 fail() { print -u2 -r -- "not ok - $*"; exit 1; }
 assert_contains() {
@@ -18,40 +16,19 @@ zmodload zsh/zpty 2>/dev/null || {
     exit 0
 }
 
-cat > "$TEST_ZDOTDIR/.zshrc" <<'ZSHRC'
-PROMPT='BASE_PATH'$'\n''BASE_OUTPUT '
-RPROMPT='BASE_RPROMPT'
-source "$ZSH_DIR/failure-messages.zsh"
-source "$ZSH_DIR/failure-animation.zsh"
-
-# Keep the production code path while making the integration test fast.
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.001
-
-_dots_test_prompt_report() {
-    local first="${PROMPT%%$'\n'*}"
-    local second="${PROMPT#*$'\n'}"
-    local -i layout=0
-    [[ "$first" == *BASE_PATH* && "$first" == *"✧━━"* &&
-        "$second" == "BASE_OUTPUT " ]] && layout=1
-    print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} STATE_${_DOTS_FAILURE_ANIMATION_STATE} LAYOUT_${layout}"
-}
-typeset -ga precmd_functions
-precmd_functions+=(_dots_test_prompt_report)
-print -r -- DOTS_TEST_ZSHRC_LOADED
-ZSHRC
-
-zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
+typeset pty_name="dots_failure_animation_test"
+zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    "ZSH_DIR=$ZSH_DIR" "HOME=$TEST_ZDOTDIR" "ZDOTDIR=$TEST_ZDOTDIR" zsh -i
-trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -rf "$TEST_ZDOTDIR"' EXIT
+    "ZSH_DIR=$ZSH_DIR" zsh -f -i
+trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
 
 read_until() {
     local needle="$1"
     local -i tries=0
     local output='' data=''
     while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        if zpty -r -t "$pty_name" data; then output+="$data"; fi
         [[ "$output" == *"$needle"* ]] && break
         command sleep 0.05
         (( tries += 1 ))
@@ -63,41 +40,52 @@ drain_for() {
     local -i rounds="$1"
     local output='' data=''
     while (( rounds > 0 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        if zpty -r -t "$pty_name" data; then output+="$data"; fi
         command sleep 0.02
         rounds=$(( rounds - 1 ))
     done
     REPLY="$output"
 }
 
-# Startup animation must happen at the first prompt, without a failed command.
-read_until "DOTS_TEST_ZSHRC_LOADED"
-assert_contains "temporary startup file was loaded" "DOTS_TEST_ZSHRC_LOADED" "$REPLY"
+# Wait for the clean zsh -f shell, then initialise the same modules the real
+# .zshrc loads. The first prompt after module initialisation must animate.
+local_startup=''
+typeset -i attempt=0
+while (( attempt < 40 )); do
+    if zpty -r -t "$pty_name" chunk; then local_startup+="$chunk"; fi
+    [[ "$local_startup" == *"%"* || "$local_startup" == *"#"* || "$local_startup" == *"$"* ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach its prompt"; fi
+print -- "ok - clean interactive child shell reached its prompt"
+
+zpty -w "$pty_name" 'PROMPT="BASE_PATH"$'"'"'\n'"'"'"BASE_OUTPUT "; RPROMPT="BASE_RPROMPT"; source "$ZSH_DIR/failure-messages.zsh"; source "$ZSH_DIR/failure-animation.zsh"; _DOTS_FAILURE_ANIMATION_INTERVAL=0.001; _dots_test_prompt_report() { local first="${PROMPT%%$'\n'*}"; local second="${PROMPT#*$'\n'}"; local -i layout=0; [[ "$first" == *BASE_PATH* && "$first" == *"✧━━"* && "$second" == "BASE_OUTPUT " ]] && layout=1; print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} STATE_${_DOTS_FAILURE_ANIMATION_STATE} LAYOUT_${layout}"; }; typeset -ga precmd_functions; precmd_functions+=(_dots_test_prompt_report); print -r -- MODULES_READY'$'\n'
 read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "first interactive prompt starts the animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
-assert_contains "animation occupies the path line before line_break" "LAYOUT_1" "$REPLY"
+assert_contains "first prompt after Zsh module initialisation starts animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+assert_contains "animation sits between path and the second prompt line" "LAYOUT_1" "$REPLY"
 
-# Let the 36-frame startup animation complete and inspect the persistent state.
-drain_for 60
-zpty -w "$PTY_NAME" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"'$'\n'
+# Drain terminal output while the asynchronous stream finishes.
+drain_for 220
+zpty -w "$pty_name" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"'$'\n'
 read_until STARTUP_FINISHED
-assert_contains "startup animation completes all frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
+assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "final startup frame remains visible" "LAYOUT_1" "$REPLY"
+assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
 
-# The public message renderer queues another animation for the next prompt.
-zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED'$'\n'
+# Trigger the real public renderer; the queued animation starts in precmd.
+zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED'$'\n'
 read_until FAILURE_MESSAGE_RETURNED
 assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "failure notice starts a new animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
 
-# Enter must cancel the remaining frames but preserve the latest one.
+# Enter cancels the remaining frames but must not clear the latest one.
 command sleep 0.08
-zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+zpty -w "$pty_name" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
 read_until INPUT_ACCEPTED
 assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
-assert_contains "RPROMPT is untouched" "RPROMPT_BASE_RPROMPT" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
 
