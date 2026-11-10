@@ -183,8 +183,14 @@ _dots_failure_message_sanitize "$unsafe_user"
 assert_contains "username is retained" "katossh" "$REPLY"
 assert_control_free "username is sanitised" "$REPLY"
 
-capture_message unexpected fallback-command
-assert_contains "unknown categories fall back to generic" "fallback-command" "$DOTS_TEST_OUTPUT"
+integer fallback_index=0
+typeset fallback_output=''
+while (( fallback_index < 30 )); do
+    capture_message unexpected fallback-command
+    fallback_output+="$DOTS_TEST_OUTPUT"
+    (( fallback_index += 1 ))
+done
+assert_contains "unknown categories fall back to generic" "fallback-command" "$fallback_output"
 
 # The renderer's state must survive between calls, and adjacent templates
 # must never repeat.
