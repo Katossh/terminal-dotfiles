@@ -17,25 +17,38 @@ assert_contains() {
     print -- "ok - $label"
 }
 
-# Exercise the real ZLE event loop in a pseudo-terminal: the animation should
-# update the right prompt, accept a command while frames are still arriving,
-# and restore the user's original RPROMPT when the line is submitted.
+# Exercise the real ZLE event loop in a pseudo-terminal. Wait for the child
+# shell's first prompt before sending input; otherwise zpty can race startup.
 zmodload zsh/zpty 2>/dev/null || {
     print -- "skip - zsh/zpty is unavailable"
     exit 0
 }
 
 typeset pty_name="dots_failure_animation_test"
-zpty -b "$pty_name" env TERM=xterm-256color zsh -f -i
+zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 zsh -f -i
 trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
-
-command sleep 0.2
-typeset init_command="source ${(q)ZSH_DIR}/failure-animation.zsh; RPROMPT='BASE_RPROMPT'; _DOTS_FAILURE_ANIMATION_PENDING=1; print -r -- ANIMATION_ARMED"
-zpty -w "$pty_name" "$init_command"$'\n'
 
 typeset captured='' chunk=''
 typeset -i attempt=0
-while (( attempt < 20 )); do
+while (( attempt < 40 )); do
+    if zpty -r -t "$pty_name" chunk; then
+        captured+="$chunk"
+    fi
+    [[ "$captured" == *"%"* ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+assert_contains "interactive child shell reached its first prompt" "%" "$captured"
+
+# Load the module in its own short command so the terminal cannot truncate
+# the command before the interactive shell has started accepting input.
+zpty -w "$pty_name" "source ${(q)ZSH_DIR}/failure-animation.zsh"$'\n'
+command sleep 0.1
+zpty -w "$pty_name" "RPROMPT='BASE_RPROMPT'; _DOTS_FAILURE_ANIMATION_PENDING=1; print -r -- ANIMATION_ARMED"$'\n'
+
+captured=''
+attempt=0
+while (( attempt < 60 )); do
     if zpty -r -t "$pty_name" chunk; then
         captured+="$chunk"
     fi
@@ -47,19 +60,19 @@ while (( attempt < 20 )); do
     (( attempt += 1 ))
 done
 
-assert_contains "interactive child shell loaded animation module" "ANIMATION_ARMED" "$captured"
+assert_contains "animation setup command ran" "ANIMATION_ARMED" "$captured"
 if [[ "$captured" != *"✦"* && "$captured" != *"🌙"* && "$captured" != *"♡"* ]]; then
     print -u2 -r -- "Captured terminal output: ${(qqq)captured}"
     fail "ZLE did not render an animation frame in the active input prompt"
 fi
 print -- "ok - animation frame rendered while ZLE was active"
 
-# This input is sent before the 24-frame animation (about 3.36 seconds) ends.
+# Submit a command while the remaining frames are still being produced.
 zpty -w "$pty_name" 'print -r -- "DOTS_INPUT_ACCEPTED:$RPROMPT"'$'\n'
 
 captured=''
 attempt=0
-while (( attempt < 30 )); do
+while (( attempt < 60 )); do
     if zpty -r -t "$pty_name" chunk; then
         captured+="$chunk"
     fi
