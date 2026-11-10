@@ -92,8 +92,7 @@ setopt no_errexit
 _dots_command_state_precmd
 setopt errexit
 assert_eq "the original typo remains available" "gti status --message 'hello world'" "$DOTS_LAST_COMMAND"
-[[ "$DOTS_LAST_EXECUTED_COMMAND" == git\ status\ --message\ hello\\\ world ]] ||
-    fail "the corrected command and safely quoted arguments must be retained"
+assert_eq "corrected command and arguments are safely quoted" "git status --message hello\\ world" "$DOTS_LAST_EXECUTED_COMMAND"
 assert_eq "confirmed correction advances sequence" "4" "$DOTS_LAST_SEQUENCE"
 
 # Re-sourcing the module must not register duplicate hook functions.
