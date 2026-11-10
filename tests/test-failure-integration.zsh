@@ -53,6 +53,11 @@ assert_eq "failure reporter is registered after state" "_dots_failure_notice_pre
 # the shell from treating test-runner commands as additional interactive input.
 preexec_functions=()
 precmd_functions=()
+# Discard the setup command captured before the hook arrays were cleared.
+_DOTS_COMMAND_STATE_PENDING=0
+_DOTS_COMMAND_STATE_PENDING_COMMAND=''
+_DOTS_COMMAND_STATE_PENDING_EXECUTED_COMMAND=''
+_DOTS_COMMAND_STATE_PENDING_CWD=''
 
 # A failed command is published, classified, and reported once.
 _dots_command_state_preexec "git status" "git status" "git status"
