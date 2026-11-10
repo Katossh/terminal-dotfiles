@@ -119,12 +119,12 @@ _dots_command_state_precmd() {
     return 0
 }
 
-# This tracker is for interactive command history only. Do not install hooks
-# in scripts or non-interactive shells that merely source the shared config.
+# These arrays exist in all shells, but only interactive shells receive
+# hooks. Scripts that source the configuration therefore remain unaffected.
+typeset -ga preexec_functions precmd_functions
 if [[ -o interactive ]]; then
     # Install each hook exactly once. Prepending precmd captures the original
     # command status before another prompt hook can fail or change state.
-    typeset -ga preexec_functions precmd_functions
     preexec_functions=(
         _dots_command_state_preexec
         ${preexec_functions:#_dots_command_state_preexec}
