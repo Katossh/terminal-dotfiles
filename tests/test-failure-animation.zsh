@@ -17,11 +17,13 @@ zmodload zsh/zpty 2>/dev/null || {
 }
 
 typeset pty_name="dots_failure_animation_test"
+typeset result_file="$(mktemp "${TMPDIR:-/tmp}/dots-failure-animation.XXXXXX")" || fail "could not create result file"
+command rm -f "$result_file"
 zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    "ZSH_DIR=$ZSH_DIR" zsh -f -i
-trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
+    "ZSH_DIR=$ZSH_DIR" "RESULT_FILE=$result_file" zsh -f -i
+trap 'zpty -d "$pty_name" 2>/dev/null || true; command rm -f "$result_file"' EXIT
 
 # Wait for either ordinary-user (%) or root (#) prompt.
 typeset captured='' chunk=''
@@ -74,16 +76,25 @@ assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
 assert_contains "animation FD was registered before ZLE starts" STATE_registered "$REPLY"
 assert_contains "animation process is active" ACTIVE_1 "$REPLY"
 
-# Wait for the watcher, then type while the five-second animation should run.
+# The ZLE event loop should receive frames while the next line is being edited.
+# Send a shell command after a short animation interval; it writes the final
+# frame count and restored prompt to a file, avoiding PTY echo/output races.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES"'$'\n'
-read_until FRAMECOUNT_
-assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
-[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || { print -u2 -r -- "Animation PTY state: $REPLY"; fail "no animation frame callback ran before Enter"; }
+zpty -w "$pty_name" 'printf "%s%s%s%s%s%s%s%s%s%s%s\\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_LAST_STATE" PREVIOUS_FRAMES_ "$_DOTS_FAILURE_ANIMATION_LAST_FRAMES" PROMPT_ "$RPROMPT" > "$RESULT_FILE"'$'\\n'
 
-# The original RPROMPT must be restored after the user submits the line.
-zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "${RPROMPT-}"'$'\n'
-read_until RPROMPT_BASE_RPROMPT
-assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
+typeset -i result_attempt=0
+while [[ ! -s "$result_file" ]] && (( result_attempt < 80 )); do
+    command sleep 0.05
+    (( result_attempt += 1 ))
+done
+[[ -s "$result_file" ]] || fail "keyboard input was not processed while animation was active"
+
+typeset animation_result="$(<"$result_file")"
+assert_contains "animation callback rendered at least one frame" "FRAMECOUNT_" "$animation_result"
+[[ "$animation_result" == *FRAMECOUNT_[1-9]* ]] || {
+    print -u2 -r -- "Animation result: $animation_result"
+    fail "no animation frame callback ran before Enter"
+}
+assert_contains "original right prompt was restored after Enter" "PROMPT_BASE_RPROMPT" "$animation_result"
 
 print -- "All non-blocking failure-animation integration tests passed."
