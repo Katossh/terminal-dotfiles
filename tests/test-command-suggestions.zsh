@@ -32,10 +32,15 @@ function dots_suggestion_fixture_got() {
 
 alias dots_suggestion_fixture_gat='dots_suggestion_fixture_git'
 
-candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
+if ! _dots_command_suggestion_candidates dots_suggestion_fixture_gti; then
     fail "expected fixture functions to produce candidates"
-
-first_candidate="${candidate_output%%$'\n'*}"
+fi
+candidate_output="${(F)_DOTS_COMMAND_SUGGESTION_RESULTS}"
+[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_READY" == 1 ]] ||
+    fail "command discovery cache must persist in the current shell"
+[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" == "$PATH" ]] ||
+    fail "command discovery cache must record the current PATH"
+first_candidate="${_DOTS_COMMAND_SUGGESTION_RESULTS[1]}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
 [[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
@@ -51,10 +56,14 @@ printf '#!/bin/sh\nexit 0\n' > "$test_bin/dots_suggestion_fixture_new"
 chmod +x "$test_bin/dots_suggestion_fixture_new"
 PATH="$test_bin:$PATH"
 
-candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_nwe)" ||
+if ! _dots_command_suggestion_candidates dots_suggestion_fixture_nwe; then
     fail "a new executable from the changed PATH should be discoverable"
-[[ "$candidate_output" == *dots_suggestion_fixture_new* ]] ||
+fi
+candidate_output="${(F)_DOTS_COMMAND_SUGGESTION_RESULTS}"
+[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" == "$PATH" ]] ||
     fail "the PATH cache did not refresh after PATH changed"
+[[ "$candidate_output" == *dots_suggestion_fixture_new* ]] ||
+    fail "a new executable from the changed PATH was not returned"
 
 if _dots_command_suggestion_candidates "../dots_suggestion_fixture_gti"; then
     fail "path-like command names must not be guessed"
