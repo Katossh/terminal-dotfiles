@@ -42,6 +42,10 @@ The order in .zshrc is intentional:
 
 The disabled zsh-manydots-magic experiment is not part of the active setup.
 
+## Command-not-found suggestions
+
+Suggestions enumerate executable names from PATH with Zsh's native globbing and cache that list for the lifetime of the shell. The cache is rebuilt when PATH changes; enabled shell functions and builtins are included dynamically. Candidate ranking uses a threshold-banded optimal-string-alignment distance, so a typo lookup evaluates only the small edit-distance band needed for the configured one- or two-edit threshold. No external process is started for candidate discovery or ranking. The optional fzf process is started only after suggestions have been prepared and the user is choosing one.
+
 ## Installing or repairing
 
 ~~~sh
