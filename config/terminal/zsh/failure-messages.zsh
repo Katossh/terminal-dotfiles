@@ -28,16 +28,16 @@ _dots_failure_message_sanitize() {
 _dots_failure_message_rainbow() {
     emulate -L zsh
 
-    local message="\${1-}"
+    local message="${1-}"
     # Rainbow ANSI output is useful only on a colour-capable interactive
     # terminal. Redirected output and NO_COLOR stay plain and copyable.
-    if [[ ! -t 1 || -n "\${NO_COLOR:-}" || "\${TERM:-dumb}" == dumb ]]; then
+    if [[ ! -t 1 || -n "${NO_COLOR:-}" || "${TERM:-dumb}" == dumb ]]; then
         print -r -- "$message"
         return 0
     fi
 
     local -a characters colors
-    characters=( "\${(@s::)message}" )
+    characters=( "${(@s::)message}" )
     colors=(
         $'\e[38;2;255;75;75m'
         $'\e[38;2;255;165;60m'
@@ -49,9 +49,9 @@ _dots_failure_message_rainbow() {
 
     local character
     local -i index=1
-    for character in "\${characters[@]}"; do
-        print -rn -- "\${colors[index]}\${character}"
-        (( index = index % \${#colors[@]} + 1 ))
+    for character in "${characters[@]}"; do
+        print -rn -- "${colors[index]}${character}"
+        (( index = index % ${#colors[@]} + 1 ))
     done
     print -r -- $'\e[0m'
 }
@@ -61,14 +61,14 @@ _dots_failure_message_animate() {
 
     # Never animate redirected logs, CI output, or terminals without cursor
     # control. The short animation is deliberately capped at four frames.
-    [[ -t 1 && "\${TERM:-dumb}" != dumb && "\${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+    [[ -t 1 && "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
-    local color="\${1-}"
-    local reset="\${2-}"
+    local color="${1-}"
+    local reset="${2-}"
     local frame
     local -a frames=( '✧' '✦' '✨' '✦' )
 
-    for frame in "\${frames[@]}"; do
+    for frame in "${frames[@]}"; do
         printf '\r\033[2K%s%s%s  Consulting the machine spirits...' "$color" "$frame" "$reset"
         command sleep 0.04 2>/dev/null || break
     done
@@ -344,25 +344,25 @@ dots_failure_message() {
             ;;
         anime)
             style_messages=(
-                "${magenta}💢 B-baka! \\"${command}\\" isn't a command! It's not like I wanted you to type something else! ${username}, honestly! ${reset}"
-                "${cyan}⚡ \\"${command}\\" has not awakened its true form. Check the spellbook above! ${reset}"
-                "${purple}🜂 The forbidden incantation \\"${command}\\" has no place in this realm. ${reset}"
-                "${yellow}✨ By the power of PATH, I reject \\"${command}\\"! ${reset}"
-                "${magenta}🐾 Nyaa~ \\"${command}\\" is missing. Did you summon the wrong familiar? ${reset}"
-                "${cyan}🌙 Even the stars cannot resolve \\"${command}\\" in this timeline. ${reset}"
-                "${red}🔥 \\"${command}\\" has reached its final form: not executable. ${reset}"
-                "${purple}🌀 A space-time anomaly detected: \\"${command}\\" does not exist here! ${reset}"
-                "${blue}🎴 The PATH card has been drawn. It says: \\"try another command.\\" ${reset}"
-                "${yellow}💫 Senpai, \\"${command}\\" is not in the command registry. ${reset}"
+                "${magenta}💢 B-baka! \"${command}\" isn't a command! It's not like I wanted you to type something else! ${username}, honestly! ${reset}"
+                "${cyan}⚡ \"${command}\" has not awakened its true form. Check the spellbook above! ${reset}"
+                "${purple}🜂 The forbidden incantation \"${command}\" has no place in this realm. ${reset}"
+                "${yellow}✨ By the power of PATH, I reject \"${command}\"! ${reset}"
+                "${magenta}🐾 Nyaa~ \"${command}\" is missing. Did you summon the wrong familiar? ${reset}"
+                "${cyan}🌙 Even the stars cannot resolve \"${command}\" in this timeline. ${reset}"
+                "${red}🔥 \"${command}\" has reached its final form: not executable. ${reset}"
+                "${purple}🌀 A space-time anomaly detected: \"${command}\" does not exist here! ${reset}"
+                "${blue}🎴 The PATH card has been drawn. It says: \"try another command.\" ${reset}"
+                "${yellow}💫 Senpai, \"${command}\" is not in the command registry. ${reset}"
             )
             messages=("${style_messages[@]}")
             ;;
         sarcastic)
             style_messages=(
-                "${yellow}🫠 \\"${command}\\" failed. Bold strategy. Let's see if reading the error helps. ${reset}"
+                "${yellow}🫠 \"${command}\" failed. Bold strategy. Let's see if reading the error helps. ${reset}"
                 "${dim}I would explain the error, but the terminal already did that above. ${reset}"
                 "${purple}I've seen more convincing commands on a broken keyboard. ${reset}"
-                "${cyan}☕ \\"${command}\\" has once again chosen the difficult path. ${reset}"
+                "${cyan}☕ \"${command}\" has once again chosen the difficult path. ${reset}"
                 "${yellow}404: command not found. Your confidence, however, remains available. ${reset}"
                 "${magenta}🤷 The command was so creative that even PATH couldn't recognize it. ${reset}"
                 "${blue}Perhaps try a command from this dimension next time. ${reset}"
@@ -372,11 +372,11 @@ dots_failure_message() {
             ;;
         dramatic)
             style_messages=(
-                "${red}☠️ The PATH has spoken. It says no to \\"${command}\\". ${reset}"
+                "${red}☠️ The PATH has spoken. It says no to \"${command}\". ${reset}"
                 "${purple}A darkness has fallen upon your PATH. One command is missing. ${reset}"
-                "${red}⚔️ \\"${command}\\" has fallen before the shell. Its quest ends here. ${reset}"
+                "${red}⚔️ \"${command}\" has fallen before the shell. Its quest ends here. ${reset}"
                 "${magenta}The terminal searched every corner of this realm. Nothing answered. ${reset}"
-                "${yellow}🎭 Thus concludes the tragic tale of \\"${command}\\". ${reset}"
+                "${yellow}🎭 Thus concludes the tragic tale of \"${command}\". ${reset}"
                 "${cyan}The error was foretold. The output above contains the prophecy. ${reset}"
             )
             messages=("${style_messages[@]}")
@@ -384,8 +384,8 @@ dots_failure_message() {
         rainbow)
             rainbow_output=1
             style_messages=(
-                "🌈 \\"${command}\\" has entered its fabulous failure era. ✨"
-                "🌈 The PATH is a spectrum. \\"${command}\\" is still missing. 🦄"
+                "🌈 \"${command}\" has entered its fabulous failure era. ✨"
+                "🌈 The PATH is a spectrum. \"${command}\" is still missing. 🦄"
                 "✨ This failure is brought to you in glorious 24-bit colour. 🌈"
             )
             messages=("${style_messages[@]}")
