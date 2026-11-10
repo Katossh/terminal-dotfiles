@@ -162,6 +162,8 @@ dots_suggest_command() {
         for selected in "${suggestions[@]}"; do
             print -u2 -- "  - $selected"
         done
+        # Never leak a candidate through REPLY when no selection was made.
+        REPLY=""
         return 1
     fi
 
