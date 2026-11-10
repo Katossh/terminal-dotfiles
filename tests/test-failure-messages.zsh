@@ -150,11 +150,14 @@ assert_absent "animation stays off when output is redirected" "Consulting the ma
 export DOTS_FAILURE_ANIMATION_CHANCE=0
 
 # Network messages must remain distinct from generic fallback messages.
-integer network_index=0
+capture_message network 'curl https://example.invalid'
+assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
+assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+
+integer network_index=1
 while (( network_index < 30 )); do
     capture_message network 'curl https://example.invalid'
-    assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
-    assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
+    assert_contains "network category survives repeat escalation" "network" "${DOTS_TEST_OUTPUT:l}"
     network_index=$((network_index + 1))
 done
 
