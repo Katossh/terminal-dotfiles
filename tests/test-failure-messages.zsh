@@ -86,6 +86,17 @@ assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
 export DOTS_FAILURE_STYLE=anime
 capture_message not_found anime-style-test
 assert_contains "anime style retains command context" "anime-style-test" "$DOTS_TEST_OUTPUT"
+
+export DOTS_FAILURE_STYLE=ecchi
+integer ecchi_index=0
+typeset ecchi_output=''
+while (( ecchi_index < 30 )); do
+    capture_message not_found ecchi-style-test
+    ecchi_output+="$DOTS_TEST_OUTPUT"
+    (( ecchi_index += 1 ))
+done
+assert_contains "ecchi style retains its adult-themed message pool" "succubus" "$ecchi_output"
+assert_contains "ecchi style includes playful emoji" "💋" "$ecchi_output"
 if [[ "$DOTS_TEST_OUTPUT" != *"💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
       "$DOTS_TEST_OUTPUT" != *"🜂"* && "$DOTS_TEST_OUTPUT" != *"✨"* &&
       "$DOTS_TEST_OUTPUT" != *"🐾"* && "$DOTS_TEST_OUTPUT" != *"🌙"* &&
