@@ -62,10 +62,12 @@ read_until PROMPTBASE_READY
 assert_contains "base right prompt configured" PROMPTBASE_READY "$REPLY"
 
 # Call the public renderer and prove it queues an animation.
-zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; printf "%s%s%s%s\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING"'$'\n'
+zpty -w "$pty_name" 'dots_failure_message generic animation-integration-test; printf "%s%s%s%s%s%s%s%s\n" FAILURE CALL_FINISHED PENDING_ "$_DOTS_FAILURE_ANIMATION_PENDING" ACTIVE_ "$_DOTS_FAILURE_ANIMATION_ACTIVE" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'$'\n'
 read_until FAILURECALL_FINISHED
 assert_contains "public failure-message function ran" FAILURECALL_FINISHED "$REPLY"
 assert_contains "animation was queued by the public function" PENDING_1 "$REPLY"
+assert_contains "animation FD was registered before ZLE starts" STATE_registered "$REPLY"
+assert_contains "animation process is active" ACTIVE_1 "$REPLY"
 
 # Wait for the watcher, then type while the five-second animation should run.
 command sleep 0.45

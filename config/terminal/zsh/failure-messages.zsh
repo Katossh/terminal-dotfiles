@@ -66,12 +66,10 @@ _dots_failure_message_rainbow() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Queue the effect for the next ZLE session. This module is loaded
-    # from the interactive shell configuration; TTY checks belong in ZLE.
-    # The animation itself is asynchronous and never sleeps in precmd.
-    [[ "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
-
-    typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=1
+    # Called by the interactive failure notifier from precmd. Launch and
+    # register the async stream now, before ZLE begins reading the next line.
+    (( ${+functions[_dots_failure_animation_start]} )) || return 0
+    _dots_failure_animation_start
 }
 
 dots_failure_message() {

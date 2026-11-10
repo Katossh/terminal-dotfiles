@@ -120,20 +120,17 @@ _dots_failure_animation_fd_handler() {
     zle && zle .reset-prompt
 }
 
-_dots_failure_animation_line_init() {
+_dots_failure_animation_start() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
-    (( _DOTS_FAILURE_ANIMATION_PENDING )) || return 0
-    _DOTS_FAILURE_ANIMATION_STATE='line-init'
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-
-    # This hook is installed only in interactive shells and runs only
-    # while ZLE owns the terminal. Rechecking -t here is unreliable.
-    [[ "${TERM:-dumb}" != dumb &&
+    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
+    [[ -o interactive && -t 0 && -t 1 &&
+        "${TERM:-dumb}" != dumb &&
         "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
     _dots_failure_animation_cleanup
+    _DOTS_FAILURE_ANIMATION_PENDING=1
     _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT="${RPROMPT-}"
     _DOTS_FAILURE_ANIMATION_STEP=0
     _DOTS_FAILURE_ANIMATION_FRAMES=0
@@ -143,6 +140,8 @@ _dots_failure_animation_line_init() {
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$variant")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
+    # Register from precmd, before ZLE starts reading the next command line.
+    # This follows the same lifecycle used by established asynchronous Zsh prompts.
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
         _DOTS_FAILURE_ANIMATION_STATE='registered'
     else
@@ -157,6 +156,5 @@ _dots_failure_animation_line_finish() {
 
 if [[ -o interactive ]]; then
     autoload -Uz add-zle-hook-widget
-    add-zle-hook-widget zle-line-init _dots_failure_animation_line_init
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
