@@ -65,10 +65,10 @@ capture_output _dots_failure_notice_precmd
 assert_eq "the same failure is not rendered twice" "" "$DOTS_TEST_CAPTURE"
 
 # why reports the saved record and preserves it through the following prompt.
+_dots_command_state_preexec "why --verbose" "why --verbose" "why --verbose"
 capture_output why --verbose
 assert_contains "why reports the previous command" "Last command: git status" "$DOTS_TEST_CAPTURE"
 assert_contains "why classifies the previous command" "Diagnosis (git)" "$DOTS_TEST_CAPTURE"
-_dots_command_state_preexec "why --verbose" "why --verbose" "why --verbose"
 true
 _dots_command_state_precmd
 assert_eq "why does not replace the previous command" "git status" "$DOTS_LAST_COMMAND"
@@ -88,8 +88,12 @@ assert_eq "typed typo remains visible" "gti status" "$DOTS_LAST_COMMAND"
 assert_eq "executed command is corrected" "git status" "$DOTS_LAST_EXECUTED_COMMAND"
 capture_output _dots_failure_notice_precmd
 assert_contains "corrected command is classified as Git" "git status" "$DOTS_TEST_CAPTURE"
+_dots_command_state_preexec "why" "why" "why"
 capture_output why
 assert_contains "why explains the corrected command" "Diagnosis (git)" "$DOTS_TEST_CAPTURE"
+true
+_dots_command_state_precmd
+assert_eq "why preserves the corrected record" "gti status" "$DOTS_LAST_COMMAND"
 
 # A successful command advances the sequence but does not produce a banner.
 _dots_command_state_preexec "true" "true" "true"
