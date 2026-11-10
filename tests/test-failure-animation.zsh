@@ -93,8 +93,137 @@ assert_contains "animation sits between path and the second prompt line" "LAYOUT
 
 # Drain terminal output while the asynchronous stream finishes.
 drain_for 220
-zpty -w "$PTY_NAME" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"'$'\n'
-read_until STARTUP_FINISHED
+zpty -w "$PTY_NAME" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"; print -r -- STATE_INSPECTION_DONE'
+assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
+
+# Trigger the real public renderer; the queued animation starts in precmd.
+zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED; print -r -- FAILURE_COMMAND_DONE'
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"; print -r -- INPUT_INSPECTION_DONE'
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until STATE_INSPECTION_DONE
+assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
+
+# Trigger the real public renderer; the queued animation starts in precmd.
+zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED'$'\n'
+read_until FAILURE_MESSAGE_RETURNED
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+read_until INPUT_ACCEPTED
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until FAILURE_COMMAND_DONE
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+read_until INPUT_ACCEPTED
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until STATE_INSPECTION_DONE
+assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
+
+# Trigger the real public renderer; the queued animation starts in precmd.
+zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED'$'\n'
+read_until FAILURE_MESSAGE_RETURNED
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+read_until INPUT_ACCEPTED
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until INPUT_INSPECTION_DONE
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until STATE_INSPECTION_DONE
+assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
+
+# Trigger the real public renderer; the queued animation starts in precmd.
+zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED'$'\n'
+read_until FAILURE_MESSAGE_RETURNED
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+read_until INPUT_ACCEPTED
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until FAILURE_COMMAND_DONE
+assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+# Enter cancels the remaining frames but must not clear the latest one.
+command sleep 0.08
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"'$'\n'
+read_until INPUT_ACCEPTED
+assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
+
+print -- "All persistent multiline animation integration tests passed."
+\n'
+read_until STATE_INSPECTION_DONE
 assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
