@@ -40,14 +40,49 @@ candidate_output="${(F)_DOTS_COMMAND_SUGGESTION_RESULTS}"
     fail "command discovery cache must persist in the current shell"
 [[ "$_DOTS_COMMAND_SUGGESTION_CACHE_PATH" == "$PATH" ]] ||
     fail "command discovery cache must record the current PATH"
+[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT" == "${#functions}" ]] ||
+    fail "function count must be recorded when the candidate cache is built"
+
 first_candidate="${_DOTS_COMMAND_SUGGESTION_RESULTS[1]}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
 [[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
     fail "aliases must not be offered as dynamically executed corrections"
 
-# A changed PATH must invalidate the executable-name cache. This also verifies
-# that discovery includes executable symlinks/files without spawning whence.
+if builtin whence -p dots-suggest >/dev/null 2>&1; then
+    [[ "$_DOTS_COMMAND_SUGGESTION_LAST_BACKEND" == rust ]] ||
+        fail "the installed Rust helper should handle candidate ranking"
+else
+    [[ "$_DOTS_COMMAND_SUGGESTION_LAST_BACKEND" == zsh ]] ||
+        fail "the pure-Zsh fallback should handle candidate ranking when Rust is absent"
+fi
+
+# The fallback remains independently testable even when dots-suggest exists.
+if ! DOTS_SUGGEST_DISABLE_RUST=1 _dots_command_suggestion_candidates dots_suggestion_fixture_gti; then
+    fail "the optimized Zsh fallback should still return candidates"
+fi
+[[ "$_DOTS_COMMAND_SUGGESTION_LAST_BACKEND" == zsh ]] ||
+    fail "DOTS_SUGGEST_DISABLE_RUST=1 must force the Zsh fallback"
+
+# A function added after the initial cache build invalidates the snapshot by
+# count, rather than forcing the full function table to be enumerated per typo.
+cached_function_count="$_DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT"
+function dots_suggestion_fixture_dynamic() {
+    :
+}
+(( ${#functions} > cached_function_count )) ||
+    fail "the dynamic fixture function should increase the function count"
+
+if ! _dots_command_suggestion_candidates dots_suggestion_fixture_dynamci; then
+    fail "a function added after startup should be found after one cache refresh"
+fi
+[[ "$_DOTS_COMMAND_SUGGESTION_CACHE_FUNCTION_COUNT" == "${#functions}" ]] ||
+    fail "the function cache count should refresh after a function is added"
+[[ "${(F)_DOTS_COMMAND_SUGGESTION_RESULTS}" == *dots_suggestion_fixture_dynamic* ]] ||
+    fail "the dynamically added function was not returned"
+
+# A changed PATH must invalidate the executable-name cache. Discovery includes
+# executable symlinks/files without spawning whence for every directory entry.
 test_bin="$(mktemp -d "${TMPDIR:-/tmp}/dots-suggestion-path.XXXXXX")" ||
     fail "could not create temporary PATH directory"
 old_path="$PATH"

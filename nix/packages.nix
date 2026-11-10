@@ -32,6 +32,16 @@ let
 
   packages = resolveRows (rowsFor "nixpkgs");
   fontPackages = resolveRows (rowsFor "nixpkgs-fonts");
+
+  # The command-not-found handler uses this small, dependency-free Rust
+  # executable for fuzzy ranking. Keep it in the same package integration as
+  # the shell configuration so NixOS users receive it automatically.
+  dotsSuggest = pkgs.rustPlatform.buildRustPackage {
+    pname = "dots-suggest";
+    version = "0.1.0";
+    src = ../rust/dots-suggest;
+    cargoLock.lockFile = ../rust/dots-suggest/Cargo.lock;
+  };
 in
 {
   # Import this module from configuration.nix or your NixOS flake modules.
@@ -39,6 +49,6 @@ in
   # users.users.<name>.shell = pkgs.zsh;
   programs.zsh.enable = true;
 
-  environment.systemPackages = packages;
+  environment.systemPackages = packages ++ [ dotsSuggest ];
   fonts.packages = fontPackages;
 }

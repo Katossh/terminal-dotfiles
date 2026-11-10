@@ -29,6 +29,18 @@ jobs:
             brew install shellcheck
           fi
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Validate Rust suggestion helper
+        run: |
+          cargo fmt --manifest-path rust/dots-suggest/Cargo.toml -- --check
+          cargo clippy --manifest-path rust/dots-suggest/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path rust/dots-suggest/Cargo.toml
+          cargo build --manifest-path rust/dots-suggest/Cargo.toml
+
       - name: Check shell syntax
         run: |
           bash -n bin/dots
@@ -56,6 +68,7 @@ jobs:
 
       - name: Zsh module tests
         run: |
+          export PATH="$PWD/rust/dots-suggest/target/debug:$PATH"
           for test in \
             tests/test-command-state.zsh \
             tests/test-command-suggestions.zsh \

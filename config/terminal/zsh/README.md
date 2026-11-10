@@ -4,11 +4,14 @@ The detailed setup and recovery instructions live in [docs/ZSH.md](../../../docs
 The entry point is `dots/zshenv`. It sets XDG paths and `ZDOTDIR=$XDG_CONFIG_HOME/zsh`, so Zsh loads its startup files from this directory rather than directly from `~`. The interactive setup uses Oh My Zsh as the framework and plugin loader, while Starship remains the prompt provider.
 
 ## Files
-- `.zshrc` — interactive shell setup, history, options, Oh My Zsh plugins, completion extensions, Starship, and optional automatic tmux startup.
+- `.zshrc` — interactive shell setup, history, options, Oh My Zsh plugins, completion extensions, failure diagnostics, Starship, and optional automatic tmux startup.
 - `aliases.zsh` — command aliases and the FZF/Neovim file preview helper.
 - `completion.zsh` — completion matching rules and cache settings; Oh My Zsh runs `compinit` once using an XDG cache file.
+- `command-state.zsh` — keeps the most recently completed command and exit status in shell memory.
+- `failure-classifier.zsh`, `failure-messages.zsh`, and `handlers.zsh` — classify failures, render one notice, and handle command-not-found events safely.
+- `command-suggestions.zsh` — caches command candidates and delegates fuzzy ranking to `dots-suggest` when available, with a pure-Zsh fallback.
+- `diagnostics.zsh` — provides `why` and `why --verbose` without rerunning the previous command.
 - `prompt.zsh` — initializes Starship; the appearance is configured in `config/starship.toml`.
-- `handlers.zsh` — custom message for unknown commands.
 
 ## Oh My Zsh and plugins
 
@@ -32,7 +35,7 @@ Downloads can be skipped for offline/config-only setups with `DOTS_SKIP_DOWNLOAD
 
 ## Dependencies
 
-The setup requires `zsh`, Starship, `git`, `fzf`, `bat`, `nvim`, and `tmux`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. The `project` helper is loaded only when `OPEN_PROJECT=1`.
+The setup requires `zsh`, Starship, `git`, `fzf`, `bat`, `nvim`, and `tmux`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. On NixOS, the imported `nix/packages.nix` module also builds and installs the Rust `dots-suggest` command-ranking helper. Other systems retain a pure-Zsh fallback; the helper can be built with `cargo build --release --manifest-path rust/dots-suggest/Cargo.toml`.
 
 ## Portability and local settings
 - `dots/zshenv` contains shared defaults only. Keep passwords, API tokens, private keys, and machine-specific credentials out of tracked files.
