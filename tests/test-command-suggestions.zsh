@@ -27,12 +27,16 @@ function dots_suggestion_fixture_got() {
     :
 }
 
+alias dots_suggestion_fixture_gat='dots_suggestion_fixture_git'
+
 candidate_output="$(_dots_command_suggestion_candidates dots_suggestion_fixture_gti)" ||
     fail "expected fixture functions to produce candidates"
 
 first_candidate="${candidate_output%%$'\n'*}"
 [[ "$first_candidate" == dots_suggestion_fixture_git ]] ||
     fail "the closest candidate should rank first (got: $first_candidate)"
+[[ "$candidate_output" != *dots_suggestion_fixture_gat* ]] ||
+    fail "aliases must not be offered as dynamically executed corrections"
 
 if _dots_command_suggestion_candidates "../dots_suggestion_fixture_gti"; then
     fail "path-like command names must not be guessed"
