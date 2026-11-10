@@ -11,6 +11,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
+typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
+typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -22,23 +24,22 @@ _dots_failure_animation_stream() {
     case "$variant" in
         2)
             frames=(
-                '🌙' '✨' '💫' '✧' '🌙' '⋆' '✨' '💫'
-                '🌙' '✧' '✨' '⋆' '💫' '🌙' '✨' '✧'
-                '💫' '⋆' '🌙' '✨' '✧' '💫' '🌙' '✨'
+                '🌙' '✨' '💫' '✧' '🌙' '⋆' '✨' '💫' '🌙' '✧' '✨' '⋆' '💫' '🌙' '✨' '✧' '💫' '⋆' '🌙' '✨' '✧' '💫' '🌙' '✨' '⋆' '🌙' '💫' '✧' '✨' '🌙' '⋆' '💫' '✨' '✧' '🌙' '✨'
             )
             ;;
         3)
             frames=(
-                '♡' '♥' '♡' '💗' '💖' '💞' '♡' '♥'
-                '💗' '♡' '💘' '💞' '♥' '♡' '💖' '💗'
-                '♡' '💞' '♥' '💘' '♡' '💗' '💖' '♡'
+                '♡' '♥' '♡' '💗' '💖' '💞' '♡' '♥' '💗' '♡' '💘' '💞' '♥' '♡' '💖' '💗' '♡' '💞' '♥' '💘' '♡' '💗' '💖' '♡' '💞' '💗' '♥' '♡' '💘' '💖' '♡' '💗' '💞' '♥' '♡' '💖'
+            )
+            ;;
+        4)
+            frames=(
+                '🦋' '✦' '🐈‍⬛' '✨' '🦋' '⋆' '💫' '🐈‍⬛' '✧' '🦋' '✨' '⋆' '🐈‍⬛' '💫' '✦' '🦋' '✧' '🐈‍⬛' '✨' '🦋' '⋆' '💫' '✦' '🐈‍⬛' '🦋' '✨' '✧' '⋆' '🐈‍⬛' '💫' '🦋' '✦' '✨' '🐈‍⬛' '⋆' '🦋'
             )
             ;;
         *)
             frames=(
-                '✦' '✧' '⋆' '✧' '✨' '✦' '✧' '⋆'
-                '✦' '✨' '✧' '✦' '⋆' '✧' '✨' '✦'
-                '✧' '⋆' '✦' '✨' '✧' '⋆' '✦' '✧'
+                '✦' '✧' '⋆' '✧' '✨' '✦' '✧' '⋆' '✦' '✨' '✧' '✦' '⋆' '✧' '✨' '✦' '✧' '⋆' '✦' '✨' '✧' '⋆' '✦' '✧' '✨' '⋆' '✧' '✦' '✨' '⋆' '✧' '✦' '💫' '✧' '⋆' '✨'
             )
             ;;
     esac
@@ -51,11 +52,16 @@ _dots_failure_animation_stream() {
 
 _dots_failure_animation_cleanup() {
     emulate -L zsh
+    setopt localoptions no_ignore_braces
 
+    local redraw="${1:-0}"
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
+        _DOTS_FAILURE_ANIMATION_LAST_STATE="$_DOTS_FAILURE_ANIMATION_STATE"
+        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
+
         local fd="$_DOTS_FAILURE_ANIMATION_FD"
         zle -F "$fd" 2>/dev/null || true
-        exec {fd}<&- 2>/dev/null || true
+        { exec {fd}<&- } 2>/dev/null || true
 
         RPROMPT="$_DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT"
         _DOTS_FAILURE_ANIMATION_FD=-1
@@ -63,17 +69,22 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_ACTIVE=0
         _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT=''
         _DOTS_FAILURE_ANIMATION_STATE='finished'
-        zle -R 2>/dev/null || true
+
+        if (( redraw )) && zle; then
+            zle .reset-prompt
+        fi
     fi
 }
 
-_dots_failure_animation_fd_widget() {
+_dots_failure_animation_fd_handler() {
     emulate -L zsh
+    setopt localoptions no_ignore_braces
 
     local fd="${1:-}"
     local frame
-    if [[ -z "$fd" ]] || ! IFS= read -r -u "$fd" frame; then
-        _dots_failure_animation_cleanup
+    if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
+        _DOTS_FAILURE_ANIMATION_STATE='stream-closed'
+        _dots_failure_animation_cleanup 1
         return 0
     fi
 
@@ -103,31 +114,35 @@ _dots_failure_animation_fd_widget() {
     RPROMPT="${right_prompt}%{${color}%}${frame}%{${reset}%}"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
-    zle -R
+
+    # This is a regular zle -F callback, not a widget handler. Resetting the
+    # prompt uses the standard shell-level ZLE widget invocation.
+    zle && zle .reset-prompt
 }
 
-_dots_failure_animation_line_init() {
+_dots_failure_animation_start() {
     emulate -L zsh
+    setopt localoptions no_ignore_braces
 
-    _DOTS_FAILURE_ANIMATION_STATE='line-init'
-    (( _DOTS_FAILURE_ANIMATION_PENDING )) || return 0
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-
+    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
     [[ -o interactive && -t 0 && -t 1 &&
         "${TERM:-dumb}" != dumb &&
         "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
     _dots_failure_animation_cleanup
+    _DOTS_FAILURE_ANIMATION_PENDING=1
     _DOTS_FAILURE_ANIMATION_ORIGINAL_RPROMPT="${RPROMPT-}"
     _DOTS_FAILURE_ANIMATION_STEP=0
     _DOTS_FAILURE_ANIMATION_FRAMES=0
     _DOTS_FAILURE_ANIMATION_STATE='starting'
 
-    local variant=$(( (RANDOM % 3) + 1 ))
+    local variant=$(( (RANDOM % 4) + 1 ))
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$variant")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
-    if zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_widget; then
+    # Register from precmd, before ZLE starts reading the next command line.
+    # This follows the same lifecycle used by established asynchronous Zsh prompts.
+    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
         _DOTS_FAILURE_ANIMATION_STATE='registered'
     else
         _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
@@ -141,7 +156,5 @@ _dots_failure_animation_line_finish() {
 
 if [[ -o interactive ]]; then
     autoload -Uz add-zle-hook-widget
-    zle -N _dots_failure_animation_fd_widget
-    add-zle-hook-widget zle-line-init _dots_failure_animation_line_init
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi

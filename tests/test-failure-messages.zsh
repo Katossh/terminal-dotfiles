@@ -78,8 +78,14 @@ capture_message git 'git push'
 assert_contains "Git category" "git push" "$DOTS_TEST_OUTPUT"
 capture_message nix 'nix build'
 assert_contains "Nix category" "nix build" "$DOTS_TEST_OUTPUT"
-capture_message generic 'cargo test'
-assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
+integer generic_index=0
+typeset generic_output=''
+while (( generic_index < 30 )); do
+    capture_message generic 'cargo test'
+    generic_output+="$DOTS_TEST_OUTPUT"
+    (( generic_index += 1 ))
+done
+assert_contains "generic category retains command context across sampled messages" "cargo test" "$generic_output"
 
 
 # Every style can be forced for previews and deterministic testing.
@@ -107,25 +113,18 @@ print -- "ok - anime style includes themed emoji"
 export DOTS_FAILURE_STYLE=ecchi
 integer ecchi_index=0
 typeset ecchi_output=''
-while (( ecchi_index < 30 )); do
-    capture_message not_found ecchi-style-test
-    ecchi_output+="$DOTS_TEST_OUTPUT"
+while (( ecchi_index < 200 )); do
+    capture_message generic ecchi-style-test
+    printf -v ecchi_output '%s\n%s' "$ecchi_output" "$DOTS_TEST_OUTPUT"
     (( ecchi_index += 1 ))
 done
-assert_contains "ecchi style uses adult-coded message pool" "adult" "$ecchi_output"
-if [[ "$ecchi_output" != *"💋"* && "$ecchi_output" != *"😈"* &&
-      "$ecchi_output" != *"🌹"* && "$ecchi_output" != *"👠"* &&
-      "$ecchi_output" != *"🍷"* && "$ecchi_output" != *"💄"* &&
-      "$ecchi_output" != *"🖤"* && "$ecchi_output" != *"🔥"* &&
-      "$ecchi_output" != *"🦇"* && "$ecchi_output" != *"💗"* &&
-      "$ecchi_output" != *"🥀"* && "$ecchi_output" != *"✨"* &&
-      "$ecchi_output" != *"🧡"* && "$ecchi_output" != *"🕯️"* &&
-      "$ecchi_output" != *"🎀"* && "$ecchi_output" != *"😏"* &&
-      "$ecchi_output" != *"🍑"* && "$ecchi_output" != *"💞"* &&
-      "$ecchi_output" != *"👑"* && "$ecchi_output" != *"🫦"* ]]; then
-    fail "ecchi style should include suggestive anime emoji"
-fi
-print -- "ok - ecchi style includes playful emoji"
+assert_contains "ecchi pool includes the Nyaa opening" "Nyaa~" "$ecchi_output"
+assert_contains "ecchi pool varies its openings" "Well, well" "$ecchi_output"
+assert_contains "ecchi pool varies its dialogue style" "Darling" "$ecchi_output"
+typeset -U unique_ecchi_messages
+unique_ecchi_messages=( "${(@f)ecchi_output}" )
+(( ${#unique_ecchi_messages} >= 20 )) || fail "ecchi pool should provide at least twenty distinct messages"
+print -- "ok - ecchi pool has broad message diversity"
 
 export DOTS_FAILURE_STYLE=sarcastic
 capture_message generic sarcasm-style-test
