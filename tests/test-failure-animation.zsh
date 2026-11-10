@@ -7,7 +7,7 @@ ZSH_DIR="$REPO_DIR/config/terminal/zsh"
 fail() { print -u2 -r -- "not ok - $*"; exit 1; }
 assert_contains() {
     local label="$1" needle="$2" haystack="$3"
-    [[ "$haystack" == *"$needle"* ]] || fail "$label (missing: $needle)"
+    [[ "$haystack" == *"$needle"* ]] || fail "$label (missing: $needle; captured: $haystack)"
     print -- "ok - $label"
 }
 
@@ -63,6 +63,7 @@ print -- "ok - clean interactive child shell reached its prompt"
 zpty -w "$pty_name" 'PROMPT="BASE_PATH"$'"'"'\n'"'"'"BASE_OUTPUT "; RPROMPT="BASE_RPROMPT"; source "$ZSH_DIR/failure-messages.zsh"; source "$ZSH_DIR/failure-animation.zsh"; _DOTS_FAILURE_ANIMATION_INTERVAL=0.001; _dots_test_prompt_report() { local first="${PROMPT%%$'\n'*}"; local second="${PROMPT#*$'\n'}"; local -i layout=0; [[ "$first" == *BASE_PATH* && "$first" == *"✧━━"* && "$second" == "BASE_OUTPUT " ]] && layout=1; print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} STATE_${_DOTS_FAILURE_ANIMATION_STATE} LAYOUT_${layout}"; }; typeset -ga precmd_functions; precmd_functions+=(_dots_test_prompt_report); print -r -- MODULES_READY'$'\n'
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "first prompt after Zsh module initialisation starts animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
+print -r -- "Initial prompt report: $REPLY"
 assert_contains "animation sits between path and the second prompt line" "LAYOUT_1" "$REPLY"
 
 # Drain terminal output while the asynchronous stream finishes.
