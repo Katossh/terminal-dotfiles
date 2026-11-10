@@ -85,7 +85,7 @@ assert_contains "generic category" "cargo test" "$DOTS_TEST_OUTPUT"
 # Every style can be forced for previews and deterministic testing.
 export DOTS_FAILURE_STYLE=anime
 capture_message not_found anime-style-test
-if [[ "$DOTS_TEST_OUTPUT" != *"💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
+if assert_control_free "rainbow style emits no terminal controls into redirected output" "$DOTS_TEST_OUTPUT""💢"* && "$DOTS_TEST_OUTPUT" != *"⚡"* &&
       "$DOTS_TEST_OUTPUT" != *"🜂"* && "$DOTS_TEST_OUTPUT" != *"✨"* &&
       "$DOTS_TEST_OUTPUT" != *"🐾"* && "$DOTS_TEST_OUTPUT" != *"🌙"* &&
       "$DOTS_TEST_OUTPUT" != *"🔥"* && "$DOTS_TEST_OUTPUT" != *"🌀"* &&
