@@ -8,8 +8,8 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 2. aliases.zsh and completion.zsh — aliases, interactive helpers, completion matching, and cache styles.
 3. command-state.zsh — records the last completed command, its status, working directory, and expanded form.
 4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command.
-5. command-suggestions.zsh and handlers.zsh — offer safe typo candidates; nothing is executed unless a candidate is selected and explicitly confirmed.
-6. diagnostics.zsh — provides `why` and `why --verbose` without rerunning the previous command.
+5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide `why` / `why --verbose` without rerunning the previous command.
+6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
