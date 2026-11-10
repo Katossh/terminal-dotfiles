@@ -108,8 +108,8 @@ _dots_failure_animation_fd_widget() {
 _dots_failure_animation_line_init() {
     emulate -L zsh
 
-    _DOTS_FAILURE_ANIMATION_STATE='line-init'
     (( _DOTS_FAILURE_ANIMATION_PENDING )) || return 0
+    _DOTS_FAILURE_ANIMATION_STATE='line-init'
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
     # This hook is installed only in interactive shells and runs only

@@ -19,7 +19,7 @@ zmodload zsh/zpty 2>/dev/null || {
 typeset pty_name="dots_failure_animation_test"
 zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 \
+    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     "ZSH_DIR=$ZSH_DIR" zsh -f -i
 trap 'zpty -d "$pty_name" 2>/dev/null || true' EXIT
 
@@ -70,7 +70,19 @@ assert_contains "public failure-message function ran" FAILURECALL_FINISHED "$REP
 # Give the ZLE file-descriptor watcher time to deliver frames, then type while
 # the animation is active. The split printf arguments avoid echo false-positives.
 command sleep 0.45
-zpty -w "$pty_name" 'printf "%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES"'$'\n'
+zpty -w "$pty_name" 'printf "%s%s%s%s%s\n" FRAME COUNT_ "$_DOTS_FAILURE_ANIMATION_FRAMES" STATE_ "$_DOTS_FAILURE_ANIMATION_STATE"'
+read_until FRAMECOUNT_
+assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
+[[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || fail "no animation frame callback ran before Enter"
+
+# Check prompt restoration after line-finish. The expected marker is assembled
+# from separate printf arguments so it cannot be matched in the echoed command.
+zpty -w "$pty_name" 'printf "%s%s%s\n" RP ROMPT_ "$RPROMPT"'$'\n'
+read_until RPROMPT_BASE_RPROMPT
+assert_contains "original right prompt restored after Enter" RPROMPT_BASE_RPROMPT "$REPLY"
+
+print -- "All non-blocking failure-animation integration tests passed."
+\n'
 read_until FRAMECOUNT_
 assert_contains "keyboard input was accepted during animation" FRAMECOUNT_ "$REPLY"
 [[ "$REPLY" == *FRAMECOUNT_[1-9]* ]] || fail "no animation frame callback ran before Enter"
