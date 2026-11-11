@@ -92,8 +92,8 @@ _dots_failure_message_gradient() {
     )
     if [[ "$style" == mythic ]]; then colors=( "${mythic_colors[@]}" ); else colors=( "${legendary_colors[@]}" ); fi
 
-    local -i character_index=0 character_count=${#characters[@]} color_index=1 palette_base=224
-    [[ "$style" == mythic ]] && palette_base=240
+    local -i character_index=0 character_count=${#characters[@]} color_index=1 palette_base=208
+    [[ "$style" == mythic ]] && palette_base=224
     local character color
     for character in "${characters[@]}"; do
         if (( character_count > 1 )); then
