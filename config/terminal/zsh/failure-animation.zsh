@@ -1,9 +1,9 @@
 # Non-blocking terminal animations for interactive Zsh.
 #
-# The motif is inserted into the first prompt line, after the current path and
-# before Starship's line_break module. The command input remains on the next
-# line. Frames are delivered asynchronously through zle -F. The final frame
-# remains in PROMPT after the stream ends or Enter cancels an animation.
+# Starship's PROMPT is a command substitution, not the rendered prompt text.
+# Preserve that command and wrap its output, inserting the motif before its
+# first real newline (the line_break module). Frames are delivered to ZLE
+# asynchronously, and the final frame remains visible until the next animation.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
@@ -15,10 +15,19 @@ typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -g _DOTS_FAILURE_ANIMATION_FRAME='✨'
-typeset -g _DOTS_FAILURE_ANIMATION_BASE_PROMPT=''
-typeset -g _DOTS_FAILURE_ANIMATION_DECORATED_PROMPT=''
-typeset -g _DOTS_FAILURE_ANIMATION_LAST_FRAME_PROMPT=''
+typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="${PROMPT-}"
+typeset -g _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
+typeset -g _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_INTERVAL='0.14'
+
+if [[ "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT" == *'$('* ]]; then
+    _DOTS_FAILURE_ANIMATION_PROMPT_MODE='command'
+fi
+
+# Starship enables promptsubst itself; keep it enabled when wrapping a static
+# fallback prompt as well.
+setopt promptsubst
+PROMPT='$(_dots_failure_animation_render_prompt)'
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -56,14 +65,16 @@ _dots_failure_animation_stream() {
     done
 }
 
-_dots_failure_animation_apply_prompt() {
+_dots_failure_animation_render_prompt() {
     emulate -L zsh
 
-    local base="$_DOTS_FAILURE_ANIMATION_BASE_PROMPT"
-    if [[ -z "$base" || "${DOTS_FAILURE_ANIMATION:-1}" == 0 ]]; then
-        PROMPT="$base"
-        _DOTS_FAILURE_ANIMATION_DECORATED_PROMPT="$PROMPT"
-        return 0
+    local rendered=''
+    if [[ "$_DOTS_FAILURE_ANIMATION_PROMPT_MODE" == command ]]; then
+        # This is the exact command-substitution string installed by Starship.
+        # It is generated from our local shell configuration, not user input.
+        rendered="$(eval "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT")"
+    else
+        rendered="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
     fi
 
     local -a colors
@@ -92,33 +103,18 @@ _dots_failure_animation_apply_prompt() {
     fi
 
     local motif="%B%{${color}%}✧━━  ✦ ${_DOTS_FAILURE_ANIMATION_FRAME} ✦  ━━✧%{${reset}%}%b"
-    local first_line="$base"
+    local first_line="$rendered"
     local remaining=''
-    if [[ "$base" == *$'\n'* ]]; then
-        first_line="${base%%$'\n'*}"
-        remaining="${base#*$'\n'}"
-        PROMPT="${first_line}  ${motif}"$'\n'"${remaining}"
+    if [[ "$rendered" == *$'\n'* ]]; then
+        first_line="${rendered%%$'\n'*}"
+        remaining="${rendered#*$'\n'}"
+        rendered="${first_line}  ${motif}"$'\n'"${remaining}"
     else
-        PROMPT="${first_line}  ${motif}"
+        rendered="${first_line}  ${motif}"
     fi
 
-    _DOTS_FAILURE_ANIMATION_DECORATED_PROMPT="$PROMPT"
-    _DOTS_FAILURE_ANIMATION_LAST_FRAME_PROMPT="$PROMPT"
-}
-
-_dots_failure_animation_refresh_prompt() {
-    emulate -L zsh
-
-    # Starship rebuilds PROMPT during precmd. A static fallback prompt may
-    # still contain our decoration, so strip only the exact previous version.
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_DECORATED_PROMPT" &&
-        "$PROMPT" == "$_DOTS_FAILURE_ANIMATION_DECORATED_PROMPT" ]]; then
-        PROMPT="$_DOTS_FAILURE_ANIMATION_BASE_PROMPT"
-    else
-        _DOTS_FAILURE_ANIMATION_BASE_PROMPT="${PROMPT-}"
-    fi
-
-    _dots_failure_animation_apply_prompt
+    _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
+    print -rn -- "$rendered"
 }
 
 _dots_failure_animation_cleanup() {
@@ -139,12 +135,8 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_STATE='finished'
     fi
 
-    # Keep both the final glyph and its final colour. A new animation resets
-    # the frame counter when it starts and replaces this state one frame later.
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BASE_PROMPT" ]]; then
-        _dots_failure_animation_apply_prompt
-    fi
-
+    # Do not reset the frame or colour index. The prompt wrapper renders the
+    # same final state until another animation begins.
     if (( redraw )) && zle; then
         zle .reset-prompt
     fi
@@ -167,14 +159,13 @@ _dots_failure_animation_fd_handler() {
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
-    _dots_failure_animation_apply_prompt
-
-    # This is a regular zle -F callback, not a widget handler.
+    # Redraw expands PROMPT, whose wrapper re-renders Starship and inserts the
+    # current frame at the correct location.
     zle && zle .reset-prompt
 }
 
-# The failure-message hook queues work here. The final precmd hook starts it
-# after Starship has rebuilt PROMPT for the next input line.
+# Failure-message hooks queue work here. The actual process starts from the
+# last precmd hook, before ZLE begins reading the next line.
 _dots_failure_animation_start() {
     emulate -L zsh
 
@@ -215,10 +206,8 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
-    _dots_failure_animation_refresh_prompt
-
-    # Play one animation on the first interactive prompt of every Zsh session,
-    # independently of whether a command has failed.
+    # One animation on the first interactive prompt of every Zsh session,
+    # regardless of whether a command has failed.
     if (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
