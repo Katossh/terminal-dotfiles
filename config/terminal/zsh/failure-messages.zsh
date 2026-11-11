@@ -7,7 +7,8 @@
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
 #   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow
-#   DOTS_FAILURE_RAINBOW_CHANCE=2         # 0..100; DOTS_FAILURE_RARE_CHANCE remains an alias
+#   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
+#   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
 #   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; animations require an interactive TTY
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
@@ -100,13 +101,17 @@ dots_failure_message() {
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
     # DOTS_FAILURE_RARE_CHANCE is retained as a backwards-compatible alias.
-    local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
+    local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}}"
+    local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-1}"
     local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
-    case "$rainbow_chance" in
-        (''|*[!0-9]*) rainbow_chance=2 ;;
+    case "$legendary_chance" in
+        (''|*[!0-9]*) legendary_chance=2 ;;
+    esac
+    case "$mythic_chance" in
+        (''|*[!0-9]*) mythic_chance=1 ;;
     esac
     case "$animation_chance" in
         (''|*[!0-9]*) animation_chance=50 ;;
@@ -115,14 +120,18 @@ dots_failure_message() {
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
         chance="${chance#0}"
     done
-    while [[ "$rainbow_chance" == 0* && "$rainbow_chance" != 0 ]]; do
-        rainbow_chance="${rainbow_chance#0}"
+    while [[ "$legendary_chance" == 0* && "$legendary_chance" != 0 ]]; do
+        legendary_chance="${legendary_chance#0}"
+    done
+    while [[ "$mythic_chance" == 0* && "$mythic_chance" != 0 ]]; do
+        mythic_chance="${mythic_chance#0}"
     done
     while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do
         animation_chance="${animation_chance#0}"
     done
     (( chance > 100 )) && chance=100
-    (( rainbow_chance > 100 )) && rainbow_chance=100
+    (( legendary_chance > 100 )) && legendary_chance=100
+    (( mythic_chance > 1000 )) && mythic_chance=1000
     (( animation_chance > 100 )) && animation_chance=100
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
@@ -363,21 +372,24 @@ dots_failure_message() {
     selected_style="${selected_style:l}"
     local -i automatic_style=0
     case "$selected_style" in
-        auto|normal|anime|ecchi|sarcastic|dramatic|rainbow) ;;
+        auto|normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic) ;;
         *) selected_style=auto ;;
     esac
 
     if [[ "$selected_style" == auto ]]; then
         automatic_style=1
         local -i style_roll=$((RANDOM % 100))
-        if (( style_roll < rainbow_chance )); then
-            selected_style=rainbow
-        elif (( rainbow_chance >= 100 )); then
-            selected_style=rainbow
+        local -i mythic_roll=$(( RANDOM % 1000 ))
+        if (( mythic_roll < mythic_chance )); then
+            selected_style=mythic
+        elif (( style_roll < legendary_chance )); then
+            selected_style=legendary
+        elif (( legendary_chance >= 100 )); then
+            selected_style=legendary
         else
-            # Reserve the configured rainbow share, then distribute the rest
-            # across the exact 48/28/14/8 proportions.
-            style_roll=$(( (style_roll - rainbow_chance) * 98 / (100 - rainbow_chance) ))
+            # Reserve the legendary share, then distribute the rest across
+            # the ordinary 48/28/14/8 style weights.
+            style_roll=$(( (style_roll - legendary_chance) * 98 / (100 - legendary_chance) ))
             if (( style_roll < 48 )); then
                 selected_style=normal
             elif (( style_roll < 76 )); then
