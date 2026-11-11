@@ -8,10 +8,10 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 2. aliases.zsh and completion.zsh — aliases, interactive helpers, completion matching, and cache styles.
 3. command-state.zsh — records the last completed command, its status, working directory, and expanded form.
 4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command.
-5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide `why` / `why --verbose` without rerunning the previous command.
+5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide why / why --verbose without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
-8. failure-animation.zsh — registers after Starship and decorates its completed prompt without disturbing its line break.
+8. failure-animation.zsh — registers after Starship and appends a bare animated emoji to the first prompt line.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -55,13 +55,15 @@ Failed commands receive a short, randomized notice after the command completes. 
 | Dramatic message | 8% |
 | 24-bit rainbow message | 2% |
 
-Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, gold, lime, teal, sky blue, violet, and lavender accents. Emoji appear throughout the ordinary category-specific pools as well as the themed styles. The rainbow renderer uses twelve RGB colour stops and does not depend on `lolcat` or another external program.
+Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, gold, lime, teal, sky blue, violet, and lavender accents. Emoji appear throughout the ordinary category-specific pools as well as the themed styles. The rainbow renderer uses twelve RGB colour stops and does not depend on lolcat or another external program.
 
-The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with `DOTS_FAILURE_STYLE=ecchi`.
+The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with DOTS_FAILURE_STYLE=ecchi.
 
-The first interactive Zsh prompt plays one 36-frame animation (~5 seconds), even before any command has failed. Later failure notices trigger another animation on the configured 50% chance. Frames are delivered to ZLE through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
+The first interactive Zsh prompt plays one 24-frame emoji animation (~3.4 seconds), even before any command has failed. Later failure notices trigger another animation on the configured 50% chance. Six themed emoji pools provide variety. Frames are delivered to ZLE through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
 
-The motif sits on the same line as the Starship path, immediately before Starship's `line_break` module; the input symbol remains on the next line. This keeps command output separate from the path-and-animation row. When the stream finishes, its final frame remains as a static prompt decoration until another animation replaces it. Pressing Enter during an animation cancels the remaining frames but preserves the latest visible frame. `RPROMPT` is untouched. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
+The animation is just the changing emoji appended to the Starship path line. It adds no side bars, decorative stars, text, or colour codes. The next prompt line and RPROMPT remain untouched. When the one-shot stream finishes, its last emoji remains visible until another animation replaces it. Pressing Enter during a sequence cancels the remaining frames but preserves the latest emoji. Animations only run in an interactive TTY; redirected output, CI, and TERM=dumb remain unaffected.
+
+Set DOTS_FAILURE_ANIMATION_CONTINUOUS=1 to loop the emoji animation for as long as the prompt is idle. The stream is stopped when you press Enter and starts again at the next prompt, so it does not continue running while a command executes. Set it to 0 to return to the normal one-shot startup and failure-triggered animations. Accepted true values are 1, true, yes, and on (case-insensitive). The master switch DOTS_FAILURE_ANIMATION=0 disables all animation, including continuous mode, without disabling failure messages.
 
 Optional overrides:
 
@@ -73,24 +75,27 @@ DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rain
 DOTS_FAILURE_RAINBOW_CHANCE=2
 DOTS_FAILURE_ANIMATION_CHANCE=50
 
-# Disable animation without disabling messages.
+# Loop the emoji animation while the prompt is idle.
+DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+
+# Disable every animation without disabling failure messages.
 DOTS_FAILURE_ANIMATION=0
 
 # Respect NO_COLOR; redirected output is plain regardless.
 NO_COLOR=1
 ~~~
 
-`DOTS_FAILURE_RARE_CHANCE` remains supported as a backwards-compatible alias for `DOTS_FAILURE_RAINBOW_CHANCE`. `DOTS_FAILURE_MESSAGE_CHANCE` still controls whether a notice is shown at all, and repeat escalation remains independently configurable through `DOTS_FAILURE_MESSAGE_ESCALATION`.
+DOTS_FAILURE_RARE_CHANCE remains supported as a backwards-compatible alias for DOTS_FAILURE_RAINBOW_CHANCE. DOTS_FAILURE_MESSAGE_CHANCE still controls whether a notice is shown at all, and repeat escalation remains independently configurable through DOTS_FAILURE_MESSAGE_ESCALATION.
 
 ## Command-not-found suggestions
 
 The command-name candidate cache is built once and reused. It is invalidated when PATH changes or the number of registered shell functions changes. This avoids re-enumerating PATH and Zsh's large function table for every typo.
 
-On NixOS, `nix/packages.nix` installs the dependency-free Rust `dots-suggest` helper automatically. The helper reads the cached candidate names from stdin, applies the existing one-edit / two-edit threshold and adjacent-transposition-aware optimal-string-alignment distance, then returns at most five candidates sorted by distance and name. The shell starts one small helper process per unknown command rather than running a Zsh function and dynamic-array edit-distance calculation for every candidate.
+On NixOS, nix/packages.nix installs the dependency-free Rust dots-suggest helper automatically. The helper reads the cached candidate names from stdin, applies the existing one-edit / two-edit threshold and adjacent-transposition-aware optimal-string-alignment distance, then returns at most five candidates sorted by distance and name. The shell starts one small helper process per unknown command rather than running a Zsh function and dynamic-array edit-distance calculation for every candidate.
 
 On other systems, the same cached candidate set is ranked by a pure-Zsh fallback. The Rust helper can also be built manually with:
 
-~~~sh
+~~~
 cargo build --release --manifest-path rust/dots-suggest/Cargo.toml
 ~~~
 
@@ -122,8 +127,8 @@ zsh-autosuggestions is updated with the Oh My Zsh checkout because it is include
 
 ## Shared Nix development environment
 
-The `dev` alias enters the general-purpose development shell exported by
-`Katossh/shiny-rotary-phone`. It uses the public `main` branch flake, so it
+The dev alias enters the general-purpose development shell exported by
+Katossh/shiny-rotary-phone. It uses the public main branch flake, so it
 works from any current directory and does not require a local clone of that
 repository:
 
@@ -132,7 +137,7 @@ dev
 ~~~
 
 The command starts an interactive Nix development shell. Exit it with
-`exit` or Ctrl-D. The first invocation may need to download the flake source
+exit or Ctrl-D. The first invocation may need to download the flake source
 and toolchain from the configured Nix caches.
 
 ## Local customization

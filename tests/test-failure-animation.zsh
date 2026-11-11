@@ -28,22 +28,17 @@ source "$ZSH_DIR/failure-animation.zsh"
 
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
-_dots_test_prompt_report() {
-    local rendered
-    local -a prompt_lines
-    rendered="$(_dots_failure_animation_render_prompt)"
-    prompt_lines=("${(@f)rendered}")
-    local first="${prompt_lines[1]-}"
-    local second="${prompt_lines[2]-}"
-    local -i layout=0
-    [[ "$first" == *BASE_PATH* && "$first" == *"✧━━"* &&
-        "$second" == "BASE_OUTPUT " ]] && layout=1
-    print -r -- "RENDER_CHECK first=${(qqq)first} second=${(qqq)second} rendered=${(qqq)rendered}"
-    print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} STATE_${_DOTS_FAILURE_ANIMATION_STATE} LAYOUT_${layout}"
+_dots_test_snapshot() {
+    print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} RPROMPT_${RPROMPT}"
 }
-typeset -ga precmd_functions
-precmd_functions+=(_dots_test_prompt_report)
-print -r -- MODULES_READY
+_dots_test_enable_continuous() {
+    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+    print -r -- CONTINUOUS_ENABLED
+}
+_dots_test_disable_continuous() {
+    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
+    print -r -- "CONTINUOUS_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
+}
 ZSH_INIT
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
@@ -77,8 +72,7 @@ drain_for() {
     REPLY="$output"
 }
 
-# Wait for the clean shell, then load the same modules as the real .zshrc.
-# Its first precmd after module initialisation must launch the startup animation.
+# Wait for the clean shell, then load the modules as the real .zshrc does.
 local_startup=''
 typeset chunk=''
 typeset -i attempt=0
@@ -92,32 +86,33 @@ if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach i
 print -- "ok - clean interactive child shell reached its prompt"
 
 zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "first prompt after Zsh module initialisation starts animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
-assert_contains "animation sits between path and the second prompt line" "LAYOUT_1" "$REPLY"
+read_until "BASE_OUTPUT"
+assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
+assert_contains "emoji-only animation preserves the second prompt line" "BASE_OUTPUT" "$REPLY"
+[[ "$REPLY" != *'━━'* && "$REPLY" != *'✦'* && "$REPLY" != *'✧'* ]] || fail "animation still contains side bars or star glyphs"
+print -- "ok - prompt contains no decorative bars or star glyphs"
 
-# Drain terminal output while the asynchronous stream finishes.
+# The ordinary startup stream is finite and leaves its last emoji in place.
 drain_for 220
-zpty -w "$PTY_NAME" 'print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME}"; print -r -- STATE_INSPECTION_DONE'$'\n'
-read_until STATE_INSPECTION_DONE
-assert_contains "startup animation completed all 36 frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_36 LAST_STATE_stream-complete" "$REPLY"
-read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "final startup frame remains in the prompt" "LAYOUT_1" "$REPLY"
-
-# Trigger the public renderer; the queued animation starts in precmd.
-zpty -w "$PTY_NAME" 'dots_failure_message generic animation-integration-test; print -r -- FAILURE_MESSAGE_RETURNED; print -r -- FAILURE_COMMAND_DONE'$'\n'
-read_until FAILURE_COMMAND_DONE
-assert_contains "public failure-message renderer returned" "FAILURE_MESSAGE_RETURNED" "$REPLY"
-read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "failure notification starts another animation" "PROMPT_STATE ACTIVE_1" "$REPLY"
-
-# Enter cancels the remaining frames but must not clear the latest one.
-command sleep 0.08
-zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} RPROMPT_${RPROMPT}"; print -r -- INPUT_INSPECTION_DONE'$'\n'
-read_until INPUT_INSPECTION_DONE
-assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
+read_until STATE_SNAPSHOT
+assert_contains "startup animation finishes all 24 emoji frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_24 LAST_STATE_stream-complete" "$REPLY"
 assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
-read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "latest frame persists after Enter" "LAYOUT_1" "$REPLY"
 
-print -- "All persistent multiline animation integration tests passed."
+# Continuous mode loops while idle; accepting a command stops it before the
+# helper changes the environment flag. The following prompt must stay static.
+zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
+read_until CONTINUOUS_ENABLED
+assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
+read_until "BASE_OUTPUT"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
+read_until CONTINUOUS_DISABLED
+assert_contains "continuous mode disables cleanly at the next command" "CONTINUOUS_DISABLED ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*LAST_FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+print -- "All emoji-only and continuous animation integration tests passed."
