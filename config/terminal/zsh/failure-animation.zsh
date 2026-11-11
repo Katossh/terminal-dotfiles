@@ -20,7 +20,7 @@ typeset -g _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_INTERVAL='0.14'
 
-if [[ "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT" == *'$('* ]]; then
+if [[ "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT" == '$('*')' ]]; then
     _DOTS_FAILURE_ANIMATION_PROMPT_MODE='command'
 fi
 
@@ -70,9 +70,12 @@ _dots_failure_animation_render_prompt() {
 
     local rendered=''
     if [[ "$_DOTS_FAILURE_ANIMATION_PROMPT_MODE" == command ]]; then
-        # This is the exact command-substitution string installed by Starship.
-        # It is generated from our local shell configuration, not user input.
-        rendered="$(eval "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT")"
+        # Strip the outer command-substitution syntax first. eval must execute
+        # the inner Starship command, not evaluate its rendered output.
+        local prompt_command="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
+        prompt_command="${prompt_command#'$('}"
+        prompt_command="${prompt_command%')'}"
+        rendered="$(eval "$prompt_command")"
     else
         rendered="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
     fi
