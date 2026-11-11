@@ -1,8 +1,9 @@
-# Non-blocking, emoji-only prompt animation for interactive Zsh.
+# Non-blocking, style-aware emoji animation immediately before the Zsh prompt character.
 #
 # Starship's PROMPT is a command substitution, not the rendered prompt text.
-# Preserve that command and wrap its output, appending one animated emoji to
-# its first line. Frames are delivered to ZLE asynchronously.
+# Preserve its output and insert the current frame before the final prompt
+# marker (❯ by default), leaving the path line and RPROMPT untouched.
+# Frames are delivered to ZLE asynchronously.
 # DOTS_FAILURE_ANIMATION_CONTINUOUS=1 loops while the prompt is idle.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
@@ -14,7 +15,9 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
-typeset -g _DOTS_FAILURE_ANIMATION_FRAME='🦊'
+typeset -g _DOTS_FAILURE_ANIMATION_FRAME='💀'
+typeset -g _DOTS_FAILURE_ANIMATION_STYLE='normal'
+typeset -ga _DOTS_FAILURE_ANIMATION_POOL=()
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="${PROMPT-}"
 typeset -g _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT=''
@@ -39,65 +42,67 @@ _dots_failure_animation_continuous_enabled() {
     esac
 }
 
-_dots_failure_animation_stream() {
+# The ordinary styles deliberately share one pool. Anime, Ecchi and Rainbow
+# each have a distinct pool so the animation matches the selected message voice.
+_dots_failure_animation_pool_for_style() {
     emulate -L zsh
 
-    local variant="${1:-1}"
-    local continuous="${2:-0}"
-    local frame
-    local -a frames
-
-    # Each variant is a 24-frame emoji sequence. The animation contains no
-    # decorative text glyphs, borders, stars, or side bars.
-    case "$variant" in
-        2)
-            frames=(
-                '🌱' '🌿' '🍀' '🌵' '🌴' '🌳' '🌲' '🌷'
-                '🌹' '🌺' '🌻' '🌼' '🪷' '🪻' '🍄' '🪴'
-                '🌾' '🍁' '🍂' '🍃' '🌊' '💧' '🌧️' '☀️'
+    local style="${1:-normal}"
+    case "$style" in
+        anime)
+            _DOTS_FAILURE_ANIMATION_POOL=(
+                '😭' '🥰' '🥺' '💖' '💗' '💓' '💕'
             )
             ;;
-        3)
-            frames=(
-                '🍓' '🍒' '🍑' '🍉' '🍋' '🍊' '🍍' '🥭'
-                '🍇' '🫐' '🍈' '🍏' '🍎' '🍐' '🍌' '🥝'
-                '🥑' '🍅' '🥕' '🌽' '🥨' '🧀' '🍰' '🍩'
+        ecchi)
+            _DOTS_FAILURE_ANIMATION_POOL=(
+                '😏' '🫠' '❤️' '🩷' '💘'
             )
             ;;
-        4)
-            frames=(
-                '🌙' '🌍' '🌎' '🌏' '🪐' '☄️' '🚀' '🛰️'
-                '🛸' '👽' '🤖' '🧬' '🔭' '🧪' '⚗️' '🧫'
-                '🦠' '⚛️' '🔬' '🧠' '🪄' '🔮' '💎' '🧿'
+        rainbow)
+            _DOTS_FAILURE_ANIMATION_POOL=(
+                '🧡' '💛' '💚' '💙' '🤍'
             )
             ;;
-        5)
-            frames=(
-                '💻' '🖥️' '⌨️' '🖱️' '📱' '📟' '📡' '🔋'
-                '🔌' '💡' '🔦' '🕹️' '🎮' '🧩' '🎧' '🎹'
-                '🎸' '📷' '📹' '🛠️' '⚙️' '🧰' '🪛' '🧲'
-            )
-            ;;
-        6)
-            frames=(
-                '🔥' '💧' '🌊' '⚡' '🌪️' '🌈' '🌫️' '🌬️'
-                '🌋' '🪨' '🪵' '🧊' '❄️' '☃️' '🌡️' '🌤️'
-                '⛈️' '🌦️' '☔' '🌀' '🪸' '🐚' '🪺' '🪹'
-            )
-            ;;
-        *)
-            frames=(
-                '🦊' '🐈' '🐈‍⬛' '🐕' '🐺' '🦝' '🐼' '🐻'
-                '🐨' '🐯' '🦁' '🐸' '🐵' '🐧' '🦉' '🦋'
-                '🐬' '🐳' '🐙' '🦀' '🐢' '🦎' '🐍' '🦖'
+        normal|sarcastic|dramatic|*)
+            _DOTS_FAILURE_ANIMATION_POOL=(
+                '👀' '😳' '✨'
+                '💀' '😂' '🤡' '🪿'
+                '🔥' '💔' '🖤' '🤎' '💜'
             )
             ;;
     esac
+}
 
+_dots_failure_animation_stream() {
+    emulate -L zsh
+
+    local style="${1:-normal}"
+    local continuous="${2:-0}"
+    local frame
+    local -i pool_size=0
+    local -i previous_index=0
+    local -i frame_number=0
+    local -i index=0
+
+    _dots_failure_animation_pool_for_style "$style"
+    pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
+    (( pool_size > 0 )) || return 0
+
+    # Keep the familiar 24-frame duration, but sample randomly from the
+    # selected style's pool and avoid identical adjacent frames.
     while true; do
-        for frame in "${frames[@]}"; do
+        previous_index=0
+        for (( frame_number = 0; frame_number < 24; frame_number++ )); do
+            index=$(( (RANDOM % pool_size) + 1 ))
+            if (( pool_size > 1 && index == previous_index )); then
+                index=$(( (index % pool_size) + 1 ))
+            fi
+
+            frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
             print -r -- "$frame" || return 0
             command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
+            previous_index="$index"
         done
 
         [[ "$continuous" == 1 ]] || break
@@ -113,18 +118,17 @@ _dots_failure_animation_render_prompt() {
         local prompt_command="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT[3,-2]}"
         rendered="$(eval "$prompt_command")"
     else
-        rendered="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
+        rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
-    # The emoji is the only addition to the existing prompt.
-    local first_line="$rendered"
-    local remaining=''
-    if [[ "$rendered" == *$'\n'* ]]; then
-        first_line="${rendered%%$'\n'*}"
-        remaining="${rendered#*$'\n'}"
-        rendered="${first_line}  ${_DOTS_FAILURE_ANIMATION_FRAME}"$'\n'"${remaining}"
-    else
-        rendered="${first_line}  ${_DOTS_FAILURE_ANIMATION_FRAME}"
+    # Insert only before the final input marker. This avoids decorating the
+    # directory/path line and keeps prompts without the marker unchanged.
+    local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
+    if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
+        local suffix="${rendered##*${(b)marker}}"
+        local marker_and_suffix="${marker}${suffix}"
+        local prefix="${rendered%${(b)marker_and_suffix}}"
+        rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
@@ -137,10 +141,10 @@ _dots_failure_animation_cleanup() {
 
     local redraw="${1:-0}"
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
-        _DOTS_FAILURE_ANIMATION_LAST_STATE="$_DOTS_FAILURE_ANIMATION_STATE"
-        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
+        _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
+        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=${_DOTS_FAILURE_ANIMATION_FRAMES}
 
-        local fd="$_DOTS_FAILURE_ANIMATION_FD"
+        local fd="${_DOTS_FAILURE_ANIMATION_FD}"
         zle -F "$fd" 2>/dev/null || true
         { exec {fd}<&- } 2>/dev/null || true
 
@@ -172,11 +176,11 @@ _dots_failure_animation_fd_handler() {
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
-    # Redraw expands PROMPT and renders the latest emoji.
+    # Redraw expands PROMPT and renders the latest emoji before the prompt marker.
     zle && zle .reset-prompt
 }
 
-# Failure-message hooks queue work here; the stream starts from precmd.
+# Failure-message hooks queue work here. The selected style follows the message.
 _dots_failure_animation_start() {
     emulate -L zsh
 
@@ -184,6 +188,13 @@ _dots_failure_animation_start() {
         "${TERM:-dumb}" != dumb &&
         "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
 
+    local style="${1:-normal}"
+    case "$style" in
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
+        *) style=normal ;;
+    esac
+
+    _DOTS_FAILURE_ANIMATION_STYLE="$style"
     _DOTS_FAILURE_ANIMATION_PENDING=1
 }
 
@@ -200,11 +211,11 @@ _dots_failure_animation_begin() {
     _DOTS_FAILURE_ANIMATION_FRAMES=0
     _DOTS_FAILURE_ANIMATION_STATE='starting'
 
-    local variant=$(( (RANDOM % 6) + 1 ))
+    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
     local continuous=0
     _dots_failure_animation_continuous_enabled && continuous=1
 
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$variant" "$continuous")
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$continuous")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
@@ -222,7 +233,7 @@ _dots_failure_animation_precmd() {
 
     if _dots_failure_animation_continuous_enabled; then
         # Restart at every new prompt. zle-line-finish stops the old stream
-        # before the command runs, so it never animates during command execution.
+        # when a command is submitted, so it never animates during execution.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
     elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
