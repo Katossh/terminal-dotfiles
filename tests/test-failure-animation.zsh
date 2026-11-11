@@ -52,7 +52,7 @@ _dots_test_palette_probe() {
     second="$(_dots_failure_animation_palette_sequence 1)"
     reset="$(_dots_failure_animation_palette_reset_sequence)"
     [[ "$first" != "$second" ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
-    [[ "$first" == *$'\e]4;224;rgb:'* && "$first" == *';255;rgb:10/14/1f'$'\a'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    [[ "$first" == *$'\e]4;224;rgb:'* && "$first" == *';239;rgb:10/14/1f'$'\a'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
     [[ "$reset" == *$'\e]104;224;'* && "$reset" == *';255'$'\a'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
     print -- PALETTE_SEQUENCE_OK
 }
