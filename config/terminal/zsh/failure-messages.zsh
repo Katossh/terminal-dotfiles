@@ -549,7 +549,7 @@ dots_failure_message() {
 
     local -i gradient_banner_active=0
     if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
-        if [[ -o interactive && -t 0 && -t 1 &&
+        if [[ -o interactive && -t 0 && -t 1 && -z "${NO_COLOR:-}" &&
               "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] &&
               (( ${+functions[_dots_failure_animation_start]} )); then
             _DOTS_FAILURE_ANIMATION_BANNER="$selected_template"
