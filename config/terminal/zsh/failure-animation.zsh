@@ -4,7 +4,7 @@
 # Preserve its output and insert the current frame before the final prompt
 # marker (❯ by default), leaving the path line and RPROMPT untouched.
 # Frames are delivered to ZLE asynchronously.
-# DOTS_FAILURE_ANIMATION_CONTINUOUS=1 loops while the prompt is idle.
+# DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1 loops emoji frames while the prompt is idle.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
