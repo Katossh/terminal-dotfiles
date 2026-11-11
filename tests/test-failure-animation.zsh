@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 setopt errexit nounset
 
-REPO_DIR="${0:A:h:h}"
+REPO_DIR="\${0:A:h:h}"
 ZSH_DIR="$REPO_DIR/config/terminal/zsh"
 INIT_FILE="$(mktemp)"
 PTY_NAME="dots_failure_animation_test"
@@ -28,26 +28,22 @@ source "$ZSH_DIR/failure-animation.zsh"
 
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
-_dots_test_enable_continuous() {
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
-    print -r -- CONTINUOUS_ENABLED
-}
-
 _dots_test_startup_snapshot() {
-    print -r -- "STARTUP_FINISHED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
+    print -r -- "STARTUP_FINISHED ACTIVE_\${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_\${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
     print -r -- STATE_INSPECTION_DONE
 }
-
 _dots_test_failure_notice() {
     dots_failure_message generic animation-integration-test
     print -r -- FAILURE_COMMAND_DONE
 }
-
 _dots_test_cancelled_input() {
     print -r -- INPUT_ACCEPTED
     print -r -- INPUT_INSPECTION_DONE
 }
-
+_dots_test_enable_continuous() {
+    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+    print -r -- CONTINUOUS_ENABLED
+}
 _dots_test_disable_continuous() {
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
     print -r -- CONTINUOUS_DISABLED
@@ -57,16 +53,15 @@ _dots_test_prompt_report() {
     local rendered
     local -a prompt_lines
     rendered="$(_dots_failure_animation_render_prompt)"
-    prompt_lines=("${(@f)rendered}")
-    local first="${prompt_lines[1]-}"
-    local second="${prompt_lines[2]-}"
+    prompt_lines=("\${(@f)rendered}")
+    local first="\${prompt_lines[1]-}"
+    local second="\${prompt_lines[2]-}"
     local -i layout=0
     [[ "$first" == *BASE_PATH* &&
         "$first" == *"$_DOTS_FAILURE_ANIMATION_FRAME"* &&
         "$first" != *'━━'* && "$first" != *'✦'* && "$first" != *'✧'* &&
         "$second" == "BASE_OUTPUT " ]] && layout=1
-    print -r -- "RENDER_CHECK first=${(qqq)first} second=${(qqq)second}"
-    print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAYOUT_${layout} CONTINUOUS_${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}"
+    print -r -- "PROMPT_STATE ACTIVE_\${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAYOUT_\${layout} CONTINUOUS_\${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}"
 }
 typeset -ga precmd_functions
 precmd_functions+=(_dots_test_prompt_report)
@@ -124,14 +119,14 @@ assert_contains "prompt adds only the current emoji, with no side bars or star g
 
 # Drain terminal output while the default one-shot stream finishes.
 drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_startup_snapshot'
+zpty -w "$PTY_NAME" '_dots_test_startup_snapshot'$'\n'
 read_until STATE_INSPECTION_DONE
 assert_contains "startup animation completes its 24 emoji frames" "STARTUP_FINISHED ACTIVE_0 LAST_FRAMES_24 LAST_STATE_stream-complete" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "final startup emoji remains in the prompt" "LAYOUT_1" "$REPLY"
 
 # Trigger the public renderer; the queued animation starts in precmd.
-zpty -w "$PTY_NAME" '_dots_test_failure_notice'
+zpty -w "$PTY_NAME" '_dots_test_failure_notice'$'\n'
 read_until FAILURE_COMMAND_DONE
 assert_contains "public failure-message renderer returned" "FAILURE_COMMAND_DONE" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_1"
@@ -139,81 +134,37 @@ assert_contains "failure notification starts another animation" "PROMPT_STATE AC
 
 # Enter cancels the remaining frames but must not clear the latest one.
 command sleep 0.08
-zpty -w "$PTY_NAME" '_dots_test_cancelled_input'
+zpty -w "$PTY_NAME" '_dots_test_cancelled_input'$'\n'
 read_until INPUT_INSPECTION_DONE
 assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED" "$REPLY"
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "latest emoji persists after Enter" "LAYOUT_1" "$REPLY"
 
-# Continuous mode should loop while the prompt is idle.
+# Continuous mode loops while the prompt is idle and restarts on new prompts.
 zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
 read_until CONTINUOUS_ENABLED
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
 
-# A short shell helper stops the loop at command acceptance; ZLE finishes the
-# stream before executing the command, so the next prompt remains static.
+# Disable from an accepted command. ZLE stops the stream before executing it.
 drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_continuous'
-typeset continuous_report="$REPLY"
-typeset continuous_frames="${continuous_report##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
-[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
-(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
-print -- "ok - continuous animation loops beyond one frame sequence"
-
-# Re-enable, verify another prompt restarts, then disable it again.
-zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
-read_until CONTINUOUS_ENABLED
-read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "continuous animation restarts on a later prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_disable_continuous'
-
-print -- "All emoji-only and continuous animation integration tests passed."
-\n'
+zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
 read_until CONTINUOUS_DISABLED
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "continuous mode stops when disabled at the prompt" "CONTINUOUS_0" "$REPLY"
 typeset continuous_report="$REPLY"
-typeset continuous_frames="${continuous_report##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
+typeset continuous_frames="\${continuous_report##*LAST_FRAMES_}"
+continuous_frames="\${continuous_frames%%[^0-9]*}"
 [[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
 (( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
 print -- "ok - continuous animation loops beyond one frame sequence"
 
-# Re-enable, verify another prompt restarts, then disable it again.
 zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
 read_until CONTINUOUS_ENABLED
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "continuous animation restarts on a later prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
-zpty -w "$PTY_NAME" $'\x18'
-read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "continuous mode can be disabled repeatedly" "CONTINUOUS_0" "$REPLY"
-
-print -- "All emoji-only and continuous animation integration tests passed."
-\n'
+zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
 read_until CONTINUOUS_DISABLED
-read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "continuous mode can be disabled repeatedly" "CONTINUOUS_0" "$REPLY"
-
-print -- "All emoji-only and continuous animation integration tests passed."
-\n'
-read_until CONTINUOUS_DISABLED
-read_until "PROMPT_STATE ACTIVE_0"
-assert_contains "continuous mode stops when disabled at the prompt" "CONTINUOUS_0" "$REPLY"
-typeset continuous_report="$REPLY"
-typeset continuous_frames="${continuous_report##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
-[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
-(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
-print -- "ok - continuous animation loops beyond one frame sequence"
-
-# Re-enable, verify another prompt restarts, then disable it again.
-zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
-read_until CONTINUOUS_ENABLED
-read_until "PROMPT_STATE ACTIVE_1"
-assert_contains "continuous animation restarts on a later prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
-zpty -w "$PTY_NAME" $'\x18'
 read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "continuous mode can be disabled repeatedly" "CONTINUOUS_0" "$REPLY"
 
