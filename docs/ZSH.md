@@ -7,10 +7,11 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 1. .zshrc — PATH, history, options, Oh My Zsh and plugin initialization, module loading, Starship, and optional tmux startup.
 2. aliases.zsh and completion.zsh — aliases, interactive helpers, completion matching, and cache styles.
 3. command-state.zsh — records the last completed command, its status, working directory, and expanded form.
-4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command; failure-animation.zsh adds a non-blocking ZLE animation.
+4. failure-classifier.zsh and failure-messages.zsh — conservatively classify failures and render one notice per failed command.
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide `why` / `why --verbose` without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
+8. failure-animation.zsh — registers after Starship and decorates its completed prompt without disturbing its line break.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -58,7 +59,9 @@ Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, g
 
 The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with `DOTS_FAILURE_STYLE=ecchi`.
 
-Animations now run for 36 frames over about 5 seconds and are enabled on 50% of displayed failures by default. The renderer feeds frames to ZLE through an asynchronous file-descriptor watcher and appends a bold, framed motif directly beside the left prompt and command input. Typing, cursor movement, deletion, and Enter remain responsive; submitting the line cancels the remaining frames, restores the original left prompt, and leaves `RPROMPT` untouched. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
+The first interactive Zsh prompt plays one 36-frame animation (~5 seconds), even before any command has failed. Later failure notices trigger another animation on the configured 50% chance. Frames are delivered to ZLE through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
+
+The motif sits on the same line as the Starship path, immediately before Starship's `line_break` module; the input symbol remains on the next line. This keeps command output separate from the path-and-animation row. When the stream finishes, its final frame remains as a static prompt decoration until another animation replaces it. Pressing Enter during an animation cancels the remaining frames but preserves the latest visible frame. `RPROMPT` is untouched. Animations only run in an interactive TTY; redirected output, CI, and `TERM=dumb` remain unaffected. They can be disabled independently.
 
 Optional overrides:
 
