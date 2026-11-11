@@ -101,7 +101,7 @@ if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach i
 print -- "ok - clean interactive child shell reached its prompt"
 
 zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "BASE_OUTPUT"
+read_until "❯"
 assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
 assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
 [[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
@@ -117,30 +117,30 @@ assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
 
 # Deterministically render a frame and verify it is directly before the input marker.
 zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
-read_until PROMPT_RENDERED:
+read_until "BASE_OUTPUT 😭 ❯"
 assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
 assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
 
 # Normal, sarcastic and dramatic styles must share one pool; special styles
 # must each have their own pool.
 zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until POOL_normal
+read_until "POOL_normal_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
 assert_contains "ordinary styles use the common 12-emoji pool" "POOL_normal_12_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until POOL_sarcastic
+read_until "POOL_sarcastic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
 assert_contains "sarcastic uses the common pool" "POOL_sarcastic_12_" "$REPLY"
 assert_contains "sarcastic pool includes the common reactions" "💀 😂 🤡 🪿" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until POOL_dramatic
+read_until "POOL_dramatic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
 assert_contains "dramatic uses the common pool" "POOL_dramatic_12_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
-read_until POOL_anime
+read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
 assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until POOL_ecchi
+read_until "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘"
 assert_contains "ecchi has its dedicated five-emoji pool" "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
-read_until POOL_rainbow
+read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
 # Continuous mode loops while idle; accepting a command stops it before the
@@ -148,7 +148,7 @@ assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡
 zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
 read_until CONTINUOUS_ENABLED
 assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
-read_until "BASE_OUTPUT"
+read_until "❯"
 drain_for 220
 zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
 read_until CONTINUOUS_DISABLED
