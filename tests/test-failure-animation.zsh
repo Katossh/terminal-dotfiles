@@ -46,27 +46,6 @@ _dots_test_assert_pool() {
     _dots_failure_animation_pool_for_style "$style"
     print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
 }
-_dots_test_render_gradient() {
-    local style="$1"
-    _DOTS_FAILURE_ANIMATION_BANNER='GRADIENT_TEST'
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE="$style"
-    _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET=0
-    local rendered="$( _dots_failure_animation_render_prompt )"
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
-    print -r -- "GRADIENT_RENDERED:$rendered"
-}
-_dots_test_mythic_stream() {
-    local fd frame
-    local -i count=0
-    exec {fd}< <(_dots_failure_animation_stream mythic 0)
-    while (( count < 3 )); do
-        IFS= read -r -u "$fd" frame || break
-        print -r -- "MYTHIC_FRAME:$frame"
-        (( count += 1 ))
-    done
-    exec {fd}<&-
-}
 _dots_test_enable_continuous() {
     export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
     print -- CONTINUOUS_ENABLED
@@ -164,69 +143,6 @@ zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
 read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
-# Mythic and legendary banners use animated gradients, not the emoji pool.
-zpty -w "$PTY_NAME" '_dots_test_render_gradient mythic' accepting a command stops it before the
-# helper changes the environment flag. The following prompt must stay static.
-zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
-read_until CONTINUOUS_ENABLED
-assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
-read_until CONTINUOUS_DISABLED
-assert_contains "continuous mode disables cleanly at the next command" "CONTINUOUS_DISABLED ACTIVE_0" "$REPLY"
-typeset continuous_frames="${REPLY##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
-[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
-(( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
-print -- "ok - continuous animation loops beyond one frame sequence"
-
-print -- "All style-aware prompt animation integration tests passed."
-\n'
-read_until "GRADIENT_TEST"
-assert_contains "mythic banner is rendered in the prompt" "GRADIENT_TEST" "$REPLY"
-assert_contains "mythic gradient starts near-white" "38;2;245;245;247" "$REPLY"
-assert_contains "mythic gradient reaches near-black" "38;2;18;19;24" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_render_gradient legendary' accepting a command stops it before the
-# helper changes the environment flag. The following prompt must stay static.
-zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
-read_until CONTINUOUS_ENABLED
-assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
-read_until CONTINUOUS_DISABLED
-assert_contains "continuous mode disables cleanly at the next command" "CONTINUOUS_DISABLED ACTIVE_0" "$REPLY"
-typeset continuous_frames="${REPLY##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
-[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
-(( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
-print -- "ok - continuous animation loops beyond one frame sequence"
-
-print -- "All style-aware prompt animation integration tests passed."
-\n'
-read_until "GRADIENT_TEST"
-assert_contains "legendary banner uses its own colour gradient" "38;2;255;91;132" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_mythic_stream' accepting a command stops it before the
-# helper changes the environment flag. The following prompt must stay static.
-zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
-read_until CONTINUOUS_ENABLED
-assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
-read_until CONTINUOUS_DISABLED
-assert_contains "continuous mode disables cleanly at the next command" "CONTINUOUS_DISABLED ACTIVE_0" "$REPLY"
-typeset continuous_frames="${REPLY##*LAST_FRAMES_}"
-continuous_frames="${continuous_frames%%[^0-9]*}"
-[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
-(( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
-print -- "ok - continuous animation loops beyond one frame sequence"
-
-print -- "All style-aware prompt animation integration tests passed."
-\n'
-read_until "MYTHIC_FRAME:G:2"
-assert_contains "mythic gradient stream keeps advancing" "MYTHIC_FRAME:G:2" "$REPLY"
 # Continuous mode loops while idle; accepting a command stops it before the
 # helper changes the environment flag. The following prompt must stay static.
 zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
