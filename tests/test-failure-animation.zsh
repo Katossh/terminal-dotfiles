@@ -56,14 +56,14 @@ _dots_test_palette_probe() {
     [[ "$reset" == $'\e]30101\e\\' ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
     print -- PALETTE_SEQUENCE_OK
 }
-_dots_test_start_gradient() {
+_dots_test_render_gradient_message() {
+    local style="$1"
     unset NO_COLOR
     export KITTY_WINDOW_ID='terminal-dotfiles-test'
-    if _dots_failure_animation_gradient_start legendary; then
-        print -r -- "GRADIENT_WORKER_STARTED_ACTIVE_${_DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE}_PID_${_DOTS_FAILURE_ANIMATION_GRADIENT_PID}"
-    else
-        print -- GRADIENT_WORKER_START_FAILED
-    fi
+    export DOTS_FAILURE_STYLE="$style"
+    export DOTS_FAILURE_MESSAGE_CHANCE=100
+    export DOTS_FAILURE_ANIMATION=1
+    dots_failure_message generic "gradient-banner-${style}"
 }
 _dots_test_gradient_status() {
     local running=0
@@ -88,7 +88,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0 \
+    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0 DOTS_FAILURE_GRADIENT_INTERVAL=0.05 \
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
@@ -192,10 +192,15 @@ zpty -w "$PTY_NAME" '_dots_test_palette_probe'$'\n'
 read_until PALETTE_SEQUENCE_OK
 assert_contains "Kitty OSC 21 rotates both dedicated gradients" "PALETTE_SEQUENCE_OK" "$REPLY"
 
-# The palette worker survives Enter so submitted messages keep animating in history.
-zpty -w "$PTY_NAME" '_dots_test_start_gradient'$'\n'
-read_until GRADIENT_WORKER_STARTED
-assert_contains "Kitty palette worker starts" "GRADIENT_WORKER_STARTED_ACTIVE_1_PID_" "$REPLY"
+# The actual messages use indexed colors, so the terminal can repaint them from scrollback.
+zpty -w "$PTY_NAME" '_dots_test_render_gradient_message legendary'$'\n'
+read_until gradient-banner-legendary
+assert_contains "Legendary message uses its animated palette slots" $'\e[38;5;208m' "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_render_gradient_message mythic'$'\n'
+read_until gradient-banner-mythic
+assert_contains "Mythic message uses its own animated palette slots" $'\e[38;5;224m' "$REPLY"
+
+# The palette worker survives Enter so both submitted messages keep animating in history.
 zpty -w "$PTY_NAME" '_dots_test_gradient_status'$'\n'
 read_until GRADIENT_WORKER_STATUS
 assert_contains "gradient worker survives command submission" "GRADIENT_WORKER_STATUS_ACTIVE_1_RUNNING_1" "$REPLY"
@@ -204,6 +209,7 @@ assert_contains "gradient worker keeps updating Kitty's palette" $'\e]21;208=' "
 zpty -w "$PTY_NAME" '_dots_test_stop_gradient'$'\n'
 read_until GRADIENT_WORKER_STOPPED
 assert_contains "gradient worker restores the saved Kitty palette" "GRADIENT_WORKER_STOPPED_ACTIVE_0" "$REPLY"
+assert_contains "palette stack is popped on cleanup" $'\e]30101\e\\' "$REPLY"
 
 print -- "All style-aware prompt animation integration tests passed."
 
