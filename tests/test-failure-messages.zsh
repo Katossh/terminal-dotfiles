@@ -27,6 +27,18 @@ assert_contains() {
     print -- "ok - $label"
 }
 
+assert_eq() {
+    local label="$1"
+    local expected="$2"
+    local actual="$3"
+
+    [[ "$actual" == "$expected" ]] || {
+        print -u2 -- "not ok - $label (expected '$expected', got '$actual')"
+        exit 1
+    }
+    print -- "ok - $label"
+}
+
 assert_absent() {
     local label="$1"
     local needle="$2"
