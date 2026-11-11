@@ -12,6 +12,11 @@ assert_contains() {
     [[ "$haystack" == *"$needle"* ]] || fail "$label (missing: $needle; captured: $haystack)"
     print -- "ok - $label"
 }
+assert_absent() {
+    local label="$1" needle="$2" haystack="$3"
+    [[ "$haystack" != *"$needle"* ]] || fail "$label (unexpected: $needle; captured: $haystack)"
+    print -- "ok - $label"
+}
 
 zmodload zsh/zpty 2>/dev/null || {
     print -- "skip - zsh/zpty is unavailable"
@@ -20,7 +25,7 @@ zmodload zsh/zpty 2>/dev/null || {
 
 cat > "$INIT_FILE" <<'ZSH_INIT'
 setopt promptsubst
-STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT '
+STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT ❯ '
 PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
@@ -29,11 +34,21 @@ source "$ZSH_DIR/failure-animation.zsh"
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
 _dots_test_snapshot() {
-    print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} RPROMPT_${RPROMPT}"
+    print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} STYLE_${_DOTS_FAILURE_ANIMATION_STYLE} RPROMPT_${RPROMPT}"
+}
+_dots_test_render_prompt() {
+    _DOTS_FAILURE_ANIMATION_FRAME='😭'
+    local rendered="$(_dots_failure_animation_render_prompt)"
+    print -r -- "PROMPT_RENDERED:${rendered}"
+}
+_dots_test_assert_pool() {
+    local style="$1"
+    _dots_failure_animation_pool_for_style "$style"
+    print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
 }
 _dots_test_enable_continuous() {
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
-    print -r -- CONTINUOUS_ENABLED
+    print -- CONTINUOUS_ENABLED
 }
 _dots_test_disable_continuous() {
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
@@ -86,25 +101,54 @@ if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach i
 print -- "ok - clean interactive child shell reached its prompt"
 
 zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "BASE_OUTPUT"
+read_until "❯"
 assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
-assert_contains "emoji-only animation preserves the second prompt line" "BASE_OUTPUT" "$REPLY"
-[[ "$REPLY" != *'━━'* && "$REPLY" != *'✦'* && "$REPLY" != *'✧'* ]] || fail "animation still contains side bars or star glyphs"
-print -- "ok - prompt contains no decorative bars or star glyphs"
+assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
+[[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
+print -- "ok - initial animation leaves the path line untouched"
 
-# The ordinary startup stream is finite and leaves its last emoji in place.
+# Let the initial one-shot animation finish before submitting another command.
 drain_for 220
 zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
 read_until STATE_SNAPSHOT
-assert_contains "startup animation finishes all 24 emoji frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_24 LAST_STATE_stream-complete" "$REPLY"
+assert_contains "startup animation finishes all 24 frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_24 LAST_STATE_stream-complete" "$REPLY"
+assert_contains "startup uses the shared style" "STYLE_normal" "$REPLY"
 assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+
+# Deterministically render a frame and verify it is directly before the input marker.
+zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
+read_until "BASE_OUTPUT 😭 ❯"
+assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
+assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
+
+# Normal, sarcastic and dramatic styles must share one pool; special styles
+# must each have their own pool.
+zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
+read_until "POOL_normal_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "ordinary styles use the common 12-emoji pool" "POOL_normal_12_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
+read_until "POOL_sarcastic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "sarcastic uses the common pool" "POOL_sarcastic_12_" "$REPLY"
+assert_contains "sarcastic pool includes the common reactions" "💀 😂 🤡 🪿" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
+read_until "POOL_dramatic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "dramatic uses the common pool" "POOL_dramatic_12_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
+read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
+assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
+read_until "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘"
+assert_contains "ecchi has its dedicated five-emoji pool" "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
+read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
+assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
 # Continuous mode loops while idle; accepting a command stops it before the
 # helper changes the environment flag. The following prompt must stay static.
 zpty -w "$PTY_NAME" '_dots_test_enable_continuous'$'\n'
 read_until CONTINUOUS_ENABLED
 assert_contains "continuous mode can be enabled through the environment" "CONTINUOUS_ENABLED" "$REPLY"
-read_until "BASE_OUTPUT"
+read_until "❯"
 drain_for 220
 zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
 read_until CONTINUOUS_DISABLED
@@ -115,4 +159,4 @@ continuous_frames="${continuous_frames%%[^0-9]*}"
 (( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
 print -- "ok - continuous animation loops beyond one frame sequence"
 
-print -- "All emoji-only and continuous animation integration tests passed."
+print -- "All style-aware prompt animation integration tests passed."

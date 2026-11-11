@@ -4,6 +4,11 @@ setopt nounset
 REPO_DIR="${0:A:h:h}"
 source "$REPO_DIR/config/terminal/zsh/failure-messages.zsh"
 
+typeset -g DOTS_TEST_ANIMATION_STYLE=''
+_dots_failure_animation_start() {
+    DOTS_TEST_ANIMATION_STYLE="${1:-normal}"
+}
+
 fail() {
     print -u2 -- "not ok - $1"
     exit 1
@@ -17,6 +22,18 @@ assert_contains() {
     [[ "$haystack" == *"$needle"* ]] || {
         print -u2 -- "not ok - $label (missing: '$needle')"
         print -u2 -- "$haystack"
+        exit 1
+    }
+    print -- "ok - $label"
+}
+
+assert_eq() {
+    local label="$1"
+    local expected="$2"
+    local actual="$3"
+
+    [[ "$actual" == "$expected" ]] || {
+        print -u2 -- "not ok - $label (expected '$expected', got '$actual')"
         exit 1
     }
     print -- "ok - $label"
@@ -141,9 +158,41 @@ assert_contains "rainbow style retains command context" "rainbow-style-test" "$D
 assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
 assert_control_free "rainbow output stays control-free when redirected" "$DOTS_TEST_OUTPUT"
 
-# Animations are never emitted into redirected output, even at a 100% chance.
-export DOTS_FAILURE_STYLE=normal
+# The final resolved message style must select the matching animation pool.
 export DOTS_FAILURE_ANIMATION_CHANCE=100
+for style in normal sarcastic dramatic anime ecchi rainbow; do
+    export DOTS_FAILURE_STYLE="$style"
+    DOTS_TEST_ANIMATION_STYLE=''
+    capture_message generic "animation-style-$style"
+    assert_eq "${style} style is passed to animation" "$style" "$DOTS_TEST_ANIMATION_STYLE"
+done
+
+export DOTS_FAILURE_STYLE=auto
+export DOTS_FAILURE_RAINBOW_CHANCE=100
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic animation-auto-rainbow
+assert_eq "automatic rainbow selection reaches the rainbow pool" "rainbow" "$DOTS_TEST_ANIMATION_STYLE"
+
+# Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
+# Anime style, to the animation. Repeat until the weighted branch is exercised.
+export DOTS_FAILURE_RAINBOW_CHANCE=0
+integer auto_attempt=0
+typeset auto_ecchi_found=0
+while (( auto_attempt < 500 )); do
+    DOTS_TEST_ANIMATION_STYLE=''
+    capture_message generic animation-auto-anime
+    if [[ "$DOTS_TEST_ANIMATION_STYLE" == ecchi ]]; then
+        auto_ecchi_found=1
+        break
+    fi
+    (( auto_attempt += 1 ))
+done
+[[ "$auto_ecchi_found" == 1 ]] || fail "automatic Anime-to-Ecchi selection never reached Ecchi animation pool"
+print -- "ok - automatic Anime-to-Ecchi selection reaches the Ecchi pool"
+
+# Animations are never emitted into redirected output, even at a 100% chance.
+# The start hook is only a state change; no animation bytes enter the message.
+export DOTS_FAILURE_STYLE=normal
 capture_message generic redirected-animation-test
 assert_absent "animation stays off when output is redirected" "Consulting the machine spirits" "$DOTS_TEST_OUTPUT"
 export DOTS_FAILURE_ANIMATION_CHANCE=0
