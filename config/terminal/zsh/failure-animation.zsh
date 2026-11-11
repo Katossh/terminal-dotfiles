@@ -4,8 +4,7 @@
 # Preserve its output and insert the current frame before the final prompt
 # marker (❯ by default), leaving the path line and RPROMPT untouched.
 # Frames are delivered to ZLE asynchronously.
-# DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1 loops emoji frames while the prompt is idle.
-# DOTS_FAILURE_GRADIENT_INTERVAL sets the persistent Kitty palette-animation step.
+# DOTS_FAILURE_ANIMATION_CONTINUOUS=1 loops while the prompt is idle.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
@@ -91,18 +90,13 @@ _dots_failure_animation_pool_for_style() {
     esac
 }
 
-
 # Legendary and Mythic messages use indexed foreground colours. Kitty stores
 # those indices in terminal cells, including scrollback. Updating the palette
 # therefore animates already-printed messages without repainting or rewriting
 # their text. Slots 224-239 belong to Legendary; 240-255 belong to Mythic.
 _dots_failure_animation_palette_sequence() {
     emulate -L zsh
-
-    local -i phase=$(( \${1:-0} % 16 ))
-    local -i offset=0
-    local -i color_index=0
-    local -i palette_index=0
+    local -i phase=$(( ${1:-0} % 16 )) offset=0 color_index=0 palette_index=0
     local sequence=
     emulate -L zsh
 
@@ -287,16 +281,14 @@ if [[ -o interactive ]]; then
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
     add-zsh-hook zshexit _dots_failure_animation_gradient_stop
 fi
-\\e]4'
-
+\e]4'
     for (( offset = 0; offset < 16; offset++ )); do
         color_index=$(( (offset + phase) % 16 + 1 ))
         palette_index=$(( 224 + offset ))
-        sequence+=";\${palette_index};\${_DOTS_FAILURE_ANIMATION_LEGENDARY_COLORS[color_index]}"
+        sequence+=";${palette_index};${_DOTS_FAILURE_ANIMATION_LEGENDARY_COLORS[color_index]}"
         palette_index=$(( 240 + offset ))
-        sequence+=";\${palette_index};\${_DOTS_FAILURE_ANIMATION_MYTHIC_COLORS[color_index]}"
+        sequence+=";${palette_index};${_DOTS_FAILURE_ANIMATION_MYTHIC_COLORS[color_index]}"
     done
-
     sequence+=
     emulate -L zsh
 
@@ -307,14 +299,6 @@ fi
     local -i previous_index=0
     local -i frame_number=0
     local -i index=0
-
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
 
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
@@ -362,38 +346,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -435,11 +387,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -457,7 +405,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -516,8 +464,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -526,13 +472,12 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\a'
+\a'
     print -rn -- "$sequence"
 }
 
 _dots_failure_animation_palette_reset_sequence() {
     emulate -L zsh
-
     local sequence=
     emulate -L zsh
 
@@ -544,14 +489,6 @@ _dots_failure_animation_palette_reset_sequence() {
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -598,38 +535,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -671,11 +576,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -693,7 +594,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -752,8 +653,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -762,10 +661,10 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\e]104'
+\e]104'
     local -i palette_index=0
     for (( palette_index = 224; palette_index <= 255; palette_index++ )); do
-        sequence+=";\${palette_index}"
+        sequence+=";${palette_index}"
     done
     sequence+=
     emulate -L zsh
@@ -778,14 +677,6 @@ fi
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -832,38 +723,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -905,11 +764,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -927,7 +782,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -986,8 +841,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -996,16 +849,14 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\a'
+\a'
     print -rn -- "$sequence"
 }
 
 _dots_failure_animation_palette_write() {
     emulate -L zsh
-
-    local sequence="\${1-}"
+    local sequence="${1-}"
     [[ -n "$sequence" ]] || return 1
-
     if [[ "$_DOTS_FAILURE_ANIMATION_PALETTE_TRANSPORT" == tmux ]]; then
         local escape=
     emulate -L zsh
@@ -1018,14 +869,6 @@ _dots_failure_animation_palette_write() {
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -1072,38 +915,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -1145,11 +956,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -1167,7 +974,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -1226,8 +1033,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -1236,8 +1041,8 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\e'
-        local passthrough="\${sequence//\${escape}/\${escape}\${escape}}"
+\e'
+        local passthrough="${sequence//${escape}/${escape}${escape}}"
         print -rn -- 
     emulate -L zsh
 
@@ -1249,14 +1054,6 @@ fi
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -1303,38 +1100,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -1376,11 +1141,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -1398,7 +1159,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -1457,8 +1218,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -1467,7 +1226,7 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\ePtmux;'"$\{passthrough}"
+\ePtmux;'"${passthrough}"
     emulate -L zsh
 
     local style="${1:-normal}"
@@ -1478,14 +1237,6 @@ fi
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -1532,38 +1283,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -1605,11 +1324,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -1627,7 +1342,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -1686,8 +1401,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
@@ -1696,7 +1409,7 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
 fi
-\\e\\\\' > /dev/tty
+\e\\' > /dev/tty
     else
         print -rn -- "$sequence" > /dev/tty
     fi
@@ -1704,19 +1417,15 @@ fi
 
 _dots_failure_animation_palette_worker() {
     emulate -L zsh
-
-    local interval="\${DOTS_FAILURE_GRADIENT_INTERVAL:-0.10}"
+    local interval="${DOTS_FAILURE_GRADIENT_INTERVAL:-0.10}"
     local -F interval_seconds=0.10
-    if [[ "$interval" == <-> || "$interval" == <->.<-> ]]; then
-        interval_seconds="$interval"
-    fi
+    if [[ "$interval" == <-> || "$interval" == <->.<-> ]]; then interval_seconds="$interval"; fi
     (( interval_seconds < 0.05 )) && interval_seconds=0.05
     (( interval_seconds > 0.50 )) && interval_seconds=0.50
-
     local -i phase=0
     local sequence=''
     while true; do
-        sequence="$(_dots_failure_animation_palette_sequence "$phase")"
+        sequence="$( _dots_failure_animation_palette_sequence "$phase" )"
         _dots_failure_animation_palette_write "$sequence" || return 0
         (( phase = (phase + 1) % 16 ))
         command sleep "$interval_seconds" 2>/dev/null || return 0
@@ -1725,33 +1434,18 @@ _dots_failure_animation_palette_worker() {
 
 _dots_failure_animation_gradient_start() {
     emulate -L zsh
-
-    # Indexed palette animation is deliberately Kitty-specific. Other
-    # terminals receive a static true-colour gradient from failure-messages.zsh.
-    [[ -o interactive && -t 0 && -t 1 && -n "\${KITTY_WINDOW_ID:-}" &&
-       -z "\${NO_COLOR:-}" && "\${TERM:-dumb}" != dumb ]] || return 1
-
-    if [[ -n "\${TMUX:-}" ]]; then
+    [[ -o interactive && -t 0 && -t 1 && -n "${KITTY_WINDOW_ID:-}" && -z "${NO_COLOR:-}" && "${TERM:-dumb}" != dumb ]] || return 1
+    if [[ -n "${TMUX:-}" ]]; then
         local passthrough_setting="$(command tmux show-options -gv allow-passthrough 2>/dev/null)"
         [[ "$passthrough_setting" == on ]] || return 1
         _DOTS_FAILURE_ANIMATION_PALETTE_TRANSPORT='tmux'
     else
         _DOTS_FAILURE_ANIMATION_PALETTE_TRANSPORT='direct'
     fi
-
-    if (( _DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE )) &&
-        kill -0 "$_DOTS_FAILURE_ANIMATION_GRADIENT_PID" 2>/dev/null; then
-        return 0
-    fi
-
-    # Restore the terminal's configured palette before reserving these slots.
-    local reset_sequence="$(_dots_failure_animation_palette_reset_sequence)"
+    if (( _DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE )) && kill -0 "$_DOTS_FAILURE_ANIMATION_GRADIENT_PID" 2>/dev/null; then return 0; fi
+    local reset_sequence="$( _dots_failure_animation_palette_reset_sequence )"
     _dots_failure_animation_palette_write "$reset_sequence" || return 1
-
-    (
-        _dots_failure_animation_palette_worker
-    ) </dev/null >/dev/null 2>&1 &
-
+    ( _dots_failure_animation_palette_worker ) </dev/null >/dev/null 2>&1 &
     _DOTS_FAILURE_ANIMATION_GRADIENT_PID=$!
     _DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE=1
     return 0
@@ -1759,18 +1453,15 @@ _dots_failure_animation_gradient_start() {
 
 _dots_failure_animation_gradient_stop() {
     emulate -L zsh
-
     if (( _DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE )); then
         local pid="$_DOTS_FAILURE_ANIMATION_GRADIENT_PID"
         kill "$pid" 2>/dev/null || true
         wait "$pid" 2>/dev/null || true
         _DOTS_FAILURE_ANIMATION_GRADIENT_PID=0
         _DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE=0
-
-        local reset_sequence="$(_dots_failure_animation_palette_reset_sequence)"
+        local reset_sequence="$( _dots_failure_animation_palette_reset_sequence )"
         _dots_failure_animation_palette_write "$reset_sequence" 2>/dev/null || true
     fi
-
     _DOTS_FAILURE_ANIMATION_PALETTE_TRANSPORT=''
 }
 
@@ -1785,14 +1476,6 @@ _dots_failure_animation_stream() {
     local -i frame_number=0
     local -i index=0
 
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        while true; do
-            print -r -- "G:$frame_number" || return 0
-            (( frame_number = (frame_number + 1) % 12 ))
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-    fi
-
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
@@ -1839,38 +1522,6 @@ _dots_failure_animation_render_prompt() {
         rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
 
-    if [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local banner="${_DOTS_FAILURE_ANIMATION_BANNER//\%/%%}"
-        local -a banner_colors banner_chars
-        local color character reset
-        printf -v reset '\033[0m'
-        local -i color_index=0 character_index=0 banner_size=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
-            banner_colors=(
-                $'\e[38;2;245;245;247m' $'\e[38;2;205;207;212m'
-                $'\e[38;2;157;160;168m' $'\e[38;2;105;109;119m'
-                $'\e[38;2;55;58;67m' $'\e[38;2;18;19;24m'
-            )
-        else
-            banner_colors=(
-                $'\e[38;2;255;91;132m' $'\e[38;2;255;169;91m'
-                $'\e[38;2;255;224;112m' $'\e[38;2;117;220;160m'
-                $'\e[38;2;90;193;255m' $'\e[38;2;161;130;255m'
-                $'\e[38;2;255;130;215m'
-            )
-        fi
-        banner_chars=( "${(@s::)banner}" )
-        banner_size=${#banner_colors[@]}
-        local gradient_banner=''
-        for character in "${banner_chars[@]}"; do
-            color_index=$(( (_DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET + character_index) % banner_size + 1 ))
-            color="${banner_colors[color_index]}"
-            gradient_banner+="%{${color}%}${character}%{${reset}%}"
-            (( character_index += 1 ))
-        done
-        rendered="${gradient_banner}"$'\n'"${rendered}"
-    fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -1912,11 +1563,7 @@ _dots_failure_animation_fd_handler() {
     fi
 
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$frame" == G:<-> ]]; then
-        _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET="${frame#G:}"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
@@ -1934,7 +1581,7 @@ _dots_failure_animation_start() {
 
     local style="${1:-normal}"
     case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        anime|ecchi|rainbow|normal|sarcastic|dramatic) ;;
         *) style=normal ;;
     esac
 
@@ -1993,8 +1640,6 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE=''
     _dots_failure_animation_cleanup
 }
 
