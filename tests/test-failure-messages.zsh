@@ -185,12 +185,14 @@ done
 
 export DOTS_FAILURE_STYLE=auto
 export DOTS_FAILURE_LEGENDARY_CHANCE=100
+export DOTS_FAILURE_MYTHIC_CHANCE=0
 DOTS_TEST_ANIMATION_STYLE=''
 capture_message generic animation-auto-legendary
 assert_contains "automatic legendary selection emits legendary message" "legendary failure" "$DOTS_TEST_OUTPUT"
 
 # Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
 # Anime style, to the animation. Repeat until the weighted branch is exercised.
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 export DOTS_FAILURE_RAINBOW_CHANCE=0
 integer auto_attempt=0
 typeset auto_ecchi_found=0
