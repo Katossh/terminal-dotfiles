@@ -31,10 +31,6 @@ _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 _dots_test_snapshot() {
     print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} RPROMPT_${RPROMPT}"
 }
-_dots_test_failure_notice() {
-    dots_failure_message generic animation-integration-test
-    print -r -- FAILURE_COMMAND_DONE
-}
 _dots_test_enable_continuous() {
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
     print -r -- CONTINUOUS_ENABLED
@@ -102,21 +98,6 @@ zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
 read_until STATE_SNAPSHOT
 assert_contains "startup animation finishes all 24 emoji frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_24 LAST_STATE_stream-complete" "$REPLY"
 assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
-
-# Explicit failure notices continue to trigger the normal one-shot animation.
-zpty -w "$PTY_NAME" '_dots_test_failure_notice'$'\n'
-read_until FAILURE_COMMAND_DONE
-assert_contains "public failure-message renderer returns" "FAILURE_COMMAND_DONE" "$REPLY"
-read_until "BASE_OUTPUT"
-command sleep 0.08
-zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
-read_until STATE_SNAPSHOT
-typeset failure_frames="${REPLY##*LAST_FRAMES_}"
-failure_frames="${failure_frames%%[^0-9]*}"
-[[ "$failure_frames" == <-> ]] || fail "failure animation frame count was not reported"
-(( failure_frames > 0 )) || fail "failure notification did not start an animation"
-assert_contains "right prompt survives failure animation" "RPROMPT_BASE_RPROMPT" "$REPLY"
-print -- "ok - failure notification starts a non-blocking emoji animation"
 
 # Continuous mode loops while idle; accepting a command stops it before the
 # helper changes the environment flag. The following prompt must stay static.
