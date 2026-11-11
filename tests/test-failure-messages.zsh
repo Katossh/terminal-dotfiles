@@ -80,6 +80,7 @@ capture_message() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_RARE_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 export DOTS_FAILURE_RAINBOW_CHANCE=0
 export DOTS_FAILURE_ANIMATION_CHANCE=0
 export DOTS_FAILURE_STYLE=normal
@@ -158,6 +159,21 @@ assert_contains "rainbow style retains command context" "rainbow-style-test" "$D
 assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
 assert_control_free "rainbow output stays control-free when redirected" "$DOTS_TEST_OUTPUT"
 
+export DOTS_FAILURE_STYLE=legendary
+capture_message generic legendary-style-test
+assert_contains "legendary style emits a dedicated message" "legendary" "$DOTS_TEST_OUTPUT"
+
+export DOTS_FAILURE_STYLE=mythic
+capture_message generic mythic-style-test
+assert_contains "mythic style includes falling-star emoji" "🌠" "$DOTS_TEST_OUTPUT"
+
+export DOTS_FAILURE_STYLE=auto
+export DOTS_FAILURE_MYTHIC_CHANCE=1000
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+capture_message generic automatic-mythic-test
+assert_contains "mythic chance can be forced for testing" "🌠" "$DOTS_TEST_OUTPUT"
+export DOTS_FAILURE_MYTHIC_CHANCE=1
+
 # The final resolved message style must select the matching animation pool.
 export DOTS_FAILURE_ANIMATION_CHANCE=100
 for style in normal sarcastic dramatic anime ecchi rainbow; do
@@ -168,10 +184,10 @@ for style in normal sarcastic dramatic anime ecchi rainbow; do
 done
 
 export DOTS_FAILURE_STYLE=auto
-export DOTS_FAILURE_RAINBOW_CHANCE=100
+export DOTS_FAILURE_LEGENDARY_CHANCE=100
 DOTS_TEST_ANIMATION_STYLE=''
-capture_message generic animation-auto-rainbow
-assert_eq "automatic rainbow selection reaches the rainbow pool" "rainbow" "$DOTS_TEST_ANIMATION_STYLE"
+capture_message generic animation-auto-legendary
+assert_contains "automatic legendary selection emits legendary message" "legendary failure" "$DOTS_TEST_OUTPUT"
 
 # Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
 # Anime style, to the animation. Repeat until the weighted branch is exercised.
