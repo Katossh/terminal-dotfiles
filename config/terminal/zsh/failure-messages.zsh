@@ -502,6 +502,23 @@ dots_failure_message() {
             )
             messages=("${style_messages[@]}")
             ;;
+        legendary)
+            style_messages=(
+                "🏆 The shell has witnessed a legendary failure: \"${command}\". The logs shall remember."
+                "✨ A legendary misfire! \"${command}\" has bent the laws of the terminal."
+                "🌟 Rare event unlocked: \"${command}\" failed with extraordinary style."
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        mythic)
+            style_messages=(
+                "🌠🌠 A mythic event: \"${command}\" vanished beneath a falling star. 🌠"
+                "🌌 The stars aligned, then \"${command}\" failed anyway. 🌠✨"
+                "☄️ A once-in-a-blue-moon failure! \"${command}\" has summoned the starfall. 🌠"
+                "🌠🌟 The terminal records a mythic collapse: \"${command}\". 🌌"
+            )
+            messages=("${style_messages[@]}")
+            ;;
         rainbow)
             rainbow_output=1
             style_messages=(
@@ -530,11 +547,24 @@ dots_failure_message() {
     fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
-    if (( RANDOM % 100 < animation_chance )); then
+    local -i gradient_banner_active=0
+    if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
+        if [[ -o interactive && -t 0 && -t 1 &&
+              "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] &&
+              (( ${+functions[_dots_failure_animation_start]} )); then
+            _DOTS_FAILURE_ANIMATION_BANNER="$selected_template"
+            _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE="$selected_style"
+            _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET=0
+            _dots_failure_animation_start "$selected_style"
+            gradient_banner_active=1
+        fi
+    elif (( RANDOM % 100 < animation_chance )); then
         _dots_failure_message_animate "$selected_style"
     fi
 
-    if (( rainbow_output )); then
+    if (( gradient_banner_active )); then
+        :
+    elif (( rainbow_output )); then
         _dots_failure_message_rainbow "$selected_template"
     else
         printf '%s\n' "$selected_template"
