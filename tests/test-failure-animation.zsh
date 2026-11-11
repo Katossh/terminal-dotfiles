@@ -50,10 +50,10 @@ _dots_test_palette_probe() {
     local first second reset
     first="$(_dots_failure_animation_palette_sequence 0)"
     second="$(_dots_failure_animation_palette_sequence 1)"
-    reset="$(_dots_failure_animation_palette_reset_sequence)"
+    reset="$(_dots_failure_animation_palette_restore_sequence)"
     [[ "$first" != "$second" ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
-    [[ "$first" == *$'\e]4;208;rgb:'* && "$first" == *';239;rgb:10/14/1f'$'\a'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
-    [[ "$reset" == *$'\e]104;208;'* && "$reset" == *';239'$'\a'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    [[ "$first" == *$'\e]21;208=rgb:'* && "$first" == *';239=rgb:10/14/1f'$'\e\\'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    [[ "$reset" == $'\e]30101\e\\' ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
     print -- PALETTE_SEQUENCE_OK
 }
 _dots_test_start_gradient() {
@@ -190,7 +190,7 @@ print -- "ok - continuous animation loops beyond one frame sequence"
 # Palette updates recolour the original indexed text cells, including scrollback.
 zpty -w "$PTY_NAME" '_dots_test_palette_probe'$'\n'
 read_until PALETTE_SEQUENCE_OK
-assert_contains "palette animation rotates both dedicated gradients" "PALETTE_SEQUENCE_OK" "$REPLY"
+assert_contains "Kitty OSC 21 rotates both dedicated gradients" "PALETTE_SEQUENCE_OK" "$REPLY"
 
 # The palette worker survives Enter so submitted messages keep animating in history.
 zpty -w "$PTY_NAME" '_dots_test_start_gradient'$'\n'
@@ -200,10 +200,10 @@ zpty -w "$PTY_NAME" '_dots_test_gradient_status'$'\n'
 read_until GRADIENT_WORKER_STATUS
 assert_contains "gradient worker survives command submission" "GRADIENT_WORKER_STATUS_ACTIVE_1_RUNNING_1" "$REPLY"
 drain_for 8
-assert_contains "gradient worker keeps updating terminal palette" $'\e]4;208;' "$REPLY"
+assert_contains "gradient worker keeps updating Kitty's palette" $'\e]21;208=' "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_stop_gradient'$'\n'
 read_until GRADIENT_WORKER_STOPPED
-assert_contains "gradient worker restores Kitty palette on cleanup" "GRADIENT_WORKER_STOPPED_ACTIVE_0" "$REPLY"
+assert_contains "gradient worker restores the saved Kitty palette" "GRADIENT_WORKER_STOPPED_ACTIVE_0" "$REPLY"
 
 print -- "All style-aware prompt animation integration tests passed."
 
