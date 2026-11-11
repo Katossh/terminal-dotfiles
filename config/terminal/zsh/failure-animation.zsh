@@ -4,7 +4,7 @@
 # Preserve its output and insert the current frame before the final prompt
 # marker (❯ by default), leaving the path line and RPROMPT untouched.
 # Frames are delivered to ZLE asynchronously.
-# DOTS_FAILURE_ANIMATION_CONTINUOUS=1 loops while the prompt is idle.
+# DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1 loops while the prompt is idle.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
@@ -198,8 +198,8 @@ _dots_failure_animation_stream() {
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
 
-    # Keep the familiar 24-frame duration, but sample randomly from the
-    # selected style's pool and avoid identical adjacent frames.
+    # 24 frames at 75 ms each gives a ~1.8-second sequence. Sample randomly
+    # from the selected style's pool and avoid identical adjacent frames.
     while true; do
         previous_index=0
         for (( frame_number = 0; frame_number < 24; frame_number++ )); do
