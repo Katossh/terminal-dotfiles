@@ -150,7 +150,7 @@ _dots_failure_animation_render_prompt() {
         local -a banner_colors banner_chars
         local color character
         local reset
-        printf -v reset '\\033[0m'
+        printf -v reset '\033[0m'
         local -i color_index=0 character_index=0 banner_size=0
         if [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_STYLE" == mythic ]]; then
             banner_colors=(
