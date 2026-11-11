@@ -506,7 +506,7 @@ dots_failure_message() {
             style_messages=(
                 "🏆 The shell has witnessed a legendary failure: \"${command}\". The logs shall remember."
                 "✨ A legendary misfire! \"${command}\" has bent the laws of the terminal."
-                "🌟 Rare event unlocked: \"${command}\" failed with extraordinary style."
+                "🌟 A legendary event unlocked: \"${command}\" failed with extraordinary style."
             )
             messages=("${style_messages[@]}")
             ;;
