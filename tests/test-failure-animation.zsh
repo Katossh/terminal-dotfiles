@@ -28,6 +28,19 @@ source "$ZSH_DIR/failure-animation.zsh"
 
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
+_dots_test_enable_continuous() {
+    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+    print -r -- CONTINUOUS_ENABLED
+}
+_dots_test_continuous_snapshot() {
+    print -r -- "CONTINUOUS_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAMES_${_DOTS_FAILURE_ANIMATION_FRAMES}"
+    print -r -- CONTINUOUS_INSPECTION_DONE
+}
+_dots_test_disable_continuous() {
+    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
+    print -r -- CONTINUOUS_DISABLED
+}
+
 _dots_test_prompt_report() {
     local rendered
     local -a prompt_lines
@@ -122,7 +135,145 @@ read_until "PROMPT_STATE ACTIVE_0"
 assert_contains "latest emoji persists after Enter" "LAYOUT_1" "$REPLY"
 
 # Continuous mode loops while the prompt is idle and restarts after each command.
-zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=1; print -r -- CONTINUOUS_ENABLED'$'\n'
+zpty -w "$PTY_NAME" '_dots_test_enable_continuous'
+read_until CONTINUOUS_ENABLED
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_continuous_snapshot'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" '_dots_test_disable_continuous'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_ENABLED
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+drain_for 220
+zpty -w "$PTY_NAME" 'print -r -- "CONTINUOUS_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAMES_${_DOTS_FAILURE_ANIMATION_FRAMES}"; print -r -- CONTINUOUS_INSPECTION_DONE'$'\n'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=0; print -r -- CONTINUOUS_DISABLED'$'\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=0; print -r -- CONTINUOUS_DISABLED'$'\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_ENABLED
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+drain_for 220
+zpty -w "$PTY_NAME" 'print -r -- "CONTINUOUS_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAMES_${_DOTS_FAILURE_ANIMATION_FRAMES}"; print -r -- CONTINUOUS_INSPECTION_DONE'$'\n'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=0; print -r -- CONTINUOUS_DISABLED'$'\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_ENABLED
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+drain_for 220
+zpty -w "$PTY_NAME" 'print -r -- "CONTINUOUS_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAMES_${_DOTS_FAILURE_ANIMATION_FRAMES}"; print -r -- CONTINUOUS_INSPECTION_DONE'$'\n'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=0; print -r -- CONTINUOUS_DISABLED'$'\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
+read_until CONTINUOUS_INSPECTION_DONE
+assert_contains "continuous stream is stopped cleanly when Enter is pressed" "CONTINUOUS_SNAPSHOT ACTIVE_0" "$REPLY"
+typeset continuous_frames="${REPLY##*FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
+[[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
+(( continuous_frames > 36 )) || fail "continuous animation must run beyond one 24-frame cycle"
+print -- "ok - continuous animation loops beyond one frame sequence"
+
+read_until "PROMPT_STATE ACTIVE_1"
+assert_contains "continuous animation restarts for the next idle prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
+
+zpty -w "$PTY_NAME" 'export DOTS_FAILURE_ANIMATION_CONTINUOUS=0; print -r -- CONTINUOUS_DISABLED'$'\n'
+read_until CONTINUOUS_DISABLED
+read_until "PROMPT_STATE ACTIVE_0"
+assert_contains "continuous mode can be disabled through its environment variable" "PROMPT_STATE ACTIVE_0" "$REPLY"
+
+print -- "All emoji-only and continuous animation integration tests passed."
+\n'
 read_until CONTINUOUS_ENABLED
 read_until "PROMPT_STATE ACTIVE_1"
 assert_contains "continuous mode starts on the next prompt" "PROMPT_STATE ACTIVE_1" "$REPLY"
