@@ -223,8 +223,9 @@ _dots_failure_animation_precmd() {
     if _dots_failure_animation_continuous_enabled; then
         # Restart at every new prompt. zle-line-finish stops the old stream
         # before the command runs, so it never animates during command execution.
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
-    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
+    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING ));
         # Preserve the one-shot startup animation when continuous mode is off.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
