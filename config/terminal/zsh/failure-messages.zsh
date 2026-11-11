@@ -66,10 +66,11 @@ _dots_failure_message_rainbow() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Called by the interactive failure notifier from precmd. Launch and
-    # register the async stream now, before ZLE begins reading the next line.
+    # Called by the interactive failure notifier from precmd. Pass the final
+    # resolved style (including automatic Anime-to-Ecchi selection) so the
+    # prompt animation uses the matching emoji pool.
     (( ${+functions[_dots_failure_animation_start]} )) || return 0
-    _dots_failure_animation_start
+    _dots_failure_animation_start "${1:-normal}"
 }
 
 dots_failure_message() {
@@ -518,7 +519,7 @@ dots_failure_message() {
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
     if (( RANDOM % 100 < animation_chance )); then
-        _dots_failure_message_animate "$cyan" "$reset"
+        _dots_failure_message_animate "$selected_style"
     fi
 
     if (( rainbow_output )); then
