@@ -64,6 +64,50 @@ _dots_failure_message_rainbow() {
     print -r -- $'\e[0m'
 }
 
+_dots_failure_message_gradient() {
+    emulate -L zsh
+
+    local style="${1:-legendary}"
+    local message="${2-}"
+    local palette_active="${3:-0}"
+    if [[ ! -t 1 || -n "${NO_COLOR:-}" || "${TERM:-dumb}" == dumb ]]; then
+        print -r -- "$message"
+        return 0
+    fi
+
+    local -a characters legendary_colors mythic_colors colors
+    characters=( "${(@s::)message}" )
+    legendary_colors=(
+        '255;91;132' '255;119;108' '255;150;92' '255;180;93'
+        '255;208;101' '236;224;105' '201;226;108' '163;222;122'
+        '125;217;154' '92;212;185' '84;198;223' '92;168;245'
+        '120;139;255' '160;123;255' '201;121;240' '237;120;189'
+    )
+    mythic_colors=(
+        '245;245;247' '229;230;234' '212;214;219' '194;197;204'
+        '176;179;189' '158;162;173' '140;145;158' '122;128;142'
+        '104;110;124' '87;93;108' '70;76;91' '54;60;75'
+        '41;47;62' '32;38;52' '24;29;42' '16;20;31'
+    )
+    if [[ "$style" == mythic ]]; then colors=( "${mythic_colors[@]}" ); else colors=( "${legendary_colors[@]}" ); fi
+
+    local -i character_index=0 character_count=${#characters[@]} color_index=1 palette_base=224
+    [[ "$style" == mythic ]] && palette_base=240
+    local character color
+    for character in "${characters[@]}"; do
+        if (( character_count > 1 )); then
+            color_index=$(( (character_index * 15 / (character_count - 1)) + 1 ))
+        fi
+        if [[ "$palette_active" == 1 ]]; then
+            printf '\e[38;5;%dm%s' "$((palette_base + color_index - 1))" "$character"
+        else
+            printf '\e[38;2;%sm%s' "${colors[color_index]}" "$character"
+        fi
+        (( character_index += 1 ))
+    done
+    printf '\e[0m\n'
+}
+
 _dots_failure_message_animate() {
     emulate -L zsh
 
@@ -547,27 +591,29 @@ dots_failure_message() {
     fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
-    local -i gradient_banner_active=0
     if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
-        if [[ -o interactive && -t 0 && -t 1 && -z "${NO_COLOR:-}" &&
-              "${TERM:-dumb}" != dumb && "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] &&
-              (( ${+functions[_dots_failure_animation_start]} )); then
-            _DOTS_FAILURE_ANIMATION_BANNER="$selected_template"
-            _DOTS_FAILURE_ANIMATION_GRADIENT_STYLE="$selected_style"
-            _DOTS_FAILURE_ANIMATION_GRADIENT_OFFSET=0
-            _dots_failure_animation_start "$selected_style"
-            gradient_banner_active=1
+        local -i palette_animation_active=0
+        if [[ "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] &&
+            (( ${+functions[_dots_failure_animation_gradient_start]} )) &&
+            _dots_failure_animation_gradient_start "$selected_style"; then
+            palette_animation_active=1
         fi
-    elif (( RANDOM % 100 < animation_chance )); then
-        _dots_failure_message_animate "$selected_style"
-    fi
 
-    if (( gradient_banner_active )); then
-        :
-    elif (( rainbow_output )); then
-        _dots_failure_message_rainbow "$selected_template"
+        if [[ "${DOTS_FAILURE_ANIMATION:-1}" == 0 ]]; then
+            printf '%s\n' "$selected_template"
+        else
+            _dots_failure_message_gradient "$selected_style" "$selected_template" "$palette_animation_active"
+        fi
     else
-        printf '%s\n' "$selected_template"
+        if (( RANDOM % 100 < animation_chance )); then
+            _dots_failure_message_animate "$selected_style"
+        fi
+
+        if (( rainbow_output )); then
+            _dots_failure_message_rainbow "$selected_template"
+        else
+            printf '%s\n' "$selected_template"
+        fi
     fi
     if [[ -n "$detail" ]]; then
         printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
