@@ -6,7 +6,7 @@
 #
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
-#   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow
+#   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
 #   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
 #   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
 #   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; animations require an interactive TTY
@@ -100,7 +100,7 @@ dots_failure_message() {
 
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
-    # DOTS_FAILURE_RARE_CHANCE is retained as a backwards-compatible alias.
+    # DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE remain aliases.
     local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}}"
     local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-1}"
     local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
