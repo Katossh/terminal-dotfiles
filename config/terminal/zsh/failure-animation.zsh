@@ -93,16 +93,16 @@ _dots_failure_animation_pool_for_style() {
 # Legendary and Mythic messages use indexed foreground colours. Kitty stores
 # those indices in terminal cells, including scrollback. Updating the palette
 # therefore animates already-printed messages without repainting or rewriting
-# their text. Slots 224-239 belong to Legendary; 240-255 belong to Mythic.
+# their text. Slots 208-223 belong to Legendary; 224-239 belong to Mythic.
 _dots_failure_animation_palette_sequence() {
     emulate -L zsh
     local -i phase=$(( ${1:-0} % 16 )) offset=0 color_index=0 palette_index=0
     local sequence=$'\e]4'
     for (( offset = 0; offset < 16; offset++ )); do
         color_index=$(( (offset + phase) % 16 + 1 ))
-        palette_index=$(( 224 + offset ))
+        palette_index=$(( 208 + offset ))
         sequence+=";${palette_index};${_DOTS_FAILURE_ANIMATION_LEGENDARY_COLORS[color_index]}"
-        palette_index=$(( 240 + offset ))
+        palette_index=$(( 224 + offset ))
         sequence+=";${palette_index};${_DOTS_FAILURE_ANIMATION_MYTHIC_COLORS[color_index]}"
     done
     sequence+=$'\a'
@@ -113,7 +113,7 @@ _dots_failure_animation_palette_reset_sequence() {
     emulate -L zsh
     local sequence=$'\e]104'
     local -i palette_index=0
-    for (( palette_index = 224; palette_index <= 255; palette_index++ )); do
+    for (( palette_index = 208; palette_index <= 239; palette_index++ )); do
         sequence+=";${palette_index}"
     done
     sequence+=$'\a'
