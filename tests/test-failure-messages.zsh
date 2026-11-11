@@ -9,6 +9,12 @@ _dots_failure_animation_start() {
     DOTS_TEST_ANIMATION_STYLE="${1:-normal}"
 }
 
+typeset -g DOTS_TEST_GRADIENT_STYLE=''
+_dots_failure_animation_gradient_start() {
+    DOTS_TEST_GRADIENT_STYLE="${1:-legendary}"
+    return 0
+}
+
 fail() {
     print -u2 -- "not ok - $1"
     exit 1
@@ -164,14 +170,18 @@ capture_message generic legendary-style-test
 assert_contains "legendary style emits a dedicated message" "legendary" "$DOTS_TEST_OUTPUT"
 
 export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_GRADIENT_STYLE=''
 capture_message generic mythic-style-test
 assert_contains "mythic style includes falling-star emoji" "🌠" "$DOTS_TEST_OUTPUT"
+assert_eq "mythic style selects the charcoal gradient" "mythic" "$DOTS_TEST_GRADIENT_STYLE"
 
 export DOTS_FAILURE_STYLE=auto
 export DOTS_FAILURE_MYTHIC_CHANCE=1000
 export DOTS_FAILURE_LEGENDARY_CHANCE=0
+DOTS_TEST_GRADIENT_STYLE=''
 capture_message generic automatic-mythic-test
 assert_contains "mythic chance can be forced for testing" "🌠" "$DOTS_TEST_OUTPUT"
+assert_eq "automatic mythic selection reaches the mythic gradient" "mythic" "$DOTS_TEST_GRADIENT_STYLE"
 export DOTS_FAILURE_MYTHIC_CHANCE=1
 
 # The final resolved message style must select the matching animation pool.
@@ -187,8 +197,10 @@ export DOTS_FAILURE_STYLE=auto
 export DOTS_FAILURE_LEGENDARY_CHANCE=100
 export DOTS_FAILURE_MYTHIC_CHANCE=0
 DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_GRADIENT_STYLE=''
 capture_message generic animation-auto-legendary
-assert_contains "automatic legendary selection emits legendary message" "legendary failure" "$DOTS_TEST_OUTPUT"
+assert_contains "automatic legendary selection retains command context" "animation-auto-legendary" "$DOTS_TEST_OUTPUT"
+assert_eq "automatic legendary selection reaches the legendary gradient" "legendary" "$DOTS_TEST_GRADIENT_STYLE"
 
 # Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
 # Anime style, to the animation. Repeat until the weighted branch is exercised.
