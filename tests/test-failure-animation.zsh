@@ -38,6 +38,7 @@ _dots_test_prompt_report() {
     local -i layout=0
     [[ "$first" == *BASE_PATH* && "$first" == *"✧━━"* &&
         "$second" == "BASE_OUTPUT " ]] && layout=1
+    print -r -- "RENDER_CHECK first=${(qqq)first} second=${(qqq)second} rendered=${(qqq)rendered}"
     print -r -- "PROMPT_STATE ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} STATE_${_DOTS_FAILURE_ANIMATION_STATE} LAYOUT_${layout}"
 }
 typeset -ga precmd_functions
@@ -50,7 +51,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    "ZSH_DIR=$ZSH_DIR" zsh -f -i
+    "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
     local needle="$1"
