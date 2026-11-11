@@ -78,7 +78,7 @@ Optional overrides:
 
 ~~~sh
 # Force a style while previewing or disable style randomization.
-DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow
+DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow, legendary, mythic
 
 # Change probabilities.
 DOTS_FAILURE_LEGENDARY_CHANCE=2 # 0..100; DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE are aliases
