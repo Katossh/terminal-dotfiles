@@ -72,9 +72,7 @@ _dots_failure_animation_render_prompt() {
     if [[ "$_DOTS_FAILURE_ANIMATION_PROMPT_MODE" == command ]]; then
         # Strip the outer command-substitution syntax first. eval must execute
         # the inner Starship command, not evaluate its rendered output.
-        local prompt_command="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
-        prompt_command="${prompt_command#'$('}"
-        prompt_command="${prompt_command%')'}"
+        local prompt_command="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT[3,-2]}"
         rendered="$(eval "$prompt_command")"
     else
         rendered="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
