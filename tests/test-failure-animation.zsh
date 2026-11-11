@@ -47,11 +47,11 @@ _dots_test_assert_pool() {
     print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
 }
 _dots_test_enable_continuous() {
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
     print -- CONTINUOUS_ENABLED
 }
 _dots_test_disable_continuous() {
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
+    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0
     print -r -- "CONTINUOUS_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
 }
 ZSH_INIT
@@ -60,7 +60,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
+    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0 \
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
@@ -124,21 +124,21 @@ assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
 # Normal, sarcastic and dramatic styles must share one pool; special styles
 # must each have their own pool.
 zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until "POOL_normal_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "ordinary styles use the common 12-emoji pool" "POOL_normal_12_" "$REPLY"
+read_until "POOL_normal_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "ordinary styles use the common 12-emoji pool" "POOL_normal_13_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until "POOL_sarcastic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "sarcastic uses the common pool" "POOL_sarcastic_12_" "$REPLY"
+read_until "POOL_sarcastic_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
 assert_contains "sarcastic pool includes the common reactions" "💀 😂 🤡 🪿" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until "POOL_dramatic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "dramatic uses the common pool" "POOL_dramatic_12_" "$REPLY"
+read_until "POOL_dramatic_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
 read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
 assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘"
-assert_contains "ecchi has its dedicated five-emoji pool" "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘" "$REPLY"
+read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
+assert_contains "ecchi has its dedicated five-emoji pool" "POOL_ecchi_4_😏 🫠 ❤️ 🩷 💘" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
 read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
