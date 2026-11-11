@@ -26,7 +26,7 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.001
+_DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
 _dots_test_prompt_report() {
     local rendered
@@ -113,7 +113,7 @@ assert_contains "failure notification starts another animation" "PROMPT_STATE AC
 
 # Enter cancels the remaining frames but must not clear the latest one.
 command sleep 0.08
-zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} FRAME_${_DOTS_FAILURE_ANIMATION_FRAME} RPROMPT_${RPROMPT}"; print -r -- INPUT_INSPECTION_DONE'$'\n'
+zpty -w "$PTY_NAME" 'print -r -- "INPUT_ACCEPTED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} RPROMPT_${RPROMPT}"; print -r -- INPUT_INSPECTION_DONE'$'\n'
 read_until INPUT_INSPECTION_DONE
 assert_contains "keyboard input remains responsive during animation" "INPUT_ACCEPTED ACTIVE_0" "$REPLY"
 assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
