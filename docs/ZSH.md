@@ -61,6 +61,15 @@ The 28% anime share includes traditional anime archetypes and a separate ecchi p
 
 The first interactive Zsh prompt plays one 24-frame emoji animation (~3.4 seconds), even before any command has failed, using the shared reaction pool. Later failure notices trigger another animation on the configured 50% chance. Normal, sarcastic, and dramatic messages share the general pool; Anime, Ecchi, and Rainbow each use a dedicated pool. The final resolved message style is passed to the animation, including automatic Anime-to-Ecchi selection. Each frame is sampled randomly from that style's pool without repeating the immediately previous frame. Frames are delivered to ZLE through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
 
+The animation pools are:
+
+| Message style | Emoji pool |
+|---|---|
+| Normal / Sarcastic / Dramatic | 👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 |
+| Anime | 😭 🥰 🥺 💖 💗 💓 💕 |
+| Ecchi | 😏 🫠 ❤️ 🩷 💘 |
+| Rainbow | 🧡 💛 💚 💙 🤍 |
+
 The animation is just the changing emoji inserted immediately before the final Starship input marker (❯ by default). It never modifies the directory/path line and adds no side bars, decorative stars, text, or colour codes. RPROMPT remains untouched. Prompts without the configured marker are left unchanged rather than placing the emoji somewhere unexpected. When the one-shot stream finishes, its last emoji remains visible until another animation replaces it. Pressing Enter during a sequence cancels the remaining frames but preserves the latest emoji. Animations only run in an interactive TTY; redirected output, CI, and TERM=dumb remain unaffected.
 
 Set DOTS_FAILURE_ANIMATION_CONTINUOUS=1 to loop the emoji animation for as long as the prompt is idle. The stream is stopped when you press Enter and starts again at the next prompt, so it does not continue running while a command executes. Set it to 0 to return to the normal one-shot startup and failure-triggered animations. Accepted true values are 1, true, yes, and on (case-insensitive). The master switch DOTS_FAILURE_ANIMATION=0 disables all animation, including continuous mode, without disabling failure messages.
