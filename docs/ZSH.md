@@ -72,7 +72,7 @@ The animation pools are:
 
 The animation is just the changing emoji inserted immediately before the final Starship input marker (❯ by default). It never modifies the directory/path line and adds no side bars, decorative stars, text, or colour codes. RPROMPT remains untouched. Prompts without the configured marker are left unchanged rather than placing the emoji somewhere unexpected. When the one-shot stream finishes, its last emoji remains visible until another animation replaces it. Pressing Enter during a sequence cancels the remaining frames but preserves the latest emoji. Animations only run in an interactive TTY; redirected output, CI, and TERM=dumb remain unaffected.
 
-Set DOTS_FAILURE_ANIMATION_CONTINUOUS=1 to loop the emoji animation for as long as the prompt is idle. The stream is stopped when you press Enter and starts again at the next prompt, so it does not continue running while a command executes. Set it to 0 to return to the normal one-shot startup and failure-triggered animations. Accepted true values are 1, true, yes, and on (case-insensitive). The master switch DOTS_FAILURE_ANIMATION=0 disables all animation, including continuous mode, without disabling failure messages.
+Set DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1 # accepts 1, true, yes, on; old DOTS_FAILURE_ANIMATION_CONTINUOUS remains an alias to loop the emoji animation for as long as the prompt is idle. The stream is stopped when you press Enter and starts again at the next prompt, so it does not continue running while a command executes. Set it to 0 to return to the normal one-shot startup and failure-triggered animations. Accepted true values are 1, true, yes, and on (case-insensitive). The master switch DOTS_FAILURE_ANIMATION=0 disables all animation, including continuous mode, without disabling failure messages.
 
 Optional overrides:
 
@@ -81,7 +81,8 @@ Optional overrides:
 DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow
 
 # Change probabilities.
-DOTS_FAILURE_RAINBOW_CHANCE=2
+DOTS_FAILURE_LEGENDARY_CHANCE=2 # 0..100; DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE are aliases
+DOTS_FAILURE_MYTHIC_CHANCE=1 # 0..1000 per mille; default 1 = 0.1%
 DOTS_FAILURE_ANIMATION_CHANCE=50
 
 # Loop the emoji animation while the prompt is idle.
