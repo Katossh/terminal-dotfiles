@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 setopt errexit nounset
 
-REPO_DIR="\${0:A:h:h}"
+REPO_DIR="${0:A:h:h}"
 ZSH_DIR="$REPO_DIR/config/terminal/zsh"
 INIT_FILE="$(mktemp)"
 PTY_NAME="dots_failure_animation_test"
@@ -29,7 +29,7 @@ source "$ZSH_DIR/failure-animation.zsh"
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
 _dots_test_snapshot() {
-    print -r -- "STATE_SNAPSHOT ACTIVE_\${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_\${_DOTS_FAILURE_ANIMATION_LAST_STATE} RPROMPT_\${RPROMPT}"
+    print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} RPROMPT_${RPROMPT}"
 }
 _dots_test_failure_notice() {
     dots_failure_message generic animation-integration-test
@@ -41,7 +41,7 @@ _dots_test_enable_continuous() {
 }
 _dots_test_disable_continuous() {
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
-    print -r -- "CONTINUOUS_DISABLED ACTIVE_\${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_\${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
+    print -r -- "CONTINUOUS_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
 }
 ZSH_INIT
 
@@ -111,8 +111,8 @@ read_until "BASE_OUTPUT"
 command sleep 0.08
 zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
 read_until STATE_SNAPSHOT
-typeset failure_frames="\${REPLY##*LAST_FRAMES_}"
-failure_frames="\${failure_frames%%[^0-9]*}"
+typeset failure_frames="${REPLY##*LAST_FRAMES_}"
+failure_frames="${failure_frames%%[^0-9]*}"
 [[ "$failure_frames" == <-> ]] || fail "failure animation frame count was not reported"
 (( failure_frames > 0 )) || fail "failure notification did not start an animation"
 assert_contains "right prompt survives failure animation" "RPROMPT_BASE_RPROMPT" "$REPLY"
@@ -128,8 +128,8 @@ drain_for 220
 zpty -w "$PTY_NAME" '_dots_test_disable_continuous'$'\n'
 read_until CONTINUOUS_DISABLED
 assert_contains "continuous mode disables cleanly at the next command" "CONTINUOUS_DISABLED ACTIVE_0" "$REPLY"
-typeset continuous_frames="\${REPLY##*LAST_FRAMES_}"
-continuous_frames="\${continuous_frames%%[^0-9]*}"
+typeset continuous_frames="${REPLY##*LAST_FRAMES_}"
+continuous_frames="${continuous_frames%%[^0-9]*}"
 [[ "$continuous_frames" == <-> ]] || fail "continuous animation frame count was not reported"
 (( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
 print -- "ok - continuous animation loops beyond one frame sequence"
