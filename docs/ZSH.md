@@ -83,6 +83,7 @@ DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rain
 # Change probabilities.
 DOTS_FAILURE_LEGENDARY_CHANCE=2 # 0..100; DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE are aliases
 DOTS_FAILURE_MYTHIC_CHANCE=1 # 0..1000 per mille; default 1 = 0.1%
+DOTS_FAILURE_GRADIENT_INTERVAL=0.10 # seconds per palette step; 16 steps = 1.6-second sweep
 DOTS_FAILURE_ANIMATION_CHANCE=50
 
 # Loop the emoji animation while the prompt is idle.
