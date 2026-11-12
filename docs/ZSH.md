@@ -97,7 +97,7 @@ The animation pools are:
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `DOTS_FAILURE_STYLE` | `auto` | `auto`, `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, `rainbow`, `legendary`, or `mythic`. Explicit styles bypass automatic rarity/style rolls. |
+| `DOTS_FAILURE_STYLE` | `auto` | `auto`, `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, or `rainbow`. The legacy `legendary` and `mythic` values remain rarity-forcing preview aliases, not content styles. |
 | `DOTS_FAILURE_MESSAGE_CHANCE` | `100` | Percentage chance (0–100) that a failure notice is shown. |
 | `DOTS_FAILURE_RAINBOW_CHANCE` | `2` | Percentage chance (0–100) for automatic Rainbow style. `DOTS_FAILURE_RARE_CHANCE` remains a legacy alias for this setting. |
 | `DOTS_FAILURE_MYTHIC_CHANCE` | `10` | Mythic rarity chance in basis points; 10 = 0.1%. |

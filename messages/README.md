@@ -41,7 +41,7 @@ Every message has:
 - `id`: globally unique message identifier; a later personal collection with the same ID overrides the earlier text.
 - `character_id`: the speaker from the shared character pool.
 - `category`: a failure category or `any` for a shared style pool.
-- `style`: `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, `rainbow`, `legendary`, or `mythic`.
+- `style`: `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, or `rainbow`. Legendary and Mythic belong exclusively to the rarity field.
 - `rarity`: `common`, `uncommon`, `rare`, `epic`, `legendary`, or `mythic`.
 - `severity`: `base`, `repeat`, or `severe`; escalation is used by the normal style.
 - `text`: one line of text. The supported placeholders are `{command}` and `{username}`.
@@ -55,7 +55,7 @@ overridden by a personal file with the same ID.
 ## Selection order
 
 1. Decide rarity first (Mythic, Legendary, Epic, Rare, Uncommon, then Common).
-2. Choose a style for that rarity; explicit `DOTS_FAILURE_STYLE` values remain useful for previews.
+2. Choose a content style for that rarity; explicit `DOTS_FAILURE_STYLE` values remain useful for previews. The legacy `legendary` and `mythic` environment values force a rarity but are not message styles.
 3. Build the eligible character set from rarity bounds, style restrictions, and available messages.
 4. Select a character, then select one message belonging to that character.
 5. Prefer a different message from the immediately previous one; apply the existing escalation tier.

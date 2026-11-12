@@ -1140,7 +1140,7 @@
       "id": "legendary-1",
       "character_id": "terminal",
       "category": "any",
-      "style": "legendary",
+      "style": "normal",
       "rarity": "legendary",
       "severity": "base",
       "text": "🏆 The shell has witnessed a legendary failure: \"{command}\". The logs shall remember."
@@ -1149,7 +1149,7 @@
       "id": "legendary-2",
       "character_id": "terminal",
       "category": "any",
-      "style": "legendary",
+      "style": "normal",
       "rarity": "legendary",
       "severity": "base",
       "text": "✨ A legendary misfire! \"{command}\" has bent the laws of the terminal."
@@ -1158,7 +1158,7 @@
       "id": "legendary-3",
       "character_id": "terminal",
       "category": "any",
-      "style": "legendary",
+      "style": "normal",
       "rarity": "legendary",
       "severity": "base",
       "text": "🌟 A legendary event unlocked: \"{command}\" failed with extraordinary style."
@@ -1167,7 +1167,7 @@
       "id": "mythic-1",
       "character_id": "terminal",
       "category": "any",
-      "style": "mythic",
+      "style": "normal",
       "rarity": "mythic",
       "severity": "base",
       "text": "🌠🌠 A mythic event: \"{command}\" vanished beneath a falling star. 🌠"
@@ -1176,7 +1176,7 @@
       "id": "mythic-2",
       "character_id": "terminal",
       "category": "any",
-      "style": "mythic",
+      "style": "normal",
       "rarity": "mythic",
       "severity": "base",
       "text": "🌌 The stars aligned, then \"{command}\" failed anyway. 🌠✨"
@@ -1185,7 +1185,7 @@
       "id": "mythic-3",
       "character_id": "terminal",
       "category": "any",
-      "style": "mythic",
+      "style": "normal",
       "rarity": "mythic",
       "severity": "base",
       "text": "☄️ A once-in-a-blue-moon failure! \"{command}\" has summoned the starfall. 🌠"
@@ -1194,7 +1194,7 @@
       "id": "mythic-4",
       "character_id": "terminal",
       "category": "any",
-      "style": "mythic",
+      "style": "normal",
       "rarity": "mythic",
       "severity": "base",
       "text": "🌠🌟 The terminal records a mythic collapse: \"{command}\". 🌌"

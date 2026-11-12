@@ -236,11 +236,17 @@ dots_failure_message() {
     while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do animation_chance="${animation_chance#0}"; done
     (( animation_chance > 100 )) && animation_chance=100
 
-    # The current renderer animates the actual message in place. Legendary and
-    # Mythic are unconditional; all other styles obey the configured chance.
+    # Rarity is not a content style. Pass it separately as the renderer
+    # palette only for Legendary/Mythic banners.
+    local animation_style="$selected_style"
+    if [[ "$selected_rarity" == legendary || "$selected_rarity" == mythic ]]; then
+        animation_style="$selected_rarity"
+    fi
+
+    # Legendary and Mythic always animate; other styles obey the configured chance.
     if [[ "$selected_rarity" == legendary || "$selected_rarity" == mythic ]] ||
        (( RANDOM % 100 < animation_chance )); then
-        if _dots_failure_message_animate "$selected_style" "$selected_template" "$detail"; then
+        if _dots_failure_message_animate "$animation_style" "$selected_template" "$detail"; then
             special_banner_queued=1
         fi
     fi

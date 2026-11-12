@@ -13,7 +13,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 RARITIES = ("common", "uncommon", "rare", "epic", "legendary", "mythic")
 RARITY_INDEX = {name: index for index, name in enumerate(RARITIES)}
-STYLES = ("normal", "anime", "ecchi", "sarcastic", "dramatic", "rainbow", "legendary", "mythic")
+STYLES = ("normal", "anime", "ecchi", "sarcastic", "dramatic", "rainbow")
 CATEGORIES = ("any", "not_found", "permission", "missing_path", "git", "nix", "network", "generic")
 SEVERITIES = ("base", "repeat", "severe")
 SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -227,15 +227,16 @@ def roll_style(rng: random.Random | random.SystemRandom) -> str:
 
 def choose_style_and_rarity(rng: random.Random | random.SystemRandom) -> tuple[str, str]:
     requested = os.environ.get("DOTS_FAILURE_STYLE", "auto").lower()
+    # Keep the old preview tokens as environment-variable aliases, not as
+    # message styles. Rarity and content style remain separate data fields.
+    if requested in ("legendary", "mythic"):
+        return "normal", requested
     if requested not in ("auto", *STYLES):
         requested = "auto"
     if requested != "auto":
-        rarity = {"legendary": "legendary", "mythic": "mythic"}.get(requested, "common")
-        return requested, rarity
+        return requested, "common"
     rarity = roll_rarity(rng)
-    if rarity in ("legendary", "mythic"):
-        return rarity, rarity
-    if rarity in ("uncommon", "rare", "epic"):
+    if rarity in ("uncommon", "rare", "epic", "legendary", "mythic"):
         return "normal", rarity
     return roll_style(rng), rarity
 

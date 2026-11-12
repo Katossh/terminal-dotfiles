@@ -47,7 +47,7 @@ class FailureMessageEngineTests(unittest.TestCase):
                 self.catalog, "generic", "cargo test", "tester", rng=random.Random(7)
             )
         self.assertEqual(result["rarity"], "mythic")
-        self.assertEqual(result["style"], "mythic")
+        self.assertEqual(result["style"], "normal")
         self.assertEqual(result["character_id"], "terminal")
 
     def test_explicit_style_bypasses_automatic_rarity_roll(self) -> None:
