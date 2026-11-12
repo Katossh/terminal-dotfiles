@@ -326,17 +326,14 @@ _dots_failure_animation_render_prompt() {
         rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
-          "$_DOTS_FAILURE_ANIMATION_MODE" != mythic ]]; then
-        # Ordinary emoji remains prompt decoration. Rare banners are printed
-        # and repainted at their original terminal output position instead.
-        local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-        if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
-            local suffix="${rendered##*${(b)marker}}"
-            local marker_and_suffix="${marker}${suffix}"
-            local prefix="${rendered%${(b)marker_and_suffix}}"
-            rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
-        fi
+    # Prompt emoji animation is independent from the in-place failure-message
+    # renderer; message frames never become part of the editable prompt.
+    local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
+    if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
+        local suffix="${rendered##*${(b)marker}}"
+        local marker_and_suffix="${marker}${suffix}"
+        local prefix="${rendered%${(b)marker_and_suffix}}"
+        rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
     fi
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
