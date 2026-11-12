@@ -292,7 +292,8 @@ _dots_failure_animation_kitty_scrollback() {
     }
     if ! _dots_failure_animation_query_cursor ||
         (( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW <= 0 ||
-           _DOTS_FAILURE_ANIMATION_ANCHOR_COL <= 0 ||
+           _DOTS_FAILURE_ANIMATION_ANCHOR_COL != 1 ||
+           _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + image_rows - 1 > terminal_lines ||
            _DOTS_FAILURE_ANIMATION_ANCHOR_COL + image_columns - 1 >= terminal_columns )); then
         local tty_fd="$_DOTS_FAILURE_ANIMATION_TTY_FD"
         { exec {tty_fd}>&- } 2>/dev/null || true
@@ -302,8 +303,6 @@ _dots_failure_animation_kitty_scrollback() {
     fi
 
     local placement="${image_columns}x${image_rows}@$(( _DOTS_FAILURE_ANIMATION_ANCHOR_COL - 1 ))x$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW - 1 ))"
-    local -i image_id=$(( ( ($$ + RANDOM) % 4294967294 ) + 1 ))
-
     # All options that would otherwise make icat read the TTY are explicit.
     if ! command kitty +kitten icat \
         --stdin=no \
@@ -313,7 +312,6 @@ _dots_failure_animation_kitty_scrollback() {
         --place "$placement" \
         --z-index 1 \
         --loop -1 \
-        --image-id "$image_id" \
         "$image_file" >/dev/tty 2>/dev/null; then
         local tty_fd="$_DOTS_FAILURE_ANIMATION_TTY_FD"
         { exec {tty_fd}>&- } 2>/dev/null || true
