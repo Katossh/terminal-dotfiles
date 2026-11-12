@@ -7,10 +7,12 @@ source "$REPO_DIR/config/terminal/zsh/failure-messages.zsh"
 typeset -g DOTS_TEST_ANIMATION_STYLE=''
 typeset -g DOTS_TEST_ANIMATION_BANNER=''
 typeset -g DOTS_TEST_ANIMATION_DETAIL=''
+typeset -g DOTS_TEST_ANIMATION_AVAILABLE=1
 _dots_failure_animation_start() {
     DOTS_TEST_ANIMATION_STYLE="${1:-normal}"
     DOTS_TEST_ANIMATION_BANNER="${2-}"
     DOTS_TEST_ANIMATION_DETAIL="${3-}"
+    (( DOTS_TEST_ANIMATION_AVAILABLE ))
 }
 
 fail() {
@@ -84,10 +86,9 @@ capture_message() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_RARE_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 export DOTS_FAILURE_RAINBOW_CHANCE=0
 export DOTS_FAILURE_ANIMATION_CHANCE=0
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-export DOTS_FAILURE_MYTHIC_CHANCE=0
 export DOTS_FAILURE_STYLE=normal
 export DOTS_FAILURE_MESSAGE_ESCALATION=0
 
@@ -164,7 +165,22 @@ assert_contains "rainbow style retains command context" "rainbow-style-test" "$D
 assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
 assert_control_free "rainbow output stays control-free when redirected" "$DOTS_TEST_OUTPUT"
 
-# The final resolved message style must select the matching animation pool.
+export DOTS_FAILURE_STYLE=legendary
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic legendary-style-test
+assert_eq "explicit Legendary style selects the banner animation" "legendary" "$DOTS_TEST_ANIMATION_STYLE"
+assert_contains "Legendary banner retains command context" "legendary-style-test" "$DOTS_TEST_ANIMATION_BANNER"
+
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic mythic-style-test
+assert_eq "explicit Mythic style selects the banner animation" "mythic" "$DOTS_TEST_ANIMATION_STYLE"
+assert_contains "Mythic banner retains command context" "mythic-style-test" "$DOTS_TEST_ANIMATION_BANNER"
+assert_contains "Mythic banner includes starfall emoji" "🌠" "$DOTS_TEST_ANIMATION_BANNER"
+
+# The final resolved ordinary style still selects the matching emoji pool.
 export DOTS_FAILURE_ANIMATION_CHANCE=100
 for style in normal sarcastic dramatic anime ecchi rainbow; do
     export DOTS_FAILURE_STYLE="$style"
@@ -173,14 +189,44 @@ for style in normal sarcastic dramatic anime ecchi rainbow; do
     assert_eq "${style} style is passed to animation" "$style" "$DOTS_TEST_ANIMATION_STYLE"
 done
 
+# Basis-point rare rolls are deterministic at 100%; Mythic has priority.
 export DOTS_FAILURE_STYLE=auto
-export DOTS_FAILURE_RAINBOW_CHANCE=100
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 DOTS_TEST_ANIMATION_STYLE=''
-capture_message generic animation-auto-rainbow
-assert_eq "automatic rainbow selection reaches the rainbow pool" "rainbow" "$DOTS_TEST_ANIMATION_STYLE"
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic automatic-mythic-test
+assert_eq "10000 basis points force automatic Mythic" "mythic" "$DOTS_TEST_ANIMATION_STYLE"
+assert_contains "automatic Mythic retains command context" "automatic-mythic-test" "$DOTS_TEST_ANIMATION_BANNER"
+
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic automatic-legendary-test
+assert_eq "10000 basis points force automatic Legendary" "legendary" "$DOTS_TEST_ANIMATION_STYLE"
+assert_contains "automatic Legendary retains command context" "automatic-legendary-test" "$DOTS_TEST_ANIMATION_BANNER"
+
+# Explicit style overrides are not replaced by automatic rarity rolls.
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic explicit-normal-style
+assert_eq "explicit Normal bypasses rare-event rolls" "normal" "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "explicit Normal queues no rare banner" "" "$DOTS_TEST_ANIMATION_BANNER"
+
+# When the prompt animator is unavailable, rare messages retain their static fallback.
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_AVAILABLE=0
+capture_message generic static-mythic-fallback
+assert_contains "static Mythic fallback retains command context" "static-mythic-fallback" "$DOTS_TEST_OUTPUT"
+DOTS_TEST_ANIMATION_AVAILABLE=1
 
 # Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
 # Anime style, to the animation. Repeat until the weighted branch is exercised.
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 export DOTS_FAILURE_RAINBOW_CHANCE=0
 integer auto_attempt=0
 typeset auto_ecchi_found=0
@@ -195,39 +241,6 @@ while (( auto_attempt < 500 )); do
 done
 [[ "$auto_ecchi_found" == 1 ]] || fail "automatic Anime-to-Ecchi selection never reached Ecchi animation pool"
 print -- "ok - automatic Anime-to-Ecchi selection reaches the Ecchi pool"
-
-# Mythic and Legendary rarity overrides are only active for automatic style selection.
-# Set the basis-point range to 100% here to exercise both paths deterministically.
-export DOTS_FAILURE_STYLE=auto
-export DOTS_FAILURE_RAINBOW_CHANCE=0
-export DOTS_FAILURE_ANIMATION_CHANCE=0
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-export DOTS_FAILURE_MYTHIC_CHANCE=10000
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic mythic-style-test
-assert_eq "mythic chance selects the Mythic message style" "mythic" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "Mythic banner includes starfall emojis" "🌠" "$DOTS_TEST_ANIMATION_BANNER"
-assert_contains "Mythic banner retains command context" "mythic-style-test" "$DOTS_TEST_ANIMATION_BANNER"
-
-export DOTS_FAILURE_MYTHIC_CHANCE=0
-export DOTS_FAILURE_LEGENDARY_CHANCE=10000
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic legendary-style-test
-assert_eq "legendary chance selects the Legendary message style" "legendary" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "Legendary banner retains command context" "legendary-style-test" "$DOTS_TEST_ANIMATION_BANNER"
-
-# Explicit style overrides remain deterministic and are not replaced by rarity rolls.
-export DOTS_FAILURE_STYLE=normal
-export DOTS_FAILURE_MYTHIC_CHANCE=10000
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-export DOTS_FAILURE_ANIMATION_CHANCE=100
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic explicit-normal-style
-assert_eq "explicit style bypasses rare-event rolls" "normal" "$DOTS_TEST_ANIMATION_STYLE"
-assert_eq "explicit normal style does not queue a special banner" "" "$DOTS_TEST_ANIMATION_BANNER"
 
 # Animations are never emitted into redirected output, even at a 100% chance.
 # The start hook is only a state change; no animation bytes enter the message.
