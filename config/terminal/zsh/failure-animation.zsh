@@ -96,7 +96,7 @@ _dots_failure_animation_stream() {
     local -i previous_index=0
     local -i frame_number=0
     local -i index=0
-    local -i phase=0
+    local -i phase="${4:-0}"
 
     # Gradient animations are intentionally endless while the prompt is
     # waiting for input. A four-point step gives a ~2-second sweep; Enter
@@ -311,6 +311,7 @@ _dots_failure_animation_cleanup() {
     setopt localoptions no_ignore_braces
 
     local redraw="${1:-0}"
+    local keep_tty="${2:-0}"
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
         _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
         _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
@@ -324,7 +325,7 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_STATE='finished'
     fi
 
-    if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
+    if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && keep_tty != 1 )); then
         local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
         { exec {tty_fd}>&- } 2>/dev/null || true
         _DOTS_FAILURE_ANIMATION_TTY_FD=-1
@@ -397,6 +398,9 @@ _dots_failure_animation_start() {
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
     if [[ "$style" == legendary || "$style" == mythic ]]; then
+        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
+            _dots_failure_animation_cleanup
+        fi
         _DOTS_FAILURE_ANIMATION_MODE="$style"
         _DOTS_FAILURE_ANIMATION_BANNER="$banner"
         [[ -n "$detail" ]] && _DOTS_FAILURE_ANIMATION_BANNER+=$'\n'"↳ ${detail}"
@@ -451,7 +455,7 @@ _dots_failure_animation_begin() {
         _dots_failure_animation_infinite_enabled && infinite=1
     fi
 
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite")
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_PHASE")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
@@ -469,9 +473,13 @@ _dots_failure_animation_precmd() {
 
     if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
           "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        # Rare banners are never restarted at later prompts. Their last frame
-        # remains as terminal output when Enter transfers control.
+        # Pause the worker while a foreground command owns the terminal. Keep
+        # the original output position and resume from the current phase when
+        # the next prompt is ready; never print the banner a second time.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
+        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 )); then
+            _DOTS_FAILURE_ANIMATION_PENDING=1
+        fi
     elif _dots_failure_animation_infinite_enabled; then
         # Restart ordinary emoji animation at each idle prompt.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
@@ -520,17 +528,19 @@ _dots_failure_animation_clear_screen_widget() {
 }
 
 _dots_failure_animation_line_finish() {
-    _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
-    # Rare output stays at its original terminal position. Enter freezes the
-    # last painted frame; a later prompt must never reinsert or restart it.
+    # ZLE stops receiving file-descriptor callbacks when Enter hands the
+    # terminal to a foreground command. Stop the worker but retain the TTY
+    # descriptor, banner text, phase, and absolute output coordinates.
     if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
             "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
           -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
+        _dots_failure_animation_cleanup 0 1
         return 0
     fi
 
+    _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_STYLE='normal'
