@@ -13,6 +13,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_PHASE=0
+typeset -gi _DOTS_FAILURE_ANIMATION_TTY_FD=-1
+typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_LINES=0
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -g _DOTS_FAILURE_ANIMATION_FRAME='💀'
@@ -20,6 +22,7 @@ typeset -g _DOTS_FAILURE_ANIMATION_STYLE='normal'
 typeset -g _DOTS_FAILURE_ANIMATION_MODE='emoji'
 typeset -g _DOTS_FAILURE_ANIMATION_BANNER=''
 typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_LINE=''
+typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW=''
 typeset -ga _DOTS_FAILURE_ANIMATION_POOL=()
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="${PROMPT-}"
 typeset -g _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
@@ -133,7 +136,7 @@ _dots_failure_animation_gradient_line() {
     local message="${1-}"
     local style="${2:-legendary}"
     local phase="${3:-0}"
-    local character output='' reset_color=$'\e[0m'
+    local character output='' raw_output='' reset_color=$'\e[0m'
     local -a characters colors
     local -i length=0 denominator=1 position=0 color_index=1 index=0 color_count=0
 
@@ -194,11 +197,60 @@ _dots_failure_animation_gradient_line() {
         # A literal percent must remain an adjacent %% pair for promptsubst.
         [[ "$character" == '%' ]] && character='%%'
         output+="%{${colors[color_index]}%}${character}%{${reset_color}%}"
+        raw_output+="${colors[color_index]}${character}${reset_color}"
         # Whitespace already exists as a character in the input string.
     done
 
     _DOTS_FAILURE_ANIMATION_GRADIENT_LINE="$output"
+    _DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW="$raw_output"
 }
+
+# Print the rare notice once at the current output position, then remember
+# that cursor location using DEC save/restore. Animation frames repaint only
+# that location while ZLE is active; they never rebuild PROMPT.
+_dots_failure_animation_print_anchor() {
+    emulate -L zsh
+    local fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
+    local -a banner_lines
+    local line
+    local -i line_count=0 index=0
+    (( fd >= 0 )) || return 1
+    banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
+    line_count=${#banner_lines}
+    (( line_count > 0 )) || return 1
+    for (( index = 1; index <= line_count; index++ )); do
+        line="${banner_lines[index]}"
+        _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" 0
+        print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
+        print -r -u "$fd" -- ''
+    done
+    # Save the top line after the initial write, then restore the cursor
+    # below the banner so the normal prompt follows it.
+    print -rn -u "$fd" -- $'\e['"${line_count}"$'A\r\e7\e['"${line_count}"$'B\r'
+    _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="$line_count"
+}
+
+_dots_failure_animation_render_anchor() {
+    emulate -L zsh
+    local fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
+    local line
+    local -a banner_lines
+    local -i index=0 line_count=0
+    (( fd >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_LINES > 0 )) || return 1
+    banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
+    line_count=${#banner_lines}
+    # Save the live ZLE cursor, jump to the original output row, repaint,
+    # then restore the prompt cursor. DEC 8 keeps the banner's anchor.
+    print -rn -u "$fd" -- $'\e[s\e8\e[?7l'
+    for (( index = 1; index <= line_count; index++ )); do
+        line="${banner_lines[index]}"
+        _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
+        print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
+        (( index < line_count )) && print -rn -u "$fd" -- $'\e[1B\r'
+    done
+    print -rn -u "$fd" -- $'\e[?7h\e[u'
+}
+
 _dots_failure_animation_render_prompt() {
     emulate -L zsh
 
