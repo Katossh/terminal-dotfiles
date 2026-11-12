@@ -1,9 +1,9 @@
 # Non-blocking, style-aware prompt animation for interactive Zsh.
 #
-# Ordinary failures animate one emoji immediately before the input marker.
-# Legendary and Mythic notices become animated prompt banners with a moving
-# left-to-right gradient. ZLE receives frames asynchronously.
-# DOTS_FAILURE_ANIMATION_INFINITE=1 loops ordinary emoji until Enter is pressed.
+# Ordinary failures animate one emoji before the input marker through ZLE.
+# Legendary and Mythic use a transparent Kitty graphics overlay attached to
+# their original output cells; Kitty owns playback and scrollback positioning.
+# Other terminals keep one static gradient. INFINITE loops ordinary emoji.
 
 typeset -g _DOTS_FAILURE_ANIMATION_SOURCE_FILE="${${(%):-%x}:A}"
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
@@ -13,12 +13,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
-typeset -gi _DOTS_FAILURE_ANIMATION_PHASE=0
-typeset -gi _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE=0
-typeset -gi _DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE=0
-typeset -gi _DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_LINES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_COL=1
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
@@ -93,7 +88,7 @@ _dots_failure_animation_stream() {
     emulate -L zsh
 
     local style="${1:-normal}"
-    local infinite="${3:-0}"
+    local infinite="${2:-0}"
     local frame
     local -i pool_size=0 previous_index=0 frame_number=0 index=0
 
@@ -463,7 +458,6 @@ _dots_failure_animation_begin() {
     _DOTS_FAILURE_ANIMATION_STATE='starting'
 
     local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
-    local mode="${_DOTS_FAILURE_ANIMATION_MODE:-emoji}"
     local infinite=0
     local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
     if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
@@ -473,14 +467,8 @@ _dots_failure_animation_begin() {
     fi
     _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
 
-    if [[ "$mode" == legendary || "$mode" == mythic ]]; then
-        infinite=1
-    else
-        _dots_failure_animation_infinite_enabled && infinite=1
-    fi
-
-    _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE")
+    _dots_failure_animation_infinite_enabled && infinite=1
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
@@ -518,7 +506,6 @@ _dots_failure_animation_reset() {
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
 }
 
 _dots_failure_animation_preexec() {
