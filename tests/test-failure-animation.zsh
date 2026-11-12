@@ -109,7 +109,7 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
+    local kitty_calls="$(command grep -c '^+kitten icat ' "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
     local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
     local animation_log="$(<"$DOTS_TEST_ANIMATION_LOG")"
