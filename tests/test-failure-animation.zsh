@@ -255,9 +255,9 @@ for style in legendary mythic; do
     zpty -w "$PTY_NAME" "typing_while_${style}_animates"
     drain_for 80
     assert_contains "${style} animation preserves partially typed input" "typing_while_${style}_animates" "$REPLY"
-    assert_contains "${style} repaint saves the live ZLE cursor"  "$REPLY"
-    assert_contains "${style} repaint restores the live ZLE cursor"  "$REPLY"
-    zpty -w "$PTY_NAME" 
+    assert_contains "${style} repaint saves the live ZLE cursor" $'\0337' "$REPLY"
+    assert_contains "${style} repaint restores the live ZLE cursor" $'\0338' "$REPLY"
+    zpty -w "$PTY_NAME" $'\025'
     drain_for 20
 
     # This inspection command submits Enter and pauses the current worker.
