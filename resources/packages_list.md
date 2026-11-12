@@ -39,7 +39,7 @@ The config-linking step is independent of package installation. If package insta
 | Syntax-highlighted cat | bat (if available) | bat (if available) | bat |
 | Fast file search | fd-find (binary is often `fdfind`) | fd-find (binary is often `fd`) | fd |
 
-The core set also includes curl, unzip, and zip. Noto Color Emoji is installed from the corresponding native package (or Nixpkgs `noto-fonts-color-emoji`) and used as Fontconfig fallback after JetBrainsMono Nerd Font. Starship is required: the installer prefers a native package and otherwise runs the official Starship release installer into `~/.local/bin`. This avoids silently enabling an additional repository on Fedora. On Linux, `xdg-utils` is optional because only some desktop integrations need it. Other optional tools include btop, fastfetch, htop, and eza; these are installed only when available in configured repositories.
+The core set also includes curl, unzip, and zip. Noto Color Emoji is installed from the platform-specific package in `manifest/packages.tsv` (or Nixpkgs `noto-fonts-color-emoji`) and used as Fontconfig fallback after JetBrainsMono Nerd Font. Starship is required: the installer prefers a native package and otherwise runs the official Starship release installer into `~/.local/bin`. This avoids silently enabling an additional repository on Fedora. On Linux, `xdg-utils` is optional because only some desktop integrations need it. Other optional tools include btop, fastfetch, htop, and eza; these are installed only when available in configured repositories.
 
 ## Optional desktop applications
 
