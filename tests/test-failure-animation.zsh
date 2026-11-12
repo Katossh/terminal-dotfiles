@@ -193,14 +193,18 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    drain_for 30
+    # The queue marker is printed inside the command, before precmd redraws
+    # the prompt and starts the async stream. Wait for that prompt explicitly.
+    read_until "BASE_OUTPUT"
+    drain_for 80
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
-    typeset special_frames="${REPLY##*LAST_FRAMES_}"
+    typeset special_state="$REPLY"
+    typeset special_frames="${special_state##*LAST_FRAMES_}"
     special_frames="${special_frames%%[^0-9]*}"
-    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported"
-    (( special_frames >= 5 )) || fail "${style} gradient did not advance while the prompt was idle"
+    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
+    (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
 done
 print -- "ok - Legendary and Mythic gradients advance continuously while the prompt is idle"
 
