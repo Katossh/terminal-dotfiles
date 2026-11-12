@@ -194,10 +194,10 @@ _dots_failure_animation_gradient_line() {
         color_index=$(( (position * color_count / 100) + 1 ))
         (( color_index > color_count )) && color_index="$color_count"
         character="${characters[index]}"
+        raw_output+="${colors[color_index]}${character}${reset_color}"
         # A literal percent must remain an adjacent %% pair for promptsubst.
         [[ "$character" == '%' ]] && character='%%'
         output+="%{${colors[color_index]}%}${character}%{${reset_color}%}"
-        raw_output+="${colors[color_index]}${character}${reset_color}"
         # Whitespace already exists as a character in the input string.
     done
 
@@ -267,7 +267,11 @@ _dots_failure_animation_render_anchor() {
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
         row=$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + index - 1 ))
-        print -rn -u "$fd" -- $'\e['"${row}"';'"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
+        if (( index == 1 )); then
+            print -rn -u "$fd" -- $'\e['"${row}";"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
+        else
+            print -rn -u "$fd" -- $'\e['"${row}";1H'
+        fi
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
     done
     print -rn -u "$fd" -- $'\e[?7h'
