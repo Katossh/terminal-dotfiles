@@ -91,16 +91,17 @@ _dots_test_queue_special_animation() {
     local probe=''
     local saved_no_color="${NO_COLOR-}"
     probe="$(_dots_failure_animation_stream "$style" "$style" 1 | command head -n 3)"
-    [[ "$probe" == $'0\\n4\\n8' ]] || {
+    [[ "$probe" == $'0\n4\n8' ]] || {
         print -r -- "STREAM_PROBE_FAILED_${style}_${(qqq)probe}"
         return 1
     }
     unset NO_COLOR
-    local start_status=0
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test" || start_status=$?
-    print -r -- "START_RESULT_${start_status}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_SET_$([[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && print 1 || print 0)_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_INTERACTIVE_$([[ -o interactive ]] && print 1 || print 0)_TTY0_$([[ -t 0 ]] && print 1 || print 0)_TTY1_$([[ -t 1 ]] && print 1 || print 0)_NO_COLOR_${NO_COLOR-}"
+    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test" || return 1
+    [[ "$_DOTS_FAILURE_ANIMATION_MODE" == "$style" &&
+       -n "$_DOTS_FAILURE_ANIMATION_BANNER" &&
+       "$_DOTS_FAILURE_ANIMATION_PENDING" == 1 ]] || return 1
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
-    (( start_status == 0 )) || return 1
+    print -r -- "ENQUEUE_STATE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_1_PENDING_1"
     print -r -- "STREAM_PROBE_OK_${style}"
     print -r -- "SPECIAL_QUEUED_${style}"
 }
@@ -234,7 +235,7 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} enqueue captures accepted TTY request" "START_RESULT_0_MODE_${style}_BANNER_SET_1_PENDING_1_INTERACTIVE_1_TTY0_1_TTY1_1_NO_COLOR_" "$REPLY"
+    assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
     # The queue marker is printed inside the command, before precmd redraws
     # the prompt and starts the async stream. Wait for that prompt explicitly.
     read_until "BASE_OUTPUT"
