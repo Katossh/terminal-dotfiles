@@ -93,20 +93,14 @@ _dots_failure_animation_stream() {
     emulate -L zsh
 
     local style="${1:-normal}"
-    local mode="${2:-emoji}"
     local infinite="${3:-0}"
     local frame
-    local -i pool_size=0
-    local -i previous_index=0
-    local -i frame_number=0
-    local -i index=0
-    local -i phase="${4:-0}"
+    local -i pool_size=0 previous_index=0 frame_number=0 index=0
 
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
 
-    # A shorter 12-frame cycle makes ordinary reactions feel snappier.
     while true; do
         previous_index=0
         for (( frame_number = 0; frame_number < 12; frame_number++ )); do
@@ -114,13 +108,11 @@ _dots_failure_animation_stream() {
             if (( pool_size > 1 && index == previous_index )); then
                 index=$(( (index % pool_size) + 1 ))
             fi
-
             frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
             print -r -- "$frame" || return 0
             previous_index="$index"
             command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
         done
-
         [[ "$infinite" == 1 ]] || break
     done
 }
@@ -214,15 +206,15 @@ _dots_failure_animation_query_cursor() {
     (( read_status == 0 )) || return 1
     response="${response#$'\e['}"
     response="${response%R}"
-    [[ "$response" == <->\;<-> ]] || return 1
+    [[ "$response" == <->$;<-> ]] || return 1
     _DOTS_FAILURE_ANIMATION_ANCHOR_ROW="${response%%;*}"
     _DOTS_FAILURE_ANIMATION_ANCHOR_COL="${response#*;}"
     (( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_COL > 0 ))
 }
 
-# Print the banner once at the current cursor position. Its absolute screen
-# coordinates were captured immediately beforehand with the terminal DSR.
-
+# Kitty receives one transparent animated overlay at the failure cursor
+# position, then the real text is printed once beneath it. Graphics placements
+# scroll with the underlying terminal cells into scrollback.
 _dots_failure_animation_kitty_scrollback() {
     emulate -L zsh
 
@@ -311,10 +303,9 @@ _dots_failure_animation_kitty_scrollback() {
     fi
 
     local placement="${image_columns}x${image_rows}@$(( _DOTS_FAILURE_ANIMATION_ANCHOR_COL - 1 ))x$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW - 1 ))"
-    local -i image_id=$(( ( ($ + RANDOM) % 4294967294 ) + 1 ))
+    local -i image_id=$(( ( ($$ + RANDOM) % 4294967294 ) + 1 ))
 
     # All options that would otherwise make icat read the TTY are explicit.
-    # Place the image first; then print selectable text once beneath it.
     if ! command kitty +kitten icat \
         --stdin=no \
         --use-window-size "$terminal_columns,$terminal_lines,$pixel_width,$pixel_height" \
@@ -332,9 +323,24 @@ _dots_failure_animation_kitty_scrollback() {
         return 1
     fi
 
-    # Restore the original cursor after icat, then emit the underlying text.
     print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- \
-        "$(builtin printf 
+        "$(builtin printf $'\e[%d;%dH' "$_DOTS_FAILURE_ANIMATION_ANCHOR_ROW" "$_DOTS_FAILURE_ANIMATION_ANCHOR_COL")"
+
+    local line
+    for line in "${banner_lines[@]}"; do
+        _dots_failure_animation_gradient_line "$line" "$style" 0
+        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
+        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- $'\r\n'
+    done
+
+    local tty_fd="$_DOTS_FAILURE_ANIMATION_TTY_FD"
+    { exec {tty_fd}>&- } 2>/dev/null || true
+    _DOTS_FAILURE_ANIMATION_TTY_FD=-1
+    command rm -rf -- "$temp_dir"
+    return 0
+}
+
+_dots_failure_animation_render_prompt() {
     emulate -L zsh
 
     local rendered=''
@@ -487,11 +493,9 @@ _dots_failure_animation_precmd() {
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
     if _dots_failure_animation_infinite_enabled; then
-        # Restart ordinary emoji animation at each idle prompt.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
     elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
-        # Preserve the one-shot startup animation when infinite mode is off.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
     fi
@@ -535,581 +539,6 @@ _dots_failure_animation_clear_screen_widget() {
 
 _dots_failure_animation_line_finish() {
     _DOTS_FAILURE_ANIMATION_PENDING=0
-    _dots_failure_animation_cleanup
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
-}
-
-if [[ -o interactive ]]; then
-    autoload -Uz add-zsh-hook add-zle-hook-widget
-    add-zsh-hook precmd _dots_failure_animation_precmd
-    add-zsh-hook preexec _dots_failure_animation_preexec
-    add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
-    # Wrap the built-in widget so Ctrl+L clears the persistent banner too.
-    zle -N clear-screen _dots_failure_animation_clear_screen_widget
-fi
-\e[%d;%dH' "$_DOTS_FAILURE_ANIMATION_ANCHOR_ROW" "$_DOTS_FAILURE_ANIMATION_ANCHOR_COL")"
-
-    local line
-    for line in "${banner_lines[@]}"; do
-        _dots_failure_animation_gradient_line "$line" "$style" 0
-        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
-        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- 
-    emulate -L zsh
-
-    local rendered=''
-    if [[ "$_DOTS_FAILURE_ANIMATION_PROMPT_MODE" == command ]]; then
-        # Execute Starship's original command, not its rendered output.
-        local prompt_command="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT[3,-2]}"
-        rendered="$(eval "$prompt_command")"
-    else
-        rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
-    fi
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
-          "$_DOTS_FAILURE_ANIMATION_MODE" != mythic ]]; then
-        # Ordinary emoji remains prompt decoration. Rare banners are printed
-        # and repainted at their original terminal output position instead.
-        local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-        if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
-            local suffix="${rendered##*${(b)marker}}"
-            local marker_and_suffix="${marker}${suffix}"
-            local prefix="${rendered%${(b)marker_and_suffix}}"
-            rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
-        fi
-    fi
-    _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
-    print -rn -- "$rendered"
-}
-_dots_failure_animation_cleanup() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    local redraw="${1:-0}"
-    local keep_tty="${2:-0}"
-    if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
-        _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
-        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
-
-        local fd="${_DOTS_FAILURE_ANIMATION_FD}"
-        zle -F "$fd" 2>/dev/null || true
-        { exec {fd}<&- } 2>/dev/null || true
-
-        _DOTS_FAILURE_ANIMATION_FD=-1
-        _DOTS_FAILURE_ANIMATION_ACTIVE=0
-        _DOTS_FAILURE_ANIMATION_STATE='finished'
-    fi
-
-    if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && keep_tty != 1 )); then
-        local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
-        { exec {tty_fd}>&- } 2>/dev/null || true
-        _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-    fi
-
-    if (( redraw )) && zle; then
-        zle .reset-prompt
-    fi
-}
-
-_dots_failure_animation_fd_handler() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    local fd="${1:-}"
-    local frame
-    if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
-        _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
-        _dots_failure_animation_cleanup 1
-        return 0
-    fi
-
-    (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        _DOTS_FAILURE_ANIMATION_PHASE="$frame"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
-    (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
-    _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        # Paint over the exact failure-output rows, not the live prompt.
-        _dots_failure_animation_render_anchor
-    else
-        # Ordinary emoji animation remains prompt decoration.
-        zle && zle .reset-prompt
-    fi
-}
-
-# Failure-message hooks queue the matching style and, for rare events, the banner.
-_dots_failure_animation_start() {
-    emulate -L zsh
-
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
-        -z "${NO_COLOR:-}" ]] || return 1
-
-    local style="${1:-normal}"
-    local banner="${2:-}"
-    local detail="${3:-}"
-    case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
-        *) style=normal ;;
-    esac
-
-    # A rare banner remains the active terminal notice until the user clears
-    # the screen. Ordinary failures must not silently dismiss it.
-    if [[ "$style" != legendary && "$style" != mythic &&
-          ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        return 0
-    fi
-
-    _DOTS_FAILURE_ANIMATION_STYLE="$style"
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
-            _dots_failure_animation_cleanup
-        fi
-        _DOTS_FAILURE_ANIMATION_MODE="$style"
-        _DOTS_FAILURE_ANIMATION_BANNER="$banner"
-        [[ -n "$detail" ]] && _DOTS_FAILURE_ANIMATION_BANNER+=$'\n'"↳ ${detail}"
-        _DOTS_FAILURE_ANIMATION_PHASE=0
-        exec {_DOTS_FAILURE_ANIMATION_TTY_FD}>/dev/tty || {
-            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-            return 1
-        }
-        if ! _dots_failure_animation_query_cursor; then
-            # Cursor-position reporting may be unavailable. Print a static
-            # notice at this exact point rather than animate an unsafe row.
-            _dots_failure_animation_print_anchor || return 1
-            local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
-            { exec {tty_fd}>&- } 2>/dev/null || true
-            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-            return 0
-        fi
-        _dots_failure_animation_print_anchor || return 1
-    fi
-
-    _DOTS_FAILURE_ANIMATION_PENDING=1
-    return 0
-}
-
-_dots_failure_animation_begin() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
-
-    _DOTS_FAILURE_ANIMATION_STEP=0
-    _DOTS_FAILURE_ANIMATION_FRAMES=0
-    _DOTS_FAILURE_ANIMATION_STATE='starting'
-
-    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
-    local mode="${_DOTS_FAILURE_ANIMATION_MODE:-emoji}"
-    local infinite=0
-    local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
-    if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
-        interval=0.08
-    elif (( interval < 0.01 || interval > 2.0 )); then
-        interval=0.08
-    fi
-    _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
-
-    if [[ "$mode" == legendary || "$mode" == mythic ]]; then
-        infinite=1
-    else
-        _dots_failure_animation_infinite_enabled && infinite=1
-    fi
-
-    _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE")
-    _DOTS_FAILURE_ANIMATION_ACTIVE=1
-
-    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
-        _DOTS_FAILURE_ANIMATION_STATE='registered'
-    else
-        _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
-        _dots_failure_animation_cleanup
-    fi
-}
-
-_dots_failure_animation_precmd() {
-    emulate -L zsh
-
-    [[ -o interactive && -t 0 && -t 1 ]] || return 0
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        # Pause the worker while a foreground command owns the terminal. Keep
-        # the original output position and resume from the current phase when
-        # the next prompt is ready; never print the banner a second time.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 )); then
-            _DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE="$_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE"
-            _DOTS_FAILURE_ANIMATION_PENDING=1
-        fi
-    elif _dots_failure_animation_infinite_enabled; then
-        # Restart ordinary emoji animation at each idle prompt.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
-        # Preserve the one-shot startup animation when infinite mode is off.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    fi
-
-    if (( _DOTS_FAILURE_ANIMATION_PENDING )); then
-        _DOTS_FAILURE_ANIMATION_PENDING=0
-        _dots_failure_animation_begin
-    fi
-}
-
-_dots_failure_animation_reset() {
-    emulate -L zsh
-
-    _dots_failure_animation_cleanup
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
-}
-
-_dots_failure_animation_preexec() {
-    emulate -L zsh
-
-    local -a command_words
-    command_words=( "${(@z)1}" )
-    case "${command_words[1]:-}" in
-        clear)
-            _dots_failure_animation_reset
-            ;;
-        command|builtin)
-            [[ "${command_words[2]:-}" == clear ]] && _dots_failure_animation_reset
-            ;;
-    esac
-}
-
-_dots_failure_animation_clear_screen_widget() {
-    _dots_failure_animation_reset
-    zle .clear-screen
-}
-
-_dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-
-    # ZLE stops receiving file-descriptor callbacks when Enter hands the
-    # terminal to a foreground command. Stop the worker but retain the TTY
-    # descriptor, banner text, phase, and absolute output coordinates.
-    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        _DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
-        _dots_failure_animation_cleanup 0 1
-        return 0
-    fi
-
-    _dots_failure_animation_cleanup
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
-}
-
-if [[ -o interactive ]]; then
-    autoload -Uz add-zsh-hook add-zle-hook-widget
-    add-zsh-hook precmd _dots_failure_animation_precmd
-    add-zsh-hook preexec _dots_failure_animation_preexec
-    add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
-    # Wrap the built-in widget so Ctrl+L clears the persistent banner too.
-    zle -N clear-screen _dots_failure_animation_clear_screen_widget
-fi
-\r\n'
-    done
-
-    local tty_fd="$_DOTS_FAILURE_ANIMATION_TTY_FD"
-    { exec {tty_fd}>&- } 2>/dev/null || true
-    _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-    command rm -rf -- "$temp_dir"
-    return 0
-}
-
-
-_dots_failure_animation_render_prompt() {
-    emulate -L zsh
-
-    local rendered=''
-    if [[ "$_DOTS_FAILURE_ANIMATION_PROMPT_MODE" == command ]]; then
-        # Execute Starship's original command, not its rendered output.
-        local prompt_command="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT[3,-2]}"
-        rendered="$(eval "$prompt_command")"
-    else
-        rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
-    fi
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
-          "$_DOTS_FAILURE_ANIMATION_MODE" != mythic ]]; then
-        # Ordinary emoji remains prompt decoration. Rare banners are printed
-        # and repainted at their original terminal output position instead.
-        local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-        if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
-            local suffix="${rendered##*${(b)marker}}"
-            local marker_and_suffix="${marker}${suffix}"
-            local prefix="${rendered%${(b)marker_and_suffix}}"
-            rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
-        fi
-    fi
-    _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
-    print -rn -- "$rendered"
-}
-_dots_failure_animation_cleanup() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    local redraw="${1:-0}"
-    local keep_tty="${2:-0}"
-    if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
-        _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
-        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
-
-        local fd="${_DOTS_FAILURE_ANIMATION_FD}"
-        zle -F "$fd" 2>/dev/null || true
-        { exec {fd}<&- } 2>/dev/null || true
-
-        _DOTS_FAILURE_ANIMATION_FD=-1
-        _DOTS_FAILURE_ANIMATION_ACTIVE=0
-        _DOTS_FAILURE_ANIMATION_STATE='finished'
-    fi
-
-    if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && keep_tty != 1 )); then
-        local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
-        { exec {tty_fd}>&- } 2>/dev/null || true
-        _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-    fi
-
-    if (( redraw )) && zle; then
-        zle .reset-prompt
-    fi
-}
-
-_dots_failure_animation_fd_handler() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    local fd="${1:-}"
-    local frame
-    if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
-        _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
-        _dots_failure_animation_cleanup 1
-        return 0
-    fi
-
-    (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        _DOTS_FAILURE_ANIMATION_PHASE="$frame"
-    else
-        _DOTS_FAILURE_ANIMATION_FRAME="$frame"
-    fi
-    (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
-    _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        # Paint over the exact failure-output rows, not the live prompt.
-        _dots_failure_animation_render_anchor
-    else
-        # Ordinary emoji animation remains prompt decoration.
-        zle && zle .reset-prompt
-    fi
-}
-
-# Failure-message hooks queue the matching style and, for rare events, the banner.
-_dots_failure_animation_start() {
-    emulate -L zsh
-
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
-        -z "${NO_COLOR:-}" ]] || return 1
-
-    local style="${1:-normal}"
-    local banner="${2:-}"
-    local detail="${3:-}"
-    case "$style" in
-        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
-        *) style=normal ;;
-    esac
-
-    # A rare banner remains the active terminal notice until the user clears
-    # the screen. Ordinary failures must not silently dismiss it.
-    if [[ "$style" != legendary && "$style" != mythic &&
-          ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        return 0
-    fi
-
-    _DOTS_FAILURE_ANIMATION_STYLE="$style"
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    if [[ "$style" == legendary || "$style" == mythic ]]; then
-        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
-            _dots_failure_animation_cleanup
-        fi
-        _DOTS_FAILURE_ANIMATION_MODE="$style"
-        _DOTS_FAILURE_ANIMATION_BANNER="$banner"
-        [[ -n "$detail" ]] && _DOTS_FAILURE_ANIMATION_BANNER+=$'\n'"↳ ${detail}"
-        _DOTS_FAILURE_ANIMATION_PHASE=0
-        exec {_DOTS_FAILURE_ANIMATION_TTY_FD}>/dev/tty || {
-            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-            return 1
-        }
-        if ! _dots_failure_animation_query_cursor; then
-            # Cursor-position reporting may be unavailable. Print a static
-            # notice at this exact point rather than animate an unsafe row.
-            _dots_failure_animation_print_anchor || return 1
-            local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
-            { exec {tty_fd}>&- } 2>/dev/null || true
-            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-            return 0
-        fi
-        _dots_failure_animation_print_anchor || return 1
-    fi
-
-    _DOTS_FAILURE_ANIMATION_PENDING=1
-    return 0
-}
-
-_dots_failure_animation_begin() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
-
-    _DOTS_FAILURE_ANIMATION_STEP=0
-    _DOTS_FAILURE_ANIMATION_FRAMES=0
-    _DOTS_FAILURE_ANIMATION_STATE='starting'
-
-    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
-    local mode="${_DOTS_FAILURE_ANIMATION_MODE:-emoji}"
-    local infinite=0
-    local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
-    if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
-        interval=0.08
-    elif (( interval < 0.01 || interval > 2.0 )); then
-        interval=0.08
-    fi
-    _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
-
-    if [[ "$mode" == legendary || "$mode" == mythic ]]; then
-        infinite=1
-    else
-        _dots_failure_animation_infinite_enabled && infinite=1
-    fi
-
-    _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE")
-    _DOTS_FAILURE_ANIMATION_ACTIVE=1
-
-    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
-        _DOTS_FAILURE_ANIMATION_STATE='registered'
-    else
-        _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
-        _dots_failure_animation_cleanup
-    fi
-}
-
-_dots_failure_animation_precmd() {
-    emulate -L zsh
-
-    [[ -o interactive && -t 0 && -t 1 ]] || return 0
-
-    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
-        # Pause the worker while a foreground command owns the terminal. Keep
-        # the original output position and resume from the current phase when
-        # the next prompt is ready; never print the banner a second time.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 )); then
-            _DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE="$_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE"
-            _DOTS_FAILURE_ANIMATION_PENDING=1
-        fi
-    elif _dots_failure_animation_infinite_enabled; then
-        # Restart ordinary emoji animation at each idle prompt.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
-        # Preserve the one-shot startup animation when infinite mode is off.
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    fi
-
-    if (( _DOTS_FAILURE_ANIMATION_PENDING )); then
-        _DOTS_FAILURE_ANIMATION_PENDING=0
-        _dots_failure_animation_begin
-    fi
-}
-
-_dots_failure_animation_reset() {
-    emulate -L zsh
-
-    _dots_failure_animation_cleanup
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
-}
-
-_dots_failure_animation_preexec() {
-    emulate -L zsh
-
-    local -a command_words
-    command_words=( "${(@z)1}" )
-    case "${command_words[1]:-}" in
-        clear)
-            _dots_failure_animation_reset
-            ;;
-        command|builtin)
-            [[ "${command_words[2]:-}" == clear ]] && _dots_failure_animation_reset
-            ;;
-    esac
-}
-
-_dots_failure_animation_clear_screen_widget() {
-    _dots_failure_animation_reset
-    zle .clear-screen
-}
-
-_dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_PENDING=0
-
-    # ZLE stops receiving file-descriptor callbacks when Enter hands the
-    # terminal to a foreground command. Stop the worker but retain the TTY
-    # descriptor, banner text, phase, and absolute output coordinates.
-    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        _DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
-        _dots_failure_animation_cleanup 0 1
-        return 0
-    fi
-
     _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
