@@ -248,7 +248,7 @@ for style in legendary mythic; do
     assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
     read_until "BASE_OUTPUT"
     drain_for 80
-    assert_contains "${style} frames repaint the saved output row" 
+    assert_contains "${style} frames repaint the saved output row" $'\e[10;1H' "$REPLY"
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} animation runs until the inspection command submits" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
