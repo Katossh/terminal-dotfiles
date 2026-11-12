@@ -89,7 +89,7 @@ The package manifest contains entries for apt, dnf, pacman, zypper, apk, xbps, F
 
 Alacritty is listed as an optional application package for the supported package managers and Nixpkgs. `dots install --packages` installs it when available; its configuration and Catppuccin Frappé theme are linked even with `--no-packages`. Homebrew's official Alacritty cask is currently disabled because it fails Gatekeeper checks, so the installer skips it rather than weakening macOS security.
 
-Noto Color Emoji is installed as a required font package where supported. Package names vary by OS; NixOS uses the `noto-fonts-color-emoji` Nixpkgs font attribute. The managed Fontconfig rule appends `Noto Color Emoji` as a fallback after `JetBrainsMono Nerd Font`, without replacing the primary terminal font. On Linux/BSD, verify glyph fallback with:
+Noto Color Emoji is installed as a required font package where supported: Debian/Ubuntu `fonts-noto-color-emoji`, Fedora `google-noto-color-emoji-fonts`, Arch `noto-fonts-emoji`, openSUSE `google-noto-coloremoji-fonts`, Alpine `font-noto-emoji`, Void `noto-fonts-emoji`, FreeBSD `noto-emoji`, and Homebrew Cask `font-noto-color-emoji`. NixOS uses the `noto-fonts-color-emoji` Nixpkgs font attribute. The managed Fontconfig rule appends `Noto Color Emoji` as a fallback after `JetBrainsMono Nerd Font`, without replacing the primary terminal font. On Linux/BSD, verify glyph fallback with:
 
 ~~~sh
 fc-match "JetBrainsMono Nerd Font"
