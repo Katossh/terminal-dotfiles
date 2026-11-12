@@ -32,6 +32,14 @@ assert_contains() {
     print -- "ok - $label"
 }
 
+assert_absent() {
+    local label="$1"
+    local unexpected="$2"
+    local actual="$3"
+    [[ "$actual" != *"$unexpected"* ]] || fail "$label (unexpected '$unexpected' in: $actual)"
+    print -- "ok - $label"
+}
+
 capture_output() {
     local capture_file
     capture_file="$(mktemp "${TMPDIR:-/tmp}/dots-failure-integration.XXXXXX")" || return 1
