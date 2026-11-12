@@ -294,6 +294,12 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_FD=-1
         _DOTS_FAILURE_ANIMATION_ACTIVE=0
         _DOTS_FAILURE_ANIMATION_STATE='finished'
+    if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
+        local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
+        { exec {tty_fd}>&- } 2>/dev/null || true
+        _DOTS_FAILURE_ANIMATION_TTY_FD=-1
+    fi
+
     fi
 
     if (( redraw )) && zle; then
@@ -367,6 +373,18 @@ _dots_failure_animation_start() {
         _DOTS_FAILURE_ANIMATION_BANNER="$banner"
         [[ -n "$detail" ]] && _DOTS_FAILURE_ANIMATION_BANNER+=$'\n'"↳ ${detail}"
         _DOTS_FAILURE_ANIMATION_PHASE=0
+        exec {_DOTS_FAILURE_ANIMATION_TTY_FD}>/dev/tty || {
+            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
+            return 1
+        }
+        if ! _dots_failure_animation_print_anchor; then
+            local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
+            { exec {tty_fd}>&- } 2>/dev/null || true
+            _DOTS_FAILURE_ANIMATION_TTY_FD=-1
+            _DOTS_FAILURE_ANIMATION_BANNER=''
+            _DOTS_FAILURE_ANIMATION_MODE='emoji'
+            return 1
+        fi
     fi
 
     _DOTS_FAILURE_ANIMATION_PENDING=1
@@ -419,21 +437,15 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
-    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        # Keep rare banners alive across submitted commands. ZLE cannot safely
-        # redraw the terminal while a foreground command owns it, so resume
-        # the animation as soon as the next prompt is ready.
+    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
+          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
+        # Rare banners are never restarted at later prompts. Their last frame
+        # remains as terminal output when Enter transfers control.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
     elif _dots_failure_animation_infinite_enabled; then
         # Restart ordinary emoji animation at each idle prompt.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
-              "$_DOTS_FAILURE_ANIMATION_MODE" != mythic ]]; then
-            _DOTS_FAILURE_ANIMATION_PENDING=1
-        fi
+        _DOTS_FAILURE_ANIMATION_PENDING=1
     elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
         # Preserve the one-shot startup animation when infinite mode is off.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
@@ -481,8 +493,8 @@ _dots_failure_animation_line_finish() {
     _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
-    # Preserve only Legendary/Mythic banners. Their next prompt restarts the
-    # asynchronous stream; ordinary emoji animations retain their old lifecycle.
+    # Rare output stays at its original terminal position. Enter freezes the
+    # last painted frame; a later prompt must never reinsert or restart it.
     if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
             "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
           -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
