@@ -138,7 +138,8 @@ _dots_failure_animation_gradient_line() {
     local -i length=0 denominator=1 position=0 color_index=1 index=0 color_count=0
 
     # Colour individual characters so the moving sweep remains visible even
-    # on short banners. Zsh keeps each Unicode code point intact.
+    # on short banners. Subtracting the phase moves the highlight left-to-right.
+    # Zsh keeps each Unicode code point intact.
     characters=( "${(@s::)message}" )
     length="${#characters[@]}"
     if (( length == 0 )); then
@@ -186,7 +187,7 @@ _dots_failure_animation_gradient_line() {
     color_count="${#colors}"
     denominator=$(( length > 1 ? length - 1 : 1 ))
     for (( index = 1; index <= length; index++ )); do
-        position=$(( (((index - 1) * 100 / denominator) + phase) % 100 ))
+        position=$(( (((index - 1) * 100 / denominator) - phase + 100) % 100 ))
         color_index=$(( (position * color_count / 100) + 1 ))
         (( color_index > color_count )) && color_index="$color_count"
         character="${characters[index]}"
@@ -301,6 +302,15 @@ _dots_failure_animation_start() {
         *) style=normal ;;
     esac
 
+    # A rare banner remains the active terminal notice until the user clears
+    # the screen. Ordinary failures must not silently dismiss it.
+    if [[ "$style" != legendary && "$style" != mythic &&
+          ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
+            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
+          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
+        return 0
+    fi
+
     _DOTS_FAILURE_ANIMATION_STYLE="$style"
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
@@ -361,7 +371,15 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
-    if _dots_failure_animation_infinite_enabled; then
+    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
+            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
+          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
+        # Keep rare banners alive across submitted commands. ZLE cannot safely
+        # redraw the terminal while a foreground command owns it, so resume
+        # the animation as soon as the next prompt is ready.
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
+        _DOTS_FAILURE_ANIMATION_PENDING=1
+    elif _dots_failure_animation_infinite_enabled; then
         # Restart ordinary emoji animation at each idle prompt.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
@@ -380,9 +398,49 @@ _dots_failure_animation_precmd() {
     fi
 }
 
+_dots_failure_animation_reset() {
+    emulate -L zsh
+
+    _dots_failure_animation_cleanup
+    _DOTS_FAILURE_ANIMATION_PENDING=0
+    _DOTS_FAILURE_ANIMATION_BANNER=''
+    _DOTS_FAILURE_ANIMATION_MODE='emoji'
+    _DOTS_FAILURE_ANIMATION_STYLE='normal'
+    _DOTS_FAILURE_ANIMATION_PHASE=0
+}
+
+_dots_failure_animation_preexec() {
+    emulate -L zsh
+
+    local -a command_words
+    command_words=( "${(@z)1}" )
+    case "${command_words[1]:-}" in
+        clear)
+            _dots_failure_animation_reset
+            ;;
+        command|builtin)
+            [[ "${command_words[2]:-}" == clear ]] && _dots_failure_animation_reset
+            ;;
+    esac
+}
+
+_dots_failure_animation_clear_screen_widget() {
+    _dots_failure_animation_reset
+    zle .clear-screen
+}
+
 _dots_failure_animation_line_finish() {
     _dots_failure_animation_cleanup
     _DOTS_FAILURE_ANIMATION_PENDING=0
+
+    # Preserve only Legendary/Mythic banners. Their next prompt restarts the
+    # asynchronous stream; ordinary emoji animations retain their old lifecycle.
+    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
+            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
+          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
+        return 0
+    fi
+
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_STYLE='normal'
@@ -392,5 +450,8 @@ _dots_failure_animation_line_finish() {
 if [[ -o interactive ]]; then
     autoload -Uz add-zsh-hook add-zle-hook-widget
     add-zsh-hook precmd _dots_failure_animation_precmd
+    add-zsh-hook preexec _dots_failure_animation_preexec
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
+    # Wrap the built-in widget so Ctrl+L clears the persistent banner too.
+    zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
