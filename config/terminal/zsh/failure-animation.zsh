@@ -206,7 +206,7 @@ _dots_failure_animation_query_cursor() {
     (( read_status == 0 )) || return 1
     response="${response#$'\e['}"
     response="${response%R}"
-    [[ "$response" == <->$;<-> ]] || return 1
+    [[ "$response" == <->\;<-> ]] || return 1
     _DOTS_FAILURE_ANIMATION_ANCHOR_ROW="${response%%;*}"
     _DOTS_FAILURE_ANIMATION_ANCHOR_COL="${response#*;}"
     (( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_COL > 0 ))
