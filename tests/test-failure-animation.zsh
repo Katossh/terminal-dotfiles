@@ -202,46 +202,7 @@ read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
 # Both historic environment-variable names remain compatible aliases.
-zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
-read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
-
-# Exercise both rare banners through the real ZLE async stream while the prompt is idle.
-for style in legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}"
-    # The queue marker is printed inside the command, before precmd redraws
-    # the prompt and starts the async stream. Wait for that prompt explicitly.
-    read_until "BASE_OUTPUT"
-    drain_for 80
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
-    typeset special_state="$REPLY"
-    typeset special_frames="${special_state##*LAST_FRAMES_}"
-    special_frames="${special_frames%%[^0-9]*}"
-    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
-    (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
-done
-print -- "ok - Legendary and Mythic gradients advance continuously while the prompt is idle"
-
-# Infinite emoji mode loops while idle; accepting a command stops it.
-zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
-read_until INFINITE_ENABLED
-assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
-read_until INFINITE_DISABLED
-assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
-typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
-infinite_frames="${infinite_frames%%[^0-9]*}"
-[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
-(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
-print -- "ok - infinite emoji animation loops beyond one frame sequence"
-
-print -- "All style-aware and rare-event prompt animation integration tests passed."
-\n'
+zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
 read_until INFINITE_ALIASES_OK
 assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
 
