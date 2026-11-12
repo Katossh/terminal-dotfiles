@@ -72,5 +72,6 @@ bindings = [
 hyperlinks = true
 post_processing = true
 persist = false
+action = "Copy"
 mouse = { enabled = true, mods = "Control" }
 binding = { key = "U", mods = "Control|Shift" }
