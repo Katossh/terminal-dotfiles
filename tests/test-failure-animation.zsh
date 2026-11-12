@@ -389,7 +389,7 @@ infinite_frames="${infinite_frames%%[^0-9]*}"
 print -- "ok - infinite emoji animation loops beyond one frame sequence"
 
 print -- "All style-aware and rare-event prompt animation integration tests passed."
-\n'
+\\n'
 read_until "PROMPT_DUPLICATE_RENDERED:"
 assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
 assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
