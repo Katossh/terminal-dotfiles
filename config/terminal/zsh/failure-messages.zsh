@@ -631,7 +631,7 @@ dots_failure_message() {
         elif [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
             _dots_failure_message_gradient "$selected_style" "$selected_template" 0
         else
-            printf '%s\n "$selected_template"
+            printf '%s\n' "$selected_template"
         fi
         if [[ -n "$detail" ]]; then
             printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
