@@ -263,19 +263,10 @@ _dots_failure_animation_render_prompt() {
         rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
-    if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
-            "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
-          -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
-        local -a banner_lines
-        local banner_rendered='' line
-        banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
-        for line in "${banner_lines[@]}"; do
-            _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
-            banner_rendered+="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE}"$'\n'
-        done
-        rendered="${banner_rendered}${rendered}"
-    else
-        # Insert ordinary emoji immediately before the final input marker.
+    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" != legendary &&
+          "$_DOTS_FAILURE_ANIMATION_MODE" != mythic ]]; then
+        # Ordinary emoji remains prompt decoration. Rare banners are printed
+        # and repainted at their original terminal output position instead.
         local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
         if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
             local suffix="${rendered##*${(b)marker}}"
@@ -284,7 +275,6 @@ _dots_failure_animation_render_prompt() {
             rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
         fi
     fi
-
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
@@ -333,8 +323,14 @@ _dots_failure_animation_fd_handler() {
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
 
-    # Redraw expands PROMPT and renders the current emoji or gradient phase.
-    zle && zle .reset-prompt
+    if [[ "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
+          "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ]]; then
+        # Paint over the exact failure-output rows, not the live prompt.
+        _dots_failure_animation_render_anchor
+    else
+        # Ordinary emoji animation remains prompt decoration.
+        zle && zle .reset-prompt
+    fi
 }
 
 # Failure-message hooks queue the matching style and, for rare events, the banner.
