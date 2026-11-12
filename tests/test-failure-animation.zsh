@@ -112,8 +112,8 @@ _dots_test_snapshot_special_animation() {
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_$kitty_calls"
-    [[ -s "$DOTS_TEST_KITTY_LOG" ]] && print -r -- "KITTY_LOG:$(<"$DOTS_TEST_KITTY_LOG")"
+    local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_$kitty_calls_KITTY_LOG_$kitty_log"
 }
 
 clear() {
