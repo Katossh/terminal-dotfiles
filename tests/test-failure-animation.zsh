@@ -107,15 +107,27 @@ _dots_test_render_gradients() {
     _DOTS_FAILURE_ANIMATION_BANNER=''
     print -- GRADIENTS_OK
 }
-_dots_test_queue_special_animation() {
-    local style="${1}"
+typeset -g _DOTS_TEST_SPECIAL_STYLE=''
+typeset -g _DOTS_TEST_SPECIAL_BANNER=''
+typeset -g _DOTS_TEST_SPECIAL_DETAIL=''
+_dots_test_start_special_animation_precmd() {
+    emulate -L zsh
+    add-zsh-hook -d precmd _dots_test_start_special_animation_precmd
+
     local saved_no_color="${NO_COLOR-}"
     unset NO_COLOR
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "live gradient test" || return 1
+    _dots_failure_animation_start \
+        "$_DOTS_TEST_SPECIAL_STYLE" \
+        "$_DOTS_TEST_SPECIAL_BANNER" \
+        "$_DOTS_TEST_SPECIAL_DETAIL" || return 1
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
-    local banner_set=0
-    [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    print -r -- "ENQUEUE_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
+}
+_dots_test_queue_special_animation() {
+    local style="${1}"
+    _DOTS_TEST_SPECIAL_STYLE="$style"
+    _DOTS_TEST_SPECIAL_BANNER="$style ANIMATED FAILURE BANNER"
+    _DOTS_TEST_SPECIAL_DETAIL='live gradient test'
+    add-zsh-hook precmd _dots_test_start_special_animation_precmd
     print -r -- "SPECIAL_QUEUED_$style"
 }
 _dots_test_snapshot_special_animation() {
@@ -126,9 +138,8 @@ _dots_test_snapshot_special_animation() {
     rendered_frames="${rendered_frames//[[:space:]]/}"
     local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
     animated_gifs="${animated_gifs//[[:space:]]/}"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
+    print -r -- "SPECIAL_STATE_GRADIENT_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
 }
-
 clear() {
     print -r -- CLEAR_EXECUTED
 }
@@ -318,48 +329,63 @@ zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 
-# Both rare styles animate their actual text, repainting the same terminal
-# rows. The final message stays as plain output; no Kitty image can scroll it.
-for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+# The banner is part of the ZLE-managed prompt. Typing while its frame pipe is
+# active must preserve the editable command buffer and must not block input.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
+read_until "SPECIAL_QUEUED_normal"
+read_until "normal ANIMATED FAILURE BANNER"
+assert_contains "gradient is rendered in the live prompt" $'\e[38;2;' "$REPLY"
+assert_contains "gradient prompt is displayed above the normal input marker" "BASE_OUTPUT" "$REPLY"
+zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "typed input appears while the gradient is still running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 60
+zpty -w "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "ZLE executes the exact input typed during the animation" "INPUT_DURING_GRADIENT" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "input test completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+assert_contains "input test leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+assert_absent "animation never places a Kitty image" "--place" "$REPLY"
+
+# Exercise every remaining message style and verify that the prompt animation
+# completes without Kitty graphics, ImageMagick, GIFs, or manual cursor motion.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} renders truecolour gradient text" $'\e[38;2;' "$REPLY"
-    assert_contains "${style} clears and repaints the same rows" $'\e[2K' "$REPLY"
-    assert_contains "${style} uses relative cursor movement" $'\e[1A' "$REPLY"
+    read_until "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} uses a truecolour prompt gradient" $'\e[38;2;' "$REPLY"
     assert_absent "${style} does not create a Kitty image placement" "--place" "$REPLY"
+    drain_for 60
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
+    read_until SPECIAL_STATE_GRADIENT_ACTIVE_
     assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "${style} leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
     assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
     assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
     assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
-
-    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
-    read_until "FOLLOWUP_${style}"
-    assert_absent "${style} message is not replayed at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} does not jump back to an old screen coordinate" $'\e[10;1H' "$REPLY"
 done
-print -- "ok - all eight message styles animate in place without persistent graphics"
+print -- "ok - all eight message styles animate through ZLE without intercepting input"
 
-# There is no longer a persistent graphic layer to clear; both clear paths
-# operate on ordinary terminal text and leave no background animation worker.
+# There is no persistent graphic layer to clear; Ctrl+L and clear stop workers.
 zpty -w "$PTY_NAME" $'\x0c'
 drain_for 30
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L leaves no animation worker" "ACTIVE_0" "$REPLY"
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
 read_until SPECIAL_QUEUED_legendary
-read_until BASE_OUTPUT
-drain_for 60
+read_until "legendary ANIMATED FAILURE BANNER"
+drain_for 30
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear leaves no persistent animation worker" "ACTIVE_0" "$REPLY"
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear leaves no persistent animation worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
 read_until INFINITE_ENABLED
