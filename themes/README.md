@@ -7,6 +7,7 @@ Terminal adapters translate palette tokens into native application formats. Alac
 - `adapters/fzf.zsh` exports FZF's color options for Zsh.
 - `dots install` generates `kitty/themes/dots-palette.conf` and `~/.tmux/dots-theme.conf` from the same tokens.
 - `config/terminal/alacritty/catppuccin-frappe.toml` provides the upstream Catppuccin Frappé palette for Alacritty.
+- `config/fontconfig/conf.d/75-noto-color-emoji.conf` appends Noto Color Emoji as a fallback for JetBrainsMono Nerd Font without changing the primary family.
 
 Local token overrides belong in `~/.config/dots/theme.local.env`. Use the same `DOTS_THEME_*` names. Only six-digit hex colors are accepted by the manager.
 

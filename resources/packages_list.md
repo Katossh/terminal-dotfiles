@@ -18,7 +18,8 @@ Run the installer from a clone of this repository:
 | `apk` | Alpine Linux | Refreshes the package index and installs available packages. |
 | `xbps` | Void Linux | Synchronizes repositories and installs available packages. |
 | `pkg` | FreeBSD | Refreshes package metadata and installs available packages. |
-| `brew` | macOS with Homebrew | Installs packages as the current user; the installer never invokes Homebrew through sudo. |
+| `brew` | macOS with Homebrew | Installs formulae as the current user; the installer never invokes Homebrew through sudo. |
+| `brew-cask` | macOS with Homebrew Cask | Installs GUI applications and fonts as the current user; casks are checked and tracked separately from formulae. |
 | NixOS module | NixOS | Package management remains declarative through `nix/packages.nix`. The installer does not edit `/etc/nixos` or run `nixos-rebuild`. |
 
 The config-linking step is independent of package installation. If package installation fails, the links are still applied and the installer exits with an error so the package issue is visible. If the OS or package manager is not recognized, use `--no-packages` to install configs without attempting package changes.
@@ -38,7 +39,7 @@ The config-linking step is independent of package installation. If package insta
 | Syntax-highlighted cat | bat (if available) | bat (if available) | bat |
 | Fast file search | fd-find (binary is often `fdfind`) | fd-find (binary is often `fd`) | fd |
 
-The core set also includes curl, unzip, and zip. Starship is required: the installer prefers a native package and otherwise runs the official Starship release installer into `~/.local/bin`. This avoids silently enabling an additional repository on Fedora. On Linux, `xdg-utils` is optional because only some desktop integrations need it. Other optional tools include btop, fastfetch, htop, and eza; these are installed only when available in configured repositories.
+The core set also includes curl, unzip, and zip. Noto Color Emoji is installed from the corresponding native package (or Nixpkgs `noto-fonts-color-emoji`) and used as Fontconfig fallback after JetBrainsMono Nerd Font. Starship is required: the installer prefers a native package and otherwise runs the official Starship release installer into `~/.local/bin`. This avoids silently enabling an additional repository on Fedora. On Linux, `xdg-utils` is optional because only some desktop integrations need it. Other optional tools include btop, fastfetch, htop, and eza; these are installed only when available in configured repositories.
 
 ## Optional desktop applications
 

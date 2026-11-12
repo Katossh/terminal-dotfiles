@@ -44,9 +44,9 @@ Git and network access to GitHub are required for framework/plugin downloads. Fa
 
 ## Package installation
 
-The installer detects the native package manager and supports apt (Debian/Ubuntu derivatives), dnf (Fedora/RHEL derivatives), pacman (Arch derivatives), zypper (openSUSE), apk (Alpine), xbps (Void), FreeBSD pkg, and Homebrew. Alacritty is an optional package for supported native package managers and Nixpkgs. Homebrew uses its Cask integration; the official Alacritty cask is currently disabled by Homebrew after failing its Gatekeeper check, so dots skips it rather than bypassing macOS security.
+The installer detects the native package manager and supports apt (Debian/Ubuntu derivatives), dnf (Fedora/RHEL derivatives), pacman (Arch derivatives), zypper (openSUSE), apk (Alpine), xbps (Void), FreeBSD pkg, and Homebrew. Alacritty is an optional package for supported native package managers and Nixpkgs. Noto Color Emoji is installed as a required font package where a verified package exists: Debian/Ubuntu `fonts-noto-color-emoji`, Fedora `google-noto-color-emoji-fonts`, Arch `noto-fonts-emoji`, Alpine `font-noto-emoji`, Void `noto-fonts-emoji`, FreeBSD `noto-emoji`, Homebrew Cask `font-noto-color-emoji`, and Nixpkgs `noto-fonts-color-emoji`. Homebrew uses its Cask integration; the official Alacritty cask is currently disabled by Homebrew after failing its Gatekeeper check, so dots skips it rather than bypassing macOS security.
 
-On NixOS, dots install --packages installs the packages declared in manifest/packages.tsv into the invoking user's Nix profile using nix profile install. On another Linux distribution, Nix is used as a fallback when no supported native package manager is detected but nix is available.
+On NixOS, dots install --packages installs the packages declared in manifest/packages.tsv into the invoking user's Nix profile using nix profile install. The NixOS module also registers Noto Color Emoji alongside JetBrainsMono Nerd Font through `fonts.packages`. On another Linux distribution, Nix is used as a fallback when no supported native package manager is detected but nix is available.
 
 For declarative, system-wide NixOS packages, import nix/packages.nix from your host configuration:
 
@@ -65,9 +65,15 @@ sudo nixos-rebuild build
 sudo nixos-rebuild switch
 ~~~
 
-The module reads Nixpkgs packages from manifest/packages.tsv. It enables Zsh and adds declared CLI/TUI packages and Alacritty to environment.systemPackages; required missing attributes fail evaluation, while optional missing attributes are skipped. Entries under the nixpkgs-fonts package-manager key are added to fonts.packages, so NixOS registers them with fontconfig. JetBrainsMono Nerd Font is included as a required system font. Set the account's login shell in your host configuration, for example users.users.<name>.shell = pkgs.zsh.
+The module reads Nixpkgs packages from manifest/packages.tsv. It enables Zsh and adds declared CLI/TUI packages and Alacritty to environment.systemPackages; required missing attributes fail evaluation, while optional missing attributes are skipped. Entries under the nixpkgs-fonts package-manager key are added to fonts.packages, so NixOS registers them with Fontconfig. JetBrainsMono Nerd Font and Noto Color Emoji are included as required system fonts. Set the account's login shell in your host configuration, for example users.users.<name>.shell = pkgs.zsh.
 
 On an unfamiliar distribution without a supported package manager or Nix, dots install --no-packages still links configurations and provisions Zsh from Git. Install the remaining CLI dependencies with that distribution's package manager.
+
+## Alacritty profile
+
+Alacritty is configured to stay close to the repository's Kitty profile: JetBrainsMono Nerd Font (regular/bold/italic/bold-italic) at 14 pt, 20,000 lines of scrollback, a blinking beam cursor, 90% opacity with compositor blur, borderless windows, Alt-based scrollback/search/font-size shortcuts, the same Ctrl+Shift+C/V clipboard shortcuts, and no middle-click selection paste. Noto Color Emoji is appended as a weak Fontconfig fallback, so JetBrains remains the primary font.
+
+Alacritty does not implement Kitty's native split/stack layouts, startup sessions, or Kitty kittens. Use tmux for pane layouts and persistent sessions. The Fontconfig rule lives under `~/.config/fontconfig/conf.d/` and affects Linux/BSD Fontconfig clients; macOS uses its native font fallback after the Noto font Cask is installed.
 
 ## Personal overrides
 
