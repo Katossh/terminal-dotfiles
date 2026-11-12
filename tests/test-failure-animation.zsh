@@ -100,7 +100,7 @@ _dots_test_queue_special_animation() {
     local style="${1}"
     local saved_no_color="${NO_COLOR-}"
     unset NO_COLOR
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test" || return 1
+    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "live gradient test" || return 1
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
