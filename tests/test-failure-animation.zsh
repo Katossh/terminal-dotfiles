@@ -250,6 +250,16 @@ for style in legendary mythic; do
     drain_for 80
     assert_contains "${style} frames repaint the saved screen row" $'\e[10;1H' "$REPLY"
 
+    # Keep a live, unfinished input line on screen while multiple frames run.
+    # Cursor save/restore must leave the editable command visible and intact.
+    zpty -w "$PTY_NAME" "typing_while_${style}_animates"
+    drain_for 80
+    assert_contains "${style} animation preserves partially typed input" "typing_while_${style}_animates" "$REPLY"
+    assert_contains "${style} repaint saves the live ZLE cursor" $'\\e7' "$REPLY"
+    assert_contains "${style} repaint restores the live ZLE cursor" $'\\e8' "$REPLY"
+    zpty -w "$PTY_NAME" $'\\x15'
+    drain_for 20
+
     # This inspection command submits Enter and pauses the current worker.
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
