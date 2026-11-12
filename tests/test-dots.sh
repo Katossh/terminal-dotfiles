@@ -219,7 +219,8 @@ done
 awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
 grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
 grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'noto-fonts-color-emoji' "$REPO_DIR/nix/packages.nix"
+awk -F '\\t' '$1 == "nixpkgs-fonts" && $2 == "noto-fonts-color-emoji" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
+grep -Fq 'fonts.packages = fontPackages;' "$REPO_DIR/nix/packages.nix"
 
 # Homebrew casks are distinct from formulae and must be installed and tracked.
 # Fake Homebrew supports the Alacritty app and Noto Color Emoji font casks.
