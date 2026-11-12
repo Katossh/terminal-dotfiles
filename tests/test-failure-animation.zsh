@@ -91,6 +91,18 @@ _dots_test_render_gradients() {
     rendered="$(_dots_failure_animation_render_prompt)"
     [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
 
+    local palette_style expected_color
+    for palette_style in normal anime ecchi rainbow; do
+        _dots_failure_animation_gradient_line 'PALETTE CHECK' "$palette_style" 0
+        case "$palette_style" in
+            normal) expected_color='36;123;160' ;;
+            anime) expected_color='255;190;220' ;;
+            ecchi) expected_color='120;24;70' ;;
+            rainbow) expected_color='255;82;82' ;;
+        esac
+        [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW" == *$'\e[38;2;'$expected_color'm'* ]] || return 1
+    done
+
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
     print -- GRADIENTS_OK
@@ -308,7 +320,7 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 
 # Both rare styles animate their actual text, repainting the same terminal
 # rows. The final message stays as plain output; no Kitty image can scroll it.
-for style in legendary mythic; do
+for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
     assert_contains "${style} renders truecolour gradient text" $'\e[38;2;' "$REPLY"
@@ -329,7 +341,7 @@ for style in legendary mythic; do
     assert_absent "${style} message is not replayed at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
     assert_absent "${style} does not jump back to an old screen coordinate" $'\e[10;1H' "$REPLY"
 done
-print -- "ok - Legendary and Mythic gradients finish in place without persistent graphics"
+print -- "ok - all eight message styles animate in place without persistent graphics"
 
 # There is no longer a persistent graphic layer to clear; both clear paths
 # operate on ordinary terminal text and leave no background animation worker.

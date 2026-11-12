@@ -185,8 +185,11 @@ export DOTS_FAILURE_ANIMATION_CHANCE=100
 for style in normal sarcastic dramatic anime ecchi rainbow; do
     export DOTS_FAILURE_STYLE="$style"
     DOTS_TEST_ANIMATION_STYLE=''
+    DOTS_TEST_ANIMATION_BANNER=''
+    DOTS_TEST_ANIMATION_DETAIL=''
     capture_message generic "animation-style-$style"
     assert_eq "${style} style is passed to animation" "$style" "$DOTS_TEST_ANIMATION_STYLE"
+    assert_contains "${style} sends the complete failure text to the animator" "animation-style-$style" "$DOTS_TEST_ANIMATION_BANNER"
 done
 
 # Basis-point rare rolls are deterministic at 100%; Mythic has priority.
