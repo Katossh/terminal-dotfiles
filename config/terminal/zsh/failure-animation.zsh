@@ -212,14 +212,14 @@ _dots_failure_animation_query_cursor() {
     local -i read_status=0
     tty_state="$(command stty -g < /dev/tty 2>/dev/null)" || return 1
     command stty -echo -icanon min 0 time 5 < /dev/tty 2>/dev/null || return 1
-    print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- $'\\e[6n'
+    print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- $'\e[6n'
     IFS= builtin read -r -d R -t 0.5 response < /dev/tty
     read_status=$?
     command stty "$tty_state" < /dev/tty 2>/dev/null || return 1
     (( read_status == 0 )) || return 1
-    response="${response#$'\\e['}"
+    response="${response#$'\e['}"
     response="${response%R}"
-    [[ "$response" == <->\\;<-> ]] || return 1
+    [[ "$response" == <->\;<-> ]] || return 1
     _DOTS_FAILURE_ANIMATION_ANCHOR_ROW="${response%%;*}"
     _DOTS_FAILURE_ANIMATION_ANCHOR_COL="${response#*;}"
     (( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_COL > 0 ))
@@ -236,14 +236,14 @@ _dots_failure_animation_print_anchor() {
     (( fd >= 0 )) || return 1
     banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
     (( ${#banner_lines} > 0 )) || return 1
-    print -rn -u "$fd" -- $'\\e[?7l'
+    print -rn -u "$fd" -- $'\e[?7l'
     for (( index = 1; index <= ${#banner_lines}; index++ )); do
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" 0
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
-        print -rn -u "$fd" -- $'\\r\\n'
+        print -rn -u "$fd" -- $'\r\n'
     done
-    print -rn -u "$fd" -- $'\\e[?7h'
+    print -rn -u "$fd" -- $'\e[?7h'
     _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="${#banner_lines}"
 }
 
@@ -262,15 +262,15 @@ _dots_failure_animation_render_anchor() {
     # Invalidate ZLE's current display before touching the terminal, then
     # repaint the fixed rows and let ZLE reconstruct the current input line.
     zle -I 2>/dev/null || true
-    print -rn -u "$fd" -- $'\\e[?7l'
+    print -rn -u "$fd" -- $'\e[?7l'
     for (( index = 1; index <= ${#banner_lines}; index++ )); do
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
         row=$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + index - 1 ))
-        print -rn -u "$fd" -- $'\\e['"${row}"';'"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
+        print -rn -u "$fd" -- $'\e['"${row}"';'"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
     done
-    print -rn -u "$fd" -- $'\\e[?7h'
+    print -rn -u "$fd" -- $'\e[?7h'
     zle .reset-prompt
 }
 _dots_failure_animation_render_prompt() {
