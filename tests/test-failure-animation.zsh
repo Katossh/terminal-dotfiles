@@ -299,7 +299,7 @@ assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
 
 # A prompt that already contains duplicate markers (including one after the
 # status code) must still render a single final marker after the emoji.
-zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\\n'
+zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\n'
 read_until "PROMPT_DUPLICATE_RENDERED:"
 assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
 assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
