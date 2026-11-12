@@ -229,7 +229,6 @@ _dots_failure_animation_kitty_scrollback() {
 
     command -v kitty >/dev/null 2>&1 || return 1
     command -v python3 >/dev/null 2>&1 || return 1
-    command -v fc-match >/dev/null 2>&1 || return 1
 
     local renderer="${_DOTS_FAILURE_ANIMATION_SOURCE_FILE:h:h:h:h}/scripts/render-failure-animation.py"
     [[ -r "$renderer" ]] || return 1
@@ -246,8 +245,11 @@ _dots_failure_animation_kitty_scrollback() {
     local -i cell_width=$(( pixel_width / terminal_columns ))
     local -i cell_height=$(( pixel_height / terminal_lines ))
     (( cell_width > 0 && cell_height > 0 )) || return 1
-    font_family="$(command fc-match -f '%{family[0]}' 'JetBrainsMono Nerd Font' 2>/dev/null)"
-    [[ -n "$font_family" ]] || font_family=monospace
+    font_family=monospace
+    if command -v fc-match >/dev/null 2>&1; then
+        font_family="$(command fc-match -f '%{family[0]}' 'JetBrainsMono Nerd Font' 2>/dev/null)"
+        [[ -n "$font_family" ]] || font_family=monospace
+    fi
 
     local -a banner_lines image_dimensions
     banner_lines=( "$banner" )
