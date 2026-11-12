@@ -80,7 +80,14 @@ _dots_test_render_gradients() {
 }
 _dots_test_queue_special_animation() {
     local style="$1"
+    local probe=''
+    probe="$(_dots_failure_animation_stream "$style" "$style" 1 | command head -n 3)"
+    [[ "$probe" == $'0\\n4\\n8' ]] || {
+        print -r -- "STREAM_PROBE_FAILED_${style}_${(qqq)probe}"
+        return 1
+    }
     _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test"
+    print -r -- "STREAM_PROBE_OK_${style}"
     print -r -- "SPECIAL_QUEUED_${style}"
 }
 _dots_test_snapshot_special_animation() {
