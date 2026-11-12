@@ -248,7 +248,135 @@ for style in legendary mythic; do
     assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
     read_until "BASE_OUTPUT"
     drain_for 80
-    assert_contains "${style} frames repaint the saved output row"  "$REPLY"
+    assert_contains "${style} frames repaint the saved output row" 
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+    read_until SPECIAL_STATE_ACTIVE_
+    assert_contains "${style} animation runs until the inspection command submits" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
+    assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
+    typeset special_state="$REPLY"
+    typeset special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
+    (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
+    typeset idle_frames="$special_frames"
+
+    # Enter freezes the final frame at its original output location. The next
+    # prompt must not print a duplicate or restart the animation below it.
+    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
+    read_until "FOLLOWUP_${style}"
+    assert_absent "${style} banner is not duplicated at the next prompt" "$style ANIMATED FAILURE BANNER" "$REPLY"
+    assert_absent "${style} animation stops repainting after Enter" $'\e[s\e8' "$REPLY"
+    drain_for 60
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+    read_until SPECIAL_STATE_ACTIVE_
+    assert_contains "${style} notice remains recorded after command submission" "MODE_${style}_BANNER_1" "$REPLY"
+    assert_contains "${style} animator is stopped after Enter" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
+    assert_contains "${style} final frame remains in terminal output" "LAST_STATE_finished" "$REPLY"
+    special_state="$REPLY"
+    special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == "$idle_frames" ]] || fail "${style} repaint worker kept advancing after Enter ($idle_frames -> $special_frames)"
+done
+print -- "ok - Legendary and Mythic gradients animate in place and freeze at their original output rows on Enter"
+
+# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 30
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+
+# The clear command is also detected before it runs, so the next prompt stays clean.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until SPECIAL_QUEUED_legendary
+read_until BASE_OUTPUT
+drain_for 60
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[10;1H' "$REPLY"
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+    read_until SPECIAL_STATE_ACTIVE_
+    assert_contains "${style} animation runs until the inspection command submits" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
+    assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
+    typeset special_state="$REPLY"
+    typeset special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
+    (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
+    typeset idle_frames="$special_frames"
+
+    # Enter freezes the final frame at its original output location. The next
+    # prompt must not print a duplicate or restart the animation below it.
+    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
+    read_until "FOLLOWUP_${style}"
+    assert_absent "${style} banner is not duplicated at the next prompt" "$style ANIMATED FAILURE BANNER" "$REPLY"
+    assert_absent "${style} animation stops repainting after Enter" $'\e[s\e8' "$REPLY"
+    drain_for 60
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+    read_until SPECIAL_STATE_ACTIVE_
+    assert_contains "${style} notice remains recorded after command submission" "MODE_${style}_BANNER_1" "$REPLY"
+    assert_contains "${style} animator is stopped after Enter" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
+    assert_contains "${style} final frame remains in terminal output" "LAST_STATE_finished" "$REPLY"
+    special_state="$REPLY"
+    special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == "$idle_frames" ]] || fail "${style} repaint worker kept advancing after Enter ($idle_frames -> $special_frames)"
+done
+print -- "ok - Legendary and Mythic gradients animate in place and freeze at their original output rows on Enter"
+
+# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 30
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+
+# The clear command is also detected before it runs, so the next prompt stays clean.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until SPECIAL_QUEUED_legendary
+read_until BASE_OUTPUT
+drain_for 60
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[10;1H' "$REPLY"
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} animation runs until the inspection command submits" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
