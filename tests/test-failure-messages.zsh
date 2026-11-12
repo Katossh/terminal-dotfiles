@@ -212,6 +212,7 @@ assert_contains "automatic Legendary retains command context" "automatic-legenda
 
 # Explicit style overrides are not replaced by automatic rarity rolls.
 export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_ANIMATION_CHANCE=0
 export DOTS_FAILURE_MYTHIC_CHANCE=10000
 export DOTS_FAILURE_LEGENDARY_CHANCE=0
 DOTS_TEST_ANIMATION_STYLE=''

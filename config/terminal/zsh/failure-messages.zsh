@@ -9,7 +9,7 @@
 #   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
 #   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
 #   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
-#   DOTS_FAILURE_GRADIENT_INTERVAL=0.10   # seconds per persistent palette step
+#   DOTS_FAILURE_GRADIENT_INTERVAL=0.08   # seconds between message gradient frames
 #   DOTS_FAILURE_ANIMATION_CHANCE=100     # 0..100; message gradient animation chance
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
