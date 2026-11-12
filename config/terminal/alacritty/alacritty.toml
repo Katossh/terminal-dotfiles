@@ -8,7 +8,7 @@ live_config_reload = true
 ipc_socket = false
 
 [font]
-normal = { family = "JetBrainsMono Nerd Font", style = "Regular" }
+normal = { family = "JetBrainsMono Nerd Font", style = "Medium" }
 bold = { family = "JetBrainsMono Nerd Font", style = "Bold" }
 italic = { family = "JetBrainsMono Nerd Font", style = "Italic" }
 bold_italic = { family = "JetBrainsMono Nerd Font", style = "Bold Italic" }
@@ -28,7 +28,7 @@ blink_timeout = 0
 decorations = "None"
 opacity = 0.9
 blur = true
-padding = { x = 0, y = 0 }
+padding = { x = 14, y = 8 }
 dynamic_title = false
 option_as_alt = "Both"
 
