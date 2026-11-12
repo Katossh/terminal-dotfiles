@@ -20,6 +20,7 @@
 
 typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
 typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
+typeset -g _DOTS_FAILURE_MESSAGE_LAST_ID=''
 typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
 
 _dots_failure_message_sanitize() {
@@ -171,12 +172,21 @@ dots_failure_message() {
     esac
 
     local -a selected_fields
+    local engine_output=''
     selected_fields=()
     if command -v python3 >/dev/null 2>&1 && [[ -r "$_DOTS_FAILURE_MESSAGE_ENGINE" ]]; then
-        selected_fields=( "${(@f)$(command python3 "$_DOTS_FAILURE_MESSAGE_ENGINE" select \
-            --category "$category" --command "$command_text" --username "$username" \
-            --streak "$_DOTS_FAILURE_MESSAGE_STREAK" \
-            --avoid-text "$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE" 2>/dev/null)}" )
+        if [[ "${DOTS_FAILURE_DEBUG:-0}" == 1 ]]; then
+            engine_output="$(command python3 "$_DOTS_FAILURE_MESSAGE_ENGINE" select \
+                --category "$category" --command "$command_text" --username "$username" \
+                --streak "$_DOTS_FAILURE_MESSAGE_STREAK" \
+                --avoid-id "$_DOTS_FAILURE_MESSAGE_LAST_ID")" || engine_output=''
+        else
+            engine_output="$(command python3 "$_DOTS_FAILURE_MESSAGE_ENGINE" select \
+                --category "$category" --command "$command_text" --username "$username" \
+                --streak "$_DOTS_FAILURE_MESSAGE_STREAK" \
+                --avoid-id "$_DOTS_FAILURE_MESSAGE_LAST_ID" 2>/dev/null)" || engine_output=''
+        fi
+        selected_fields=( "${(@f)engine_output}" )
     fi
 
     local selected_style='normal'
@@ -194,6 +204,7 @@ dots_failure_message() {
         print -u2 -- "dots: message engine unavailable; using the emergency fallback"
     fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
+    _DOTS_FAILURE_MESSAGE_LAST_ID="$selected_id"
 
     local red='' green='' yellow='' blue='' magenta='' cyan='' purple='' dim=''
     local pink='' reset=''

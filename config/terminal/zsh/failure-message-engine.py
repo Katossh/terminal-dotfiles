@@ -140,9 +140,11 @@ def load_catalog(
         )
         user_messages = config_home / "dots" / "messages"
         character_sources.append((user_messages / "characters", True))
+        # Imported collections load first; deliberate personal collections
+        # are the final override layer.
         collection_sources.extend([
-            (user_messages / "collections", True),
             (user_messages / "imported", True),
+            (user_messages / "collections", True),
         ])
 
     for directory, recursive in character_sources:
@@ -254,7 +256,7 @@ def select_message(
     username: str,
     streak: int = 1,
     rng: random.Random | random.SystemRandom | None = None,
-    avoid_text: str = "",
+    avoid_id: str = "",
 ) -> dict[str, str]:
     rng = rng or random.SystemRandom()
     style, rarity = choose_style_and_rarity(rng)
@@ -296,16 +298,13 @@ def select_message(
     character_ids = sorted(eligible)
     alternatives = [
         character_id for character_id in character_ids
-        if any(_render_text(item["text"], command, username) != avoid_text for item in eligible[character_id])
+        if any(item["id"] != avoid_id for item in eligible[character_id])
     ]
     if alternatives:
         character_ids = alternatives
     character_id = rng.choice(character_ids)
     candidates = eligible[character_id]
-    not_repeated = [
-        item for item in candidates
-        if _render_text(item["text"], command, username) != avoid_text
-    ]
+    not_repeated = [item for item in candidates if item["id"] != avoid_id]
     if not_repeated:
         candidates = not_repeated
     message = rng.choice(candidates)
@@ -333,7 +332,7 @@ def main() -> int:
     select.add_argument("--command", default="unknown")
     select.add_argument("--username", default=os.environ.get("USER", "user"))
     select.add_argument("--streak", type=int, default=1)
-    select.add_argument("--avoid-text", default="")
+    select.add_argument("--avoid-id", default="")
     args = parser.parse_args()
 
     try:
@@ -351,7 +350,7 @@ def main() -> int:
         category = args.category if args.category in CATEGORIES else "generic"
         result = select_message(
             catalog, category, args.command, args.username, max(1, args.streak),
-            avoid_text=args.avoid_text,
+            avoid_id=args.avoid_id,
         )
         print(result["style"])
         print(result["rarity"])

@@ -92,6 +92,18 @@ class FailureMessageEngineTests(unittest.TestCase):
         self.assertTrue(repeat["message_id"].startswith("generic-repeat-"))
         self.assertTrue(severe["message_id"].startswith("generic-severe-"))
 
+    def test_anti_repeat_uses_message_id_across_command_changes(self) -> None:
+        with patch.dict(os.environ, {"DOTS_FAILURE_STYLE": "normal"}, clear=False):
+            first = ENGINE.select_message(
+                self.catalog, "generic", "cargo test", "tester", rng=random.Random(17)
+            )
+            second = ENGINE.select_message(
+                self.catalog, "generic", "git status", "tester", rng=random.Random(17),
+                avoid_id=first["message_id"],
+            )
+        self.assertNotEqual(first["message_id"], second["message_id"])
+        self.assertIn("git status", second["text"])
+
     def test_custom_collection_overrides_message_id(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             config_home = Path(temporary)
@@ -113,6 +125,33 @@ class FailureMessageEngineTests(unittest.TestCase):
             (collection_dir / "personal.json").write_text(json.dumps(custom), encoding="utf-8")
             catalog = ENGINE.load_catalog(ROOT, config_home=config_home, include_user=True)
         self.assertEqual(catalog["messages"]["generic-base-1"]["text"], "A private replacement for {command}.")
+        self.assertEqual(catalog["issues"], [])
+
+    def test_personal_collection_overrides_imported_collection(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config_home = Path(temporary)
+            imported_dir = config_home / "dots/messages/imported"
+            personal_dir = config_home / "dots/messages/collections"
+            imported_dir.mkdir(parents=True)
+            personal_dir.mkdir(parents=True)
+            base = {
+                "schema_version": 1,
+                "id": "same-id",
+                "messages": [{
+                    "id": "generic-base-1",
+                    "character_id": "terminal",
+                    "category": "generic",
+                    "style": "normal",
+                    "rarity": "common",
+                    "severity": "base",
+                    "text": "Imported wording for {command}.",
+                }],
+            }
+            (imported_dir / "bundle.json").write_text(json.dumps(base), encoding="utf-8")
+            base["messages"][0]["text"] = "Personal wording for {command}."
+            (personal_dir / "custom.json").write_text(json.dumps(base), encoding="utf-8")
+            catalog = ENGINE.load_catalog(ROOT, config_home=config_home, include_user=True)
+        self.assertEqual(catalog["messages"]["generic-base-1"]["text"], "Personal wording for {command}.")
         self.assertEqual(catalog["issues"], [])
 
     def test_personal_data_cannot_weaken_builtin_character_eligibility(self) -> None:
