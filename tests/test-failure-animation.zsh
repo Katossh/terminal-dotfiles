@@ -234,6 +234,7 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
+    assert_contains "${style} enqueue captures accepted TTY request" "START_RESULT_0_MODE_${style}_BANNER_SET_1_PENDING_1_INTERACTIVE_1_TTY0_1_TTY1_1_NO_COLOR_" "$REPLY"
     # The queue marker is printed inside the command, before precmd redraws
     # the prompt and starts the async stream. Wait for that prompt explicitly.
     read_until "BASE_OUTPUT"
