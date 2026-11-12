@@ -152,12 +152,25 @@ if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size
 fi
 if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
     image_file="${@: -1}"
-    [[ -s "$image_file" ]] || exit 1
-    [[ "$(head -c 6 "$image_file")" == GIF89a ]] || exit 1
+    printf 'KITTY_GIF_CANDIDATE_%s\n' "$image_file" >> "${DOTS_TEST_KITTY_LOG:?}"
+    [[ -s "$image_file" ]] || {
+        printf 'KITTY_GIF_REJECTED_EMPTY\n' >> "${DOTS_TEST_KITTY_LOG:?}"
+        exit 1
+    }
+    [[ "$(head -c 6 "$image_file")" == GIF89a ]] || {
+        printf 'KITTY_GIF_REJECTED_HEADER\n' >> "${DOTS_TEST_KITTY_LOG:?}"
+        exit 1
+    }
     frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-    [[ "$frame_count" -ge 2 ]] || exit 1
-    grep -aq 'NETSCAPE2.0' "$image_file" || exit 1
-    printf 'ANIMATED_GIF_FRAMES_%s\nANIMATED_GIF_LOOPING\n' "$frame_count" >> "${DOTS_TEST_ANIMATION_LOG:?}"
+    [[ "$frame_count" -ge 2 ]] || {
+        printf 'KITTY_GIF_REJECTED_FRAME_COUNT_%s\n' "$frame_count" >> "${DOTS_TEST_KITTY_LOG:?}"
+        exit 1
+    }
+    grep -aq 'NETSCAPE2.0' "$image_file" || {
+        printf 'KITTY_GIF_REJECTED_NO_LOOP_EXTENSION\n' >> "${DOTS_TEST_KITTY_LOG:?}"
+        exit 1
+    }
+    printf 'ANIMATED_GIF_FRAMES_%s\nANIMATED_GIF_LOOPING\n' "$frame_count" >> "${DOTS_TEST_KITTY_LOG:?}"
 fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
