@@ -76,6 +76,7 @@ zypper	htop	optional
 zypper	eza	optional
 zypper	starship	optional
 zypper	alacritty	optional
+zypper	google-noto-coloremoji-fonts	required
 apk	zsh	required
 apk	git	required
 apk	tmux	required
