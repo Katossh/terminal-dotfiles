@@ -66,8 +66,16 @@ _dots_test_render_gradients() {
     local first_frame=''
     _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 0
     first_frame="$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE"
+    local first_color_zero="${first_frame#*38;2;}"
+    first_color_zero="${first_color_zero%%m*}"
     _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 20
     [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" != "$first_frame" ]] || return 1
+    local first_color_twenty="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE#*38;2;}"
+    first_color_twenty="${first_color_twenty%%m*}"
+    # At phase 20 the leftmost character has advanced into the later part
+    # of the palette; adding the phase would move the highlight the other way.
+    [[ "$first_color_zero" == '74;50;12' &&
+       "$first_color_twenty" == '190;145;55' ]] || return 1
 
     _DOTS_FAILURE_ANIMATION_MODE='mythic'
     _DOTS_FAILURE_ANIMATION_BANNER='🌠 MYTHIC STARFALL 🌠'
@@ -94,7 +102,12 @@ _dots_test_queue_special_animation() {
     print -r -- "SPECIAL_QUEUED_${style}"
 }
 _dots_test_snapshot_special_animation() {
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
+    local banner_set=0
+    [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
+}
+clear() {
+    print -r -- CLEAR_EXECUTED
 }
 _dots_test_enable_infinite() {
     export DOTS_FAILURE_ANIMATION_INFINITE=1
@@ -225,13 +238,172 @@ for style in legendary mythic; do
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
+    assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
     typeset special_state="$REPLY"
     typeset special_frames="${special_state##*LAST_FRAMES_}"
     special_frames="${special_frames%%[^0-9]*}"
     [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
     (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
+
+    # Submitting another command must preserve the banner and restart its
+    # animation at the next prompt rather than discarding it on line-finish.
+    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+    read_until "FOLLOWUP_${style}"
+    drain_for 60
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+    read_until SPECIAL_STATE_ACTIVE_
+    assert_contains "${style} banner survives a submitted command" "MODE_${style}_BANNER_1" "$REPLY"
+    special_state="$REPLY"
+    special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == <-> ]] || fail "${style} post-command frame count was not reported: ${special_state}"
+    (( special_frames >= 3 )) || fail "${style} animation did not resume after a submitted command: ${special_state}"
 done
-print -- "ok - Legendary and Mythic gradients advance continuously while the prompt is idle"
+print -- "ok - Legendary and Mythic gradients resume at each prompt until the screen is cleared"
+
+# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
+zpty -w "$PTY_NAME" 
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\x0c'
+drain_for 30
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+
+# The clear command is also detected before it runs, so the next prompt stays clean.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+read_until SPECIAL_QUEUED_legendary
+read_until BASE_OUTPUT
+drain_for 60
+zpty -w "$PTY_NAME" 'clear'
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\\n'
+read_until SPECIAL_STATE_ACTIVE_
+assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
 
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
