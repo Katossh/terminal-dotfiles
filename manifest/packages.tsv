@@ -19,6 +19,7 @@ apt	eza	optional
 apt	xdg-utils	optional
 apt	starship	optional
 apt	alacritty	optional
+apt	fonts-noto-color-emoji	required
 dnf	zsh	required
 dnf	git	required
 dnf	tmux	required
@@ -37,6 +38,7 @@ dnf	htop	optional
 dnf	eza	optional
 dnf	starship	optional
 dnf	alacritty	optional
+dnf	google-noto-color-emoji-fonts	required
 pacman	zsh	required
 pacman	git	required
 pacman	tmux	required
@@ -55,6 +57,7 @@ pacman	htop	optional
 pacman	eza	optional
 pacman	starship	optional
 pacman	alacritty	optional
+pacman	noto-fonts-emoji	required
 zypper	zsh	required
 zypper	git	required
 zypper	tmux	required
@@ -91,6 +94,7 @@ apk	htop	optional
 apk	eza	optional
 apk	starship	optional
 apk	alacritty	optional
+apk	font-noto-emoji	required
 xbps	zsh	required
 xbps	git	required
 xbps	tmux	required
@@ -109,6 +113,7 @@ xbps	htop	optional
 xbps	eza	optional
 xbps	starship	optional
 xbps	alacritty	optional
+xbps	noto-fonts-emoji	required
 pkg	zsh	required
 pkg	git	required
 pkg	tmux	required
@@ -126,6 +131,7 @@ pkg	fastfetch	optional
 pkg	htop	optional
 pkg	eza	optional
 pkg	alacritty	optional
+pkg	noto-emoji	required
 brew	zsh	required
 brew	git	required
 brew	tmux	required
@@ -144,6 +150,7 @@ brew	htop	optional
 brew	eza	optional
 brew	starship	optional
 brew-cask	alacritty	optional
+brew-cask	font-noto-color-emoji	required
 nixpkgs	zsh	required
 nixpkgs	git	required
 nixpkgs	tmux	required
@@ -164,3 +171,4 @@ nixpkgs	xdg-utils	optional
 nixpkgs	starship	optional
 nixpkgs	alacritty	optional
 nixpkgs-fonts	nerd-fonts.jetbrains-mono	required
+nixpkgs-fonts	noto-fonts-color-emoji	required

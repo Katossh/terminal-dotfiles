@@ -1,20 +1,71 @@
-# Alacritty configuration.
-# The relative import works with both the default and custom XDG_CONFIG_HOME.
+# Alacritty tuned to match config/terminal/kitty/kitty.conf.
+# Native pane splits, persistent layouts and Kitty kittens are not Alacritty
+# features; use tmux for pane/layout management.
 
 [general]
 import = ["catppuccin-frappe.toml"]
 live_config_reload = true
+ipc_socket = false
 
 [font]
 normal = { family = "JetBrainsMono Nerd Font", style = "Regular" }
+bold = { family = "JetBrainsMono Nerd Font", style = "Bold" }
+italic = { family = "JetBrainsMono Nerd Font", style = "Italic" }
+bold_italic = { family = "JetBrainsMono Nerd Font", style = "Bold Italic" }
 size = 14.0
+offset = { x = 0, y = 2 }
 
 [scrolling]
 history = 20000
+multiplier = 3
 
 [cursor]
 style = { shape = "Beam", blinking = "On" }
+blink_interval = 1000
+blink_timeout = 0
 
 [window]
+decorations = "None"
 opacity = 0.9
-padding = { x = 8, y = 8 }
+blur = true
+padding = { x = 0, y = 0 }
+dynamic_title = false
+option_as_alt = "Both"
+
+[bell]
+duration = 0
+
+[selection]
+save_to_clipboard = false
+
+[mouse]
+hide_when_typing = false
+bindings = [
+  { mouse = "Middle", action = "None" },
+]
+
+[keyboard]
+bindings = [
+  # Kitty's Alt-based scrollback and search controls.
+  { key = "K", mods = "Alt", action = "ScrollLineUp" },
+  { key = "J", mods = "Alt", action = "ScrollLineDown" },
+  { key = "U", mods = "Alt", action = "ScrollPageUp" },
+  { key = "D", mods = "Alt", action = "ScrollPageDown" },
+  { key = "/", mods = "Alt", action = "SearchForward" },
+  { key = ".", mods = "Alt", action = "SearchBackward" },
+
+  # Keep the same explicit OS-clipboard shortcuts as Kitty.
+  { key = "C", mods = "Control|Shift", action = "Copy" },
+  { key = "V", mods = "Control|Shift", action = "Paste" },
+
+  # Kitty's Alt-based font-size controls.
+  { key = "=", mods = "Alt", action = "IncreaseFontSize" },
+  { key = "-", mods = "Alt", action = "DecreaseFontSize" },
+]
+
+[[hints.enabled]]
+hyperlinks = true
+post_processing = true
+persist = false
+mouse = { enabled = true, mods = "Control" }
+binding = { key = "U", mods = "Control|Shift" }
