@@ -91,6 +91,18 @@ _dots_test_render_gradients() {
     rendered="$(_dots_failure_animation_render_prompt)"
     [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
 
+    local palette_style expected_color
+    for palette_style in normal anime ecchi rainbow; do
+        _dots_failure_animation_gradient_line 'PALETTE CHECK' "$palette_style" 0
+        case "$palette_style" in
+            normal) expected_color='36;123;160' ;;
+            anime) expected_color='255;190;220' ;;
+            ecchi) expected_color='120;24;70' ;;
+            rainbow) expected_color='255;82;82' ;;
+        esac
+        [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW" == *$'\e[38;2;'$expected_color'm'* ]] || return 1
+    done
+
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
     print -- GRADIENTS_OK
@@ -107,16 +119,14 @@ _dots_test_queue_special_animation() {
     print -r -- "SPECIAL_QUEUED_$style"
 }
 _dots_test_snapshot_special_animation() {
-    local banner_set=0
-    [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
+    local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
     local rendered_frames="$(command grep -o 'MAGICK_INPUT_FRAMES_25' "$DOTS_TEST_ANIMATION_LOG" | command wc -l)"
     rendered_frames="${rendered_frames//[[:space:]]/}"
     local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
     animated_gifs="${animated_gifs//[[:space:]]/}"
-    local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}_KITTY_LOG_${kitty_log}"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
 }
 
 clear() {
@@ -211,7 +221,7 @@ chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
 
-zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \
+zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" DOTS_TEST_GIF_LOG="$GIF_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
@@ -308,47 +318,39 @@ zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 
-# Exercise both rare styles using one Kitty graphics placement per failure.
-local -i expected_kitty_calls=0
-for style in legendary mythic; do
+# Both rare styles animate their actual text, repainting the same terminal
+# rows. The final message stays as plain output; no Kitty image can scroll it.
+for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0" "$REPLY"
+    assert_contains "${style} renders truecolour gradient text" $'\e[38;2;' "$REPLY"
+    assert_contains "${style} clears and repaints the same rows" $'\e[2K' "$REPLY"
+    assert_contains "${style} uses relative cursor movement" $'\e[1A' "$REPLY"
+    assert_absent "${style} does not create a Kitty image placement" "--place" "$REPLY"
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    (( expected_kitty_calls += 1 ))
-    assert_contains "${style} creates exactly one scrollback graphic" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} overlay uses absolute cell placement" "--place" "$REPLY"
-    assert_contains "${style} overlay is layered above the text cells" "--z-index 1" "$REPLY"
-    assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
-    assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
-    assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
-    assert_contains "${style} renderer generates 25 distinct frames" "RENDERED_25_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIFS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIFS_$expected_kitty_calls" "$REPLY"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
+    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
+    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
 
-    # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
     read_until "FOLLOWUP_${style}"
-    assert_absent "${style} banner is not re-emitted at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} animation does not move beneath the input line" $'\e[10;1H' "$REPLY"
-
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} does not create another graphic on the next prompt" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} leaves no shell-side animation worker" "ACTIVE_0" "$REPLY"
+    assert_absent "${style} message is not replayed at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
+    assert_absent "${style} does not jump back to an old screen coordinate" $'\e[10;1H' "$REPLY"
 done
-print -- "ok - Legendary and Mythic overlays are emitted once and stay attached to Kitty scrollback"
+print -- "ok - all eight message styles animate in place without persistent graphics"
 
-# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
+# There is no longer a persistent graphic layer to clear; both clear paths
+# operate on ordinary terminal text and leave no background animation worker.
 zpty -w "$PTY_NAME" $'\x0c'
 drain_for 30
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+assert_contains "Ctrl+L leaves no animation worker" "ACTIVE_0" "$REPLY"
 
-# The clear command is also detected before it runs, so the next prompt stays clean.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
 read_until SPECIAL_QUEUED_legendary
 read_until BASE_OUTPUT
@@ -357,7 +359,7 @@ zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
+assert_contains "clear leaves no persistent animation worker" "ACTIVE_0" "$REPLY"
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
 read_until INFINITE_ENABLED

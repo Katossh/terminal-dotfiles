@@ -9,8 +9,8 @@
 #   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
 #   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
 #   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
-#   DOTS_FAILURE_GRADIENT_INTERVAL=0.10   # seconds per persistent palette step
-#   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; animations require an interactive TTY
+#   DOTS_FAILURE_GRADIENT_INTERVAL=0.08   # seconds between message gradient frames
+#   DOTS_FAILURE_ANIMATION_CHANCE=100     # 0..100; message gradient animation chance
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
@@ -147,7 +147,7 @@ dots_failure_message() {
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
     # DOTS_FAILURE_RARE_CHANCE remains an alias for the old Rainbow setting.
     local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
-    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
+    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-100}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
@@ -614,15 +614,14 @@ dots_failure_message() {
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
     local -i special_banner_queued=0
-    if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
-        # Rare banners own their continuous gradient and bypass the ordinary
-        # emoji chance. Fall back to static gradient output when ZLE animation
-        # is unavailable, disabled, or suppressed by NO_COLOR.
+    if [[ "$selected_style" == legendary || "$selected_style" == mythic ]] ||
+       (( RANDOM % 100 < animation_chance )); then
+        # Every style animates the complete message in place. Rare styles
+        # always animate; ordinary styles use DOTS_FAILURE_ANIMATION_CHANCE.
+        # The renderer leaves only final, selectable text in scrollback.
         if _dots_failure_message_animate "$selected_style" "$selected_template" "$detail"; then
             special_banner_queued=1
         fi
-    elif (( RANDOM % 100 < animation_chance )); then
-        _dots_failure_message_animate "$selected_style"
     fi
 
     if (( ! special_banner_queued )); then
