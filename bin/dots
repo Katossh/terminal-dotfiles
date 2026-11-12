@@ -504,10 +504,10 @@ install_packages() {
             fi
         fi
     done < "$PACKAGES_MANIFEST"
-    (("${#required[@]}")) && install_package_batch "$manager" "${required[@]}"
-    (("${#optional[@]}")) && install_package_batch "$manager" "${optional[@]}"
-    (("${#cask_required[@]}")) && install_package_batch brew-cask "${cask_required[@]}"
-    (("${#cask_optional[@]}")) && install_package_batch brew-cask "${cask_optional[@]}"
+    (( ${#required[@]} )) && install_package_batch "$manager" "${required[@]}"
+    (( ${#optional[@]} )) && install_package_batch "$manager" "${optional[@]}"
+    (( ${#cask_required[@]} )) && install_package_batch brew-cask "${cask_required[@]}"
+    (( ${#cask_optional[@]} )) && install_package_batch brew-cask "${cask_optional[@]}"
     while IFS=$'\t' read -r pkg_manager package was; do
         [[ "$was" == new ]] || continue
         if package_installed "$pkg_manager" "$package"; then
@@ -516,7 +516,9 @@ install_packages() {
     done < "$before"
     rm -f "$before"
     if ! command -v starship >/dev/null 2>&1 && [[ ! -x "$LOCAL_BIN/starship" ]]; then install_starship_upstream; fi
-}create_compat_command() {
+}
+
+create_compat_command() {
     local target_command="$1" alias_name="$2" actual_path
     command -v "$alias_name" >/dev/null 2>&1 && return 0
     actual_path="$(command -v "$target_command" 2>/dev/null || true)"
