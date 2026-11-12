@@ -228,6 +228,7 @@ DOTS_TEST_ANIMATION_AVAILABLE=1
 # Anime style, to the animation. Repeat until the weighted branch is exercised.
 export DOTS_FAILURE_STYLE=auto
 export DOTS_FAILURE_LEGENDARY_CHANCE=0
+export DOTS_FAILURE_MYTHIC_CHANCE=0
 export DOTS_FAILURE_RAINBOW_CHANCE=0
 integer auto_attempt=0
 typeset auto_ecchi_found=0
