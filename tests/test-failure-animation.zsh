@@ -125,7 +125,7 @@ _dots_test_start_special_animation_precmd() {
     emulate -L zsh
     add-zsh-hook -d precmd _dots_test_start_special_animation_precmd
 
-    local saved_no_color="\${NO_COLOR-}"
+    local saved_no_color="${NO_COLOR-}"
     unset NO_COLOR
     local -i start_status=0
     _dots_failure_animation_start \
@@ -136,7 +136,7 @@ _dots_test_start_special_animation_precmd() {
     return "$start_status"
 }
 _dots_test_queue_special_animation() {
-    local style="\${1}"
+    local style="${1}"
     _DOTS_TEST_SPECIAL_STYLE="$style"
     _DOTS_TEST_SPECIAL_BANNER="$style ANIMATED FAILURE BANNER"
     _DOTS_TEST_SPECIAL_DETAIL='live gradient test'
@@ -146,12 +146,12 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
-    kitty_calls="\${kitty_calls//[[:space:]]/}"
+    kitty_calls="${kitty_calls//[[:space:]]/}"
     local rendered_frames="$(command grep -o 'MAGICK_INPUT_FRAMES_25' "$DOTS_TEST_ANIMATION_LOG" | command wc -l)"
-    rendered_frames="\${rendered_frames//[[:space:]]/}"
+    rendered_frames="${rendered_frames//[[:space:]]/}"
     local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
-    animated_gifs="\${animated_gifs//[[:space:]]/}"
-    print -r -- "SPECIAL_STATE_GRADIENT_ACTIVE_\${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_\${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_\${banner_frames}_PHASE_\${_DOTS_FAILURE_GRADIENT_PHASE}_PENDING_\${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_\${kitty_calls}_RENDERED_25_\${rendered_frames}_ANIMATED_GIFS_\${animated_gifs}"
+    animated_gifs="${animated_gifs//[[:space:]]/}"
+    print -r -- "SPECIAL_STATE_GRADIENT_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
 }
 clear() {
     print -r -- CLEAR_EXECUTED
