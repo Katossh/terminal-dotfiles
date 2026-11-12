@@ -378,20 +378,20 @@ assert_absent "animation never places a Kitty image" "--place" "$REPLY"
 # completes without Kitty graphics or ImageMagick.
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_\${style}"
-    assert_contains "\${style} queue is acknowledged" "SPECIAL_QUEUED_\${style}" "$REPLY"
-    read_until "\${style} ANIMATED FAILURE BANNER"
-    assert_contains "\${style} banner is shown in the editable prompt" "\${style} ANIMATED FAILURE BANNER" "$REPLY"
-    assert_contains "\${style} uses a truecolour prompt gradient" $'\e[38;2;' "$REPLY"
+    read_until "SPECIAL_QUEUED_${style}"
+    assert_contains "${style} queue is acknowledged" "SPECIAL_QUEUED_${style}" "$REPLY"
+    read_until "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} banner is shown in the editable prompt" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} uses a truecolour prompt gradient" $'\e[38;2;' "$REPLY"
     drain_for 60
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-    assert_contains "\${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "\${style} leaves no asynchronous gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-    assert_contains "\${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
-    assert_contains "\${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
-    assert_contains "\${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
+    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
+    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
 done
 print -- "ok - all eight message styles animate through ZLE without intercepting input"
 
