@@ -31,7 +31,7 @@ sudo nixos-rebuild build
 sudo nixos-rebuild switch
 ```
 
-The module reads the `nixpkgs` rows from `../manifest/packages.tsv`, enables Zsh and adds packages to `environment.systemPackages`. Missing optional attributes are skipped; missing required attributes fail evaluation rather than silently omitting required dependencies.
+The module reads the `nixpkgs` rows from `../manifest/packages.tsv`, enables Zsh and adds packages to `environment.systemPackages`. Alacritty is included as an optional package. `nixpkgs-fonts` rows are installed through `fonts.packages`: both JetBrainsMono Nerd Font and `noto-fonts-color-emoji` are required, with the latter used as the configured color-emoji fallback. Missing optional attributes are skipped; missing required attributes fail evaluation rather than silently omitting required dependencies.
 
 Set the login shell in your host configuration if desired:
 

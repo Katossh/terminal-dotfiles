@@ -32,6 +32,15 @@ test -L "$XDG_CONFIG_HOME/zsh/.zshrc"
 test ! -d "$REPO_DIR/config/terminal/zsh/.packages"
 test -L "$XDG_CONFIG_HOME/kitty/kitty.conf"
 test "$(readlink "$XDG_CONFIG_HOME/kitty/kitty.conf")" = "$XDG_CONFIG_HOME/dots/overrides/kitty/kitty.conf"
+test -L "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+test -L "$XDG_CONFIG_HOME/alacritty/catppuccin-frappe.toml"
+test -L "$XDG_CONFIG_HOME/alacritty/LICENSE"
+test -L "$XDG_CONFIG_HOME/fontconfig/conf.d/75-noto-color-emoji.conf"
+grep -Fq 'import = ["catppuccin-frappe.toml"]' "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+grep -Fq 'family = "JetBrainsMono Nerd Font"' "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+grep -Fq 'decorations = "None"' "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+grep -Fq 'action = "None"' "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+grep -Fq 'Noto Color Emoji' "$XDG_CONFIG_HOME/fontconfig/conf.d/75-noto-color-emoji.conf"
 test -L "$HOME/.local/bin/dots"
 test -L "$HOME/.local/bin/kp"
 test -f "$XDG_CONFIG_HOME/kitty/themes/dots-palette.conf"
@@ -186,7 +195,86 @@ grep -Fq 'The installer never edits /etc/nixos' <<< "$nixos_output"
 grep -Fq 'profile install' "$NIX_TEST_LOG"
 grep -Fq 'nixpkgs#zsh' "$NIX_TEST_LOG"
 grep -Fq 'nixpkgs#neovim' "$NIX_TEST_LOG"
+grep -Fq 'nixpkgs#alacritty' "$NIX_TEST_LOG"
+
+for manager in apt dnf pacman zypper apk xbps pkg brew-cask nixpkgs; do
+    awk -F '\t' -v manager="$manager" '$1 == manager && $2 == "alacritty" && $3 == "optional" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
+done
+
+expected_font_packages=(
+    $'apt\tfonts-noto-color-emoji\trequired'
+    $'dnf\tgoogle-noto-color-emoji-fonts\trequired'
+    $'pacman\tnoto-fonts-emoji\trequired'
+    $'zypper\tgoogle-noto-coloremoji-fonts\trequired'
+    $'apk\tfont-noto-emoji\trequired'
+    $'xbps\tnoto-fonts-emoji\trequired'
+    $'pkg\tnoto-emoji\trequired'
+    $'brew-cask\tfont-noto-color-emoji\trequired'
+    $'nixpkgs-fonts\tnoto-fonts-color-emoji\trequired'
+)
+for expected in "${expected_font_packages[@]}"; do
+    grep -Fqx -- "$expected" "$REPO_DIR/manifest/packages.tsv"
+done
+
 awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
 grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
 grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
+awk -F '\\t' '$1 == "nixpkgs-fonts" && $2 == "noto-fonts-color-emoji" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
+grep -Fq 'fonts.packages = fontPackages;' "$REPO_DIR/nix/packages.nix"
+
+# Homebrew casks are distinct from formulae and must be installed and tracked.
+# Fake Homebrew supports the Alacritty app and Noto Color Emoji font casks.
+cat > "$TEST_ROOT/bin/brew" <<'BREW'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf '%s\n' "$*" >> "${BREW_TEST_LOG:?}"
+case "${1:-} ${2:-}" in
+    "list --formula") exit 0 ;;
+    "list --cask") [[ -e "$BREW_TEST_ROOT/${3}-installed" ]] ;;
+    "info --cask")
+        if [[ "${3:-}" == alacritty && "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
+            printf '%s\n' 'Alacritty is disabled'
+        else
+            printf '%s\n' "${3} is available"
+        fi
+        ;;
+    "install --cask")
+        [[ "${3:-}" == alacritty || "${3:-}" == font-noto-color-emoji ]] || exit 1
+        touch "$BREW_TEST_ROOT/${3}-installed"
+        ;;
+    "uninstall --cask")
+        [[ "${3:-}" == alacritty || "${3:-}" == font-noto-color-emoji ]] || exit 1
+        rm -f "$BREW_TEST_ROOT/${3}-installed"
+        ;;
+    *) exit 1 ;;
+esac
+BREW
+cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
+#!/usr/bin/env bash
+exit 0
+STARSHIP
+chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
+export BREW_TEST_LOG="$TEST_ROOT/brew.log"
+export BREW_TEST_ROOT="$TEST_ROOT"
+
+# Disabled Alacritty cask is skipped; the font cask remains installable.
+PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
+    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
+! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
+grep -Fq 'install --cask font-noto-color-emoji' "$BREW_TEST_LOG"
+grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
+
+# With the cask enabled, both packages are recorded and safely purgeable.
+PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
+    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
+grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
+grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
+grep -Fq 'brew-cask:font-noto-color-emoji' "$XDG_DATA_HOME/dots/state.tsv"
+PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
+    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
+grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
+grep -Fq 'uninstall --cask font-noto-color-emoji' "$BREW_TEST_LOG"
+test ! -e "$TEST_ROOT/alacritty-installed"
+test ! -e "$TEST_ROOT/font-noto-color-emoji-installed"
+
 echo 'dots lifecycle tests passed'

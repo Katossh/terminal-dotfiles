@@ -87,6 +87,17 @@ The package manifest contains entries for apt, dnf, pacman, zypper, apk, xbps, F
 - Required packages are requested directly; optional packages are installed only when available.
 - Package operations may request administrator privileges through sudo or doas. Configuration linking and Git downloads run as the normal user.
 
+Alacritty is listed as an optional application package for the supported package managers and Nixpkgs. `dots install --packages` installs it when available; its configuration and Catppuccin Frappé theme are linked even with `--no-packages`. Homebrew's official Alacritty cask is currently disabled because it fails Gatekeeper checks, so the installer skips it rather than weakening macOS security.
+
+Noto Color Emoji is installed as a required font package where supported: Debian/Ubuntu `fonts-noto-color-emoji`, Fedora `google-noto-color-emoji-fonts`, Arch `noto-fonts-emoji`, openSUSE `google-noto-coloremoji-fonts`, Alpine `font-noto-emoji`, Void `noto-fonts-emoji`, FreeBSD `noto-emoji`, and Homebrew Cask `font-noto-color-emoji`. NixOS uses the `noto-fonts-color-emoji` Nixpkgs font attribute. The managed Fontconfig rule appends `Noto Color Emoji` as a fallback after `JetBrainsMono Nerd Font`, without replacing the primary terminal font. On Linux/BSD, verify glyph fallback with:
+
+~~~sh
+fc-match "JetBrainsMono Nerd Font"
+fc-match "JetBrainsMono Nerd Font:charset=1f600"
+~~~
+
+The second query should resolve to Noto Color Emoji when the font is installed and the Fontconfig rule is loaded.
+
 ## NixOS
 
 dots install --packages installs declared packages into the current user's Nix profile. It does not modify /etc/nixos, generate a host configuration or execute nixos-rebuild.

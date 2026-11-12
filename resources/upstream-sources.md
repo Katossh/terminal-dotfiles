@@ -7,6 +7,7 @@ The current `master` tree contains the following third-party projects as regular
 | `config/terminal/bat/themes/oceanic-next-color-scheme` | [voronianski/oceanic-next-color-scheme](https://github.com/voronianski/oceanic-next-color-scheme) |
 | `config/terminal/bat/themes/material-theme` | [equinusocio/material-theme](https://github.com/equinusocio/material-theme) |
 | `config/terminal/kitty/kitty_grab` | [yurikhan/kitty_grab](https://github.com/yurikhan/kitty_grab) |
+| `config/terminal/alacritty/catppuccin-frappe.toml` | [catppuccin/alacritty](https://github.com/catppuccin/alacritty) — Catppuccin Frappé (MIT; license included beside the theme) |
 | `config/terminal/yazi/theme.toml` | [catppuccin/yazi](https://github.com/catppuccin/yazi) — Catppuccin Frappé Sapphire |
 | `config/terminal/yazi/Catppuccin-frappe.tmTheme` | [catppuccin/bat](https://github.com/catppuccin/bat) — Frappé syntax highlighting |
 

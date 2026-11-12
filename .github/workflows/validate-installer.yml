@@ -88,6 +88,7 @@ jobs:
       - name: Validate common profile
         shell: bash
         run: |
+          test -x bin/dots
           test -s manifest/configs.tsv
           test -s manifest/packages.tsv
           test -s nix/packages.nix
@@ -121,6 +122,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import tomllib
+          import xml.etree.ElementTree as ET
 
           config = Path("config/terminal/yazi")
           settings = tomllib.loads((config / "yazi.toml").read_text())
@@ -131,7 +133,40 @@ jobs:
           assert theme["mgr"]["syntect_theme"] == "~/.config/yazi/Catppuccin-frappe.tmTheme"
           assert theme["mode"]["normal_main"]["bg"] == "#85c1dc"
           assert (config / "Catppuccin-frappe.tmTheme").is_file()
-          print("Yazi config is valid: Neovim opener and Catppuccin Frappé Sapphire theme.")
+          alacritty = Path("config/terminal/alacritty")
+          terminal = tomllib.loads((alacritty / "alacritty.toml").read_text())
+          frappe = tomllib.loads((alacritty / "catppuccin-frappe.toml").read_text())
+
+          assert terminal["general"]["import"] == ["catppuccin-frappe.toml"]
+          assert terminal["font"]["normal"]["family"] == "JetBrainsMono Nerd Font"
+          assert terminal["font"]["bold"]["family"] == "JetBrainsMono Nerd Font"
+          assert terminal["font"]["italic"]["family"] == "JetBrainsMono Nerd Font"
+          assert terminal["font"]["bold_italic"]["family"] == "JetBrainsMono Nerd Font"
+          assert terminal["scrolling"]["history"] == 20000
+          assert terminal["cursor"]["style"]["shape"] == "Beam"
+          assert terminal["cursor"]["blink_interval"] == 1000
+          assert terminal["window"]["opacity"] == 0.9
+          assert terminal["window"]["decorations"] == "None"
+          assert terminal["window"]["blur"] is True
+          assert terminal["general"]["ipc_socket"] is False
+          assert terminal["hints"]["enabled"][0]["hyperlinks"] is True
+          assert terminal["hints"]["enabled"][0]["action"] == "Copy"
+          bindings = terminal["keyboard"]["bindings"]
+          assert {"key": "T", "mods": "Alt", "action": "CreateNewTab"} in bindings
+          assert {"key": "]", "mods": "Alt", "action": "SelectNextTab"} in bindings
+          assert {"key": "[", "mods": "Alt", "action": "SelectPreviousTab"} in bindings
+          assert frappe["colors"]["primary"]["background"] == "#303446"
+          assert frappe["colors"]["primary"]["foreground"] == "#c6d0f5"
+          assert frappe["colors"]["normal"]["blue"] == "#8caaee"
+          assert (alacritty / "LICENSE").is_file()
+
+          fontconfig = ET.parse("config/fontconfig/conf.d/75-noto-color-emoji.conf").getroot()
+          fallback_test = fontconfig.find("./match/test")
+          fallback_edit = fontconfig.find("./match/edit")
+          assert fallback_test is not None and fallback_test.findtext("string") == "JetBrainsMono Nerd Font"
+          assert fallback_edit is not None and fallback_edit.attrib["mode"] == "append"
+          assert fallback_edit.findtext("string") == "Noto Color Emoji"
+          print("Yazi, Alacritty TOML, Fontconfig XML, and Catppuccin Frappé configuration are valid.")
           PY
 
       - name: Help and non-destructive dry run
