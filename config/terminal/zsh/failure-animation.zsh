@@ -205,52 +205,74 @@ _dots_failure_animation_gradient_line() {
     _DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW="$raw_output"
 }
 
-# Print the rare notice once at the current output position, then remember
-# that cursor location using DEC save/restore. Animation frames repaint only
-# that location while ZLE is active; they never rebuild PROMPT.
+_dots_failure_animation_query_cursor() {
+    emulate -L zsh
+
+    local tty_state response
+    local -i read_status=0
+    tty_state="$(command stty -g < /dev/tty 2>/dev/null)" || return 1
+    command stty -echo -icanon min 0 time 5 < /dev/tty 2>/dev/null || return 1
+    print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- $'\\e[6n'
+    IFS= builtin read -r -d R -t 0.5 response < /dev/tty
+    read_status=$?
+    command stty "$tty_state" < /dev/tty 2>/dev/null || return 1
+    (( read_status == 0 )) || return 1
+    response="${response#$'\\e['}"
+    response="${response%R}"
+    [[ "$response" == <->\\;<-> ]] || return 1
+    _DOTS_FAILURE_ANIMATION_ANCHOR_ROW="${response%%;*}"
+    _DOTS_FAILURE_ANIMATION_ANCHOR_COL="${response#*;}"
+    (( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_COL > 0 ))
+}
+
+# Print the banner once at the current cursor position. Its absolute screen
+# coordinates were captured immediately beforehand with the terminal DSR.
 _dots_failure_animation_print_anchor() {
     emulate -L zsh
     local fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
-    local -a banner_lines
     local line
-    local -i line_count=0 index=0
+    local -a banner_lines
+    local -i index=0
     (( fd >= 0 )) || return 1
     banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
-    line_count=${#banner_lines}
-    (( line_count > 0 )) || return 1
-    for (( index = 1; index <= line_count; index++ )); do
+    (( ${#banner_lines} > 0 )) || return 1
+    print -rn -u "$fd" -- $'\\e[?7l'
+    for (( index = 1; index <= ${#banner_lines}; index++ )); do
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" 0
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
-        print -r -u "$fd" -- ''
+        print -rn -u "$fd" -- $'\\r\\n'
     done
-    # Save the top line after the initial write, then restore the cursor
-    # below the banner so the normal prompt follows it.
-    print -rn -u "$fd" -- $'\e['"${line_count}"$'A\r\e7\e['"${line_count}"$'B\r'
-    _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="$line_count"
+    print -rn -u "$fd" -- $'\\e[?7h'
+    _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="${#banner_lines}"
 }
 
+# Repaint with absolute cursor coordinates. Never use DECSC/DECRC or CSI s/u:
+# ZLE shares those single save-cursor slots and can overwrite them while editing.
 _dots_failure_animation_render_anchor() {
     emulate -L zsh
     local fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
     local line
     local -a banner_lines
-    local -i index=0 line_count=0
-    (( fd >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_LINES > 0 )) || return 1
+    local -i index=0 row=0
+    (( fd >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 )) || return 1
     banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
-    line_count=${#banner_lines}
-    # Save the live ZLE cursor, jump to the original output row, repaint,
-    # then restore the prompt cursor. DEC 8 keeps the banner's anchor.
-    print -rn -u "$fd" -- $'\e[s\e8\e[?7l'
-    for (( index = 1; index <= line_count; index++ )); do
+    (( ${#banner_lines} > 0 )) || return 1
+
+    # Invalidate ZLE's current display before touching the terminal, then
+    # repaint the fixed rows and let ZLE reconstruct the current input line.
+    zle -I 2>/dev/null || true
+    print -rn -u "$fd" -- $'\\e[?7l'
+    for (( index = 1; index <= ${#banner_lines}; index++ )); do
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
+        row=$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + index - 1 ))
+        print -rn -u "$fd" -- $'\\e['"${row}"';'"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
-        (( index < line_count )) && print -rn -u "$fd" -- $'\e[1B\r'
     done
-    print -rn -u "$fd" -- $'\e[?7h\e[u'
+    print -rn -u "$fd" -- $'\\e[?7h'
+    zle .reset-prompt
 }
-
 _dots_failure_animation_render_prompt() {
     emulate -L zsh
 
@@ -294,12 +316,12 @@ _dots_failure_animation_cleanup() {
         _DOTS_FAILURE_ANIMATION_FD=-1
         _DOTS_FAILURE_ANIMATION_ACTIVE=0
         _DOTS_FAILURE_ANIMATION_STATE='finished'
+    fi
+
     if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 )); then
         local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
         { exec {tty_fd}>&- } 2>/dev/null || true
         _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-    fi
-
     fi
 
     if (( redraw )) && zle; then
@@ -377,14 +399,16 @@ _dots_failure_animation_start() {
             _DOTS_FAILURE_ANIMATION_TTY_FD=-1
             return 1
         }
-        if ! _dots_failure_animation_print_anchor; then
+        if ! _dots_failure_animation_query_cursor; then
+            # Cursor-position reporting may be unavailable. Print a static
+            # notice at this exact point rather than animate an unsafe row.
+            _dots_failure_animation_print_anchor || return 1
             local tty_fd="${_DOTS_FAILURE_ANIMATION_TTY_FD}"
             { exec {tty_fd}>&- } 2>/dev/null || true
             _DOTS_FAILURE_ANIMATION_TTY_FD=-1
-            _DOTS_FAILURE_ANIMATION_BANNER=''
-            _DOTS_FAILURE_ANIMATION_MODE='emoji'
-            return 1
+            return 0
         fi
+        _dots_failure_animation_print_anchor || return 1
     fi
 
     _DOTS_FAILURE_ANIMATION_PENDING=1
