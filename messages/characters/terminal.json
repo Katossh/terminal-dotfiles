@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "id": "terminal",
+  "name": "Terminal",
+  "persona": "A dry, observant narrator who keeps the useful diagnostic context in view.",
+  "min_rarity": "common",
+  "max_rarity": "mythic",
+  "adult_content_eligible": false
+}

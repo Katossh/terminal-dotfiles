@@ -41,6 +41,12 @@ jobs:
           cargo test --manifest-path rust/dots-suggest/Cargo.toml
           cargo build --manifest-path rust/dots-suggest/Cargo.toml
 
+      - name: Validate failure-message data and engine
+        run: |
+          python3 -m py_compile config/terminal/zsh/failure-message-engine.py tests/test-failure-message-engine.py
+          python3 config/terminal/zsh/failure-message-engine.py validate --repo-only
+          python3 tests/test-failure-message-engine.py
+
       - name: Check shell syntax
         run: |
           bash -n bin/dots

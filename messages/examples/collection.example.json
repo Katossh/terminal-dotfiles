@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "id": "my-custom-collection",
+  "messages": [
+    {
+      "id": "example-generic-failure",
+      "character_id": "example-character",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "{username}, {command} failed. Add your own dialogue here."
+    }
+  ]
+}

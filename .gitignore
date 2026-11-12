@@ -45,3 +45,7 @@ secrets/
 # Runtime and machine-specific state must never be committed.
 **/pulse/cookie
 /legacy/ui/rofi/.current_wallpaper
+
+# Keep only user-private message collections out of Git; tracked defaults stay visible.
+/messages/characters/private/
+/messages/collections/private/
