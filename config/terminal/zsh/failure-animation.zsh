@@ -179,11 +179,15 @@ _dots_failure_animation_gradient_line() {
     for (( index = 1; index <= length; index++ )); do
         position=$(( (((index - 1) * 100 / denominator) - phase + 100) % 100 ))
         color_index=$(( (position * color_count / 100) + 1 ))
-        (( color_index > color_count )) && color_index="$color_count"
+        if (( color_index > color_count )); then
+            color_index="$color_count"
+        fi
         character="${characters[index]}"
         raw_output+="${colors[color_index]}${character}${reset_color}"
         # A literal percent must remain an adjacent %% pair for promptsubst.
-        [[ "$character" == '%' ]] && character='%%'
+        if [[ "$character" == '%' ]]; then
+            character='%%'
+        fi
         output+="%{${colors[color_index]}%}${character}%{${reset_color}%}"
         # Whitespace already exists as a character in the input string.
     done
