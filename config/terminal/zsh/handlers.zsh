@@ -35,7 +35,9 @@ _dots_failure_notice_precmd() {
         *) category=generic ;;
     esac
 
-    dots_failure_message "$category" "${DOTS_LAST_COMMAND:-$command_text}" "exit status $status_code"
+    # Starship already displays the numeric exit code beside the prompt marker.
+    # Keep the failure notice focused on the message itself.
+    dots_failure_message "$category" "${DOTS_LAST_COMMAND:-$command_text}"
     return 0
 }
 
