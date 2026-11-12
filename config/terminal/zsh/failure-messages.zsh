@@ -145,18 +145,14 @@ dots_failure_message() {
 
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
-    # DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE remain aliases.
-    local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}}"
-    local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-1}"
+    # DOTS_FAILURE_RARE_CHANCE remains an alias for the old Rainbow setting.
+    local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
     local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
-    case "$legendary_chance" in
-        (''|*[!0-9]*) legendary_chance=2 ;;
-    esac
-    case "$mythic_chance" in
-        (''|*[!0-9]*) mythic_chance=1 ;;
+    case "$rainbow_chance" in
+        (''|*[!0-9]*) rainbow_chance=2 ;;
     esac
     case "$animation_chance" in
         (''|*[!0-9]*) animation_chance=50 ;;
@@ -165,18 +161,14 @@ dots_failure_message() {
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
         chance="${chance#0}"
     done
-    while [[ "$legendary_chance" == 0* && "$legendary_chance" != 0 ]]; do
-        legendary_chance="${legendary_chance#0}"
-    done
-    while [[ "$mythic_chance" == 0* && "$mythic_chance" != 0 ]]; do
-        mythic_chance="${mythic_chance#0}"
+    while [[ "$rainbow_chance" == 0* && "$rainbow_chance" != 0 ]]; do
+        rainbow_chance="${rainbow_chance#0}"
     done
     while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do
         animation_chance="${animation_chance#0}"
     done
     (( chance > 100 )) && chance=100
-    (( legendary_chance > 100 )) && legendary_chance=100
-    (( mythic_chance > 1000 )) && mythic_chance=1000
+    (( rainbow_chance > 100 )) && rainbow_chance=100
     (( animation_chance > 100 )) && animation_chance=100
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
@@ -639,10 +631,10 @@ dots_failure_message() {
         elif [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
             _dots_failure_message_gradient "$selected_style" "$selected_template" 0
         else
-            printf '%s\\n' "$selected_template"
+            printf '%s\n "$selected_template"
         fi
         if [[ -n "$detail" ]]; then
-            printf '  %s↳ %s%s\\n' "$dim" "$detail" "$reset"
+            printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
         fi
     fi
 
