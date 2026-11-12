@@ -264,25 +264,23 @@ _dots_failure_animation_render_anchor() {
     banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
     (( ${#banner_lines} > 0 )) || return 1
 
-    # Invalidate ZLE's current display before touching the terminal, then
-    # repaint the fixed rows and let ZLE reconstruct the current input line.
-    zle -I 2>/dev/null || true
-    print -rn -u "$fd" -- $'\e[?7l'
+    # ZLE invokes this handler synchronously between key-processing cycles.
+    # Save and restore the live terminal cursor around the absolute repaint;
+    # never invalidate or redraw ZLE's input line for an animation frame.
+    # This keeps typed text and the insertion cursor untouched.
+    print -rn -u "$fd" -- $'\e7'
     for (( index = 1; index <= ${#banner_lines}; index++ )); do
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
         row=$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + index - 1 ))
-        local cup=""
         if (( index == 1 )); then
-            cup="$(builtin printf $'\e[%d;%dH' "$row" "$_DOTS_FAILURE_ANIMATION_ANCHOR_COL")"
+            print -rn -u "$fd" -- "$(builtin printf $'\e[%d;%dH' "$row" "$_DOTS_FAILURE_ANIMATION_ANCHOR_COL")"
         else
-            cup="$(builtin printf $'\e[%d;1H' "$row")"
+            print -rn -u "$fd" -- "$(builtin printf $'\e[%d;1H' "$row")"
         fi
-        print -rn -u "$fd" -- "$cup"
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
     done
-    print -rn -u "$fd" -- $'\e[?7h'
-    zle .reset-prompt
+    print -rn -u "$fd" -- $'\e8'
 }
 _dots_failure_animation_render_prompt() {
     emulate -L zsh
