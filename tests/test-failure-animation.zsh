@@ -241,13 +241,14 @@ for style in legendary mythic; do
     assert_contains "${style} frames repaint the saved output row" $'\e[s\e8' "$REPLY"
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_1_LAST_FRAMES_" "$REPLY"
+    assert_contains "${style} animation runs until the inspection command submits" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
     assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
     typeset special_state="$REPLY"
     typeset special_frames="${special_state##*LAST_FRAMES_}"
     special_frames="${special_frames%%[^0-9]*}"
     [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
     (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
+    typeset idle_frames="$special_frames"
 
     # Enter freezes the final frame at its original output location. The next
     # prompt must not print a duplicate or restart the animation below it.
@@ -261,6 +262,10 @@ for style in legendary mythic; do
     assert_contains "${style} notice remains recorded after command submission" "MODE_${style}_BANNER_1" "$REPLY"
     assert_contains "${style} animator is stopped after Enter" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
     assert_contains "${style} final frame remains in terminal output" "LAST_STATE_finished" "$REPLY"
+    special_state="$REPLY"
+    special_frames="${special_state##*LAST_FRAMES_}"
+    special_frames="${special_frames%%[^0-9]*}"
+    [[ "$special_frames" == "$idle_frames" ]] || fail "${style} repaint worker kept advancing after Enter ($idle_frames -> $special_frames)"
 done
 print -- "ok - Legendary and Mythic gradients animate in place and freeze at their original output rows on Enter"
 
