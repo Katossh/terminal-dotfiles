@@ -80,7 +80,7 @@ _dots_test_render_gradients() {
     _DOTS_FAILURE_ANIMATION_MODE='mythic'
     _DOTS_FAILURE_ANIMATION_BANNER='🌠 MYTHIC STARFALL 🌠'
     rendered="$(_dots_failure_animation_render_prompt)"
-    [[ "$rendered" == *'M'* && "$rendered" == *'S'* ]] || return 1
+    [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
 
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
@@ -231,18 +231,17 @@ zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 
-# Exercise both rare banners through the real ZLE async stream while the prompt is idle.
+# Exercise both rare banners at their original terminal output rows.
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
     assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
-    # The queue marker is printed inside the command, before precmd redraws
-    # the prompt and starts the async stream. Wait for that prompt explicitly.
     read_until "BASE_OUTPUT"
     drain_for 80
+    assert_contains "${style} frames repaint the saved output row" $'\e[s\e8' "$REPLY"
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
+    assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_1_LAST_FRAMES_" "$REPLY"
     assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
     typeset special_state="$REPLY"
     typeset special_frames="${special_state##*LAST_FRAMES_}"
@@ -250,21 +249,20 @@ for style in legendary mythic; do
     [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
     (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
 
-    # Submit a harmless command. The line-finish hook may pause the worker,
-    # but the banner must survive and animate again at the next prompt.
+    # Enter freezes the final frame at its original output location. The next
+    # prompt must not print a duplicate or restart the animation below it.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
     read_until "FOLLOWUP_${style}"
+    assert_absent "${style} banner is not duplicated at the next prompt" "$style ANIMATED FAILURE BANNER" "$REPLY"
+    assert_absent "${style} animation stops repainting after Enter" $'\e[s\e8' "$REPLY"
     drain_for 60
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} banner survives a submitted command" "MODE_${style}_BANNER_1" "$REPLY"
-    special_state="$REPLY"
-    special_frames="${special_state##*LAST_FRAMES_}"
-    special_frames="${special_frames%%[^0-9]*}"
-    [[ "$special_frames" == <-> ]] || fail "${style} post-command frame count was not reported: ${special_state}"
-    (( special_frames >= 3 )) || fail "${style} animation did not resume after a submitted command: ${special_state}"
+    assert_contains "${style} notice remains recorded after command submission" "MODE_${style}_BANNER_1" "$REPLY"
+    assert_contains "${style} animator is stopped after Enter" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
+    assert_contains "${style} final frame remains in terminal output" "LAST_STATE_finished" "$REPLY"
 done
-print -- "ok - Legendary and Mythic gradients resume at each prompt until the screen is cleared"
+print -- "ok - Legendary and Mythic gradients animate in place and freeze at their original output rows on Enter"
 
 # Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
 zpty -w "$PTY_NAME" $'\x0c'
