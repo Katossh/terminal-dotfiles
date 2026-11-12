@@ -149,6 +149,10 @@ jobs:
           assert terminal["window"]["decorations"] == "None"
           assert terminal["window"]["blur"] is True
           assert terminal["general"]["ipc_socket"] is False
+          bindings = terminal["keyboard"]["bindings"]
+          assert {"key": "T", "mods": "Alt", "action": "CreateNewTab"} in bindings
+          assert {"key": "]", "mods": "Alt", "action": "SelectNextTab"} in bindings
+          assert {"key": "[", "mods": "Alt", "action": "SelectPreviousTab"} in bindings
           assert frappe["colors"]["primary"]["background"] == "#303446"
           assert frappe["colors"]["primary"]["foreground"] == "#c6d0f5"
           assert frappe["colors"]["normal"]["blue"] == "#8caaee"
