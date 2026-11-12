@@ -31,6 +31,16 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 
+# Deterministic visible-screen coordinates for PTY integration tests.
+_dots_failure_animation_query_cursor() {
+    local -a banner_lines
+    banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
+    _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=10
+    _DOTS_FAILURE_ANIMATION_ANCHOR_COL=1
+    _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="${#banner_lines}"
+    return 0
+}
+
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
 
 _dots_test_snapshot() {
@@ -80,7 +90,7 @@ _dots_test_render_gradients() {
     _DOTS_FAILURE_ANIMATION_MODE='mythic'
     _DOTS_FAILURE_ANIMATION_BANNER='🌠 MYTHIC STARFALL 🌠'
     rendered="$(_dots_failure_animation_render_prompt)"
-    [[ "$rendered" == *'M'* && "$rendered" == *'S'* ]] || return 1
+    [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
 
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
@@ -108,7 +118,7 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_PHASE_${_DOTS_FAILURE_ANIMATION_PHASE}_PAUSED_${_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE}_RESUME_FROM_${_DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE}_START_PHASE_${_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
 }
 clear() {
     print -r -- CLEAR_EXECUTED
@@ -231,40 +241,48 @@ zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 
-# Exercise both rare banners through the real ZLE async stream while the prompt is idle.
+# Exercise both rare banners at their original terminal output rows.
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
     assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
-    # The queue marker is printed inside the command, before precmd redraws
-    # the prompt and starts the async stream. Wait for that prompt explicitly.
     read_until "BASE_OUTPUT"
     drain_for 80
+    assert_contains "${style} frames repaint the saved screen row" $'\e[10;1H' "$REPLY"
+
+    # This inspection command submits Enter and pauses the current worker.
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} animation starts its ZLE stream" "SPECIAL_STATE_ACTIVE_0_LAST_FRAMES_" "$REPLY"
-    assert_contains "${style} banner is retained in prompt state" "MODE_${style}_BANNER_1" "$REPLY"
-    typeset special_state="$REPLY"
-    typeset special_frames="${special_state##*LAST_FRAMES_}"
-    special_frames="${special_frames%%[^0-9]*}"
-    [[ "$special_frames" == <-> ]] || fail "${style} animation frame count was not reported: ${special_state}"
-    (( special_frames >= 5 )) || fail "${style} gradient produced only ${special_frames} frames while idle: ${special_state}"
+    assert_contains "${style} first worker is stopped for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
+    assert_contains "${style} banner remains stored" "MODE_${style}_BANNER_1" "$REPLY"
+    assert_contains "${style} first worker has rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
+    typeset first_state="$REPLY"
+    typeset first_frames="${first_state##*LAST_FRAMES_}"
+    first_frames="${first_frames%%[^0-9]*}"
+    (( first_frames >= 5 )) || fail "${style} gradient rendered only ${first_frames} frames before inspection"
 
-    # Submit a harmless command. The line-finish hook may pause the worker,
-    # but the banner must survive and animate again at the next prompt.
+    # The next command must not cause a duplicate banner in the prompt. The
+    # animation should resume repainting the same fixed output row afterwards.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
     read_until "FOLLOWUP_${style}"
-    drain_for 60
+    drain_for 80
+    assert_contains "${style} animation resumes at its original screen row" $'\e[10;1H' "$REPLY"
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} banner survives a submitted command" "MODE_${style}_BANNER_1" "$REPLY"
-    special_state="$REPLY"
-    special_frames="${special_state##*LAST_FRAMES_}"
-    special_frames="${special_frames%%[^0-9]*}"
-    [[ "$special_frames" == <-> ]] || fail "${style} post-command frame count was not reported: ${special_state}"
-    (( special_frames >= 3 )) || fail "${style} animation did not resume after a submitted command: ${special_state}"
+    assert_contains "${style} resumed worker stops for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
+    assert_contains "${style} banner remains stored after another command" "MODE_${style}_BANNER_1" "$REPLY"
+    assert_contains "${style} resumed worker rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
+    typeset second_state="$REPLY"
+    typeset second_frames="${second_state##*LAST_FRAMES_}"
+    second_frames="${second_frames%%[^0-9]*}"
+    (( second_frames >= 5 )) || fail "${style} animation did not resume after the follow-up command"
+    typeset resume_from_phase="${second_state##*RESUME_FROM_}"
+    resume_from_phase="${resume_from_phase%%[^0-9]*}"
+    typeset second_start_phase="${second_state##*START_PHASE_}"
+    second_start_phase="${second_start_phase%%[^0-9]*}"
+    [[ "$resume_from_phase" == "$second_start_phase" ]] || fail "${style} resumed worker started at phase ${second_start_phase}, expected saved pause phase ${resume_from_phase}"
 done
-print -- "ok - Legendary and Mythic gradients resume at each prompt until the screen is cleared"
+print -- "ok - Legendary and Mythic gradients resume at their original output rows after commands"
 
 # Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
 zpty -w "$PTY_NAME" $'\x0c'
