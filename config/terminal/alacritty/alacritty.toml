@@ -61,6 +61,11 @@ bindings = [
   # Kitty's Alt-based font-size controls.
   { key = "=", mods = "Alt", action = "IncreaseFontSize" },
   { key = "-", mods = "Alt", action = "DecreaseFontSize" },
+
+  # Preserve Kitty's tab-management shortcuts.
+  { key = "T", mods = "Alt", action = "CreateNewTab" },
+  { key = "]", mods = "Alt", action = "SelectNextTab" },
+  { key = "[", mods = "Alt", action = "SelectPreviousTab" },
 ]
 
 [[hints.enabled]]
