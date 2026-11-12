@@ -239,7 +239,7 @@ grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
 PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
     "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
 grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq package\tbrew-cask:alacritty\talacritty' "$XDG_DATA_HOME/dots/state.tsv"
+grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
 PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
     "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
 grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
