@@ -251,6 +251,19 @@ zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
+
+read_until() {
+    local needle="$1"
+    local -i tries=0
+    local output='' data=''
+    while (( tries < 120 )); do
+        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        [[ "$output" == *"$needle"* ]] && break
+        command sleep 0.05
+        (( tries += 1 ))
+    done
+    REPLY="$output"
+}
 # Wait for visible prompt text while preserving raw ANSI output for colour checks.
 read_until_visible() {
     local needle="$1"
@@ -265,20 +278,6 @@ read_until_visible() {
     done
     _DOTS_TEST_LAST_RAW_OUTPUT="$output"
     REPLY="$visible"
-}
-
-
-read_until() {
-    local needle="$1"
-    local -i tries=0
-    local output='' data=''
-    while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        [[ "$output" == *"$needle"* ]] && break
-        command sleep 0.05
-        (( tries += 1 ))
-    done
-    REPLY="$output"
 }
 
 drain_for() {
@@ -331,6 +330,35 @@ assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\n'
 read_until "PROMPT_DUPLICATE_RENDERED:"
 assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
+assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
+
+# Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
+zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
+read_until "POOL_normal_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
+read_until "POOL_sarcastic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
+assert_contains "sarcastic pool includes melting face" "🫠" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
+read_until "POOL_dramatic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
+read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
+assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
+read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
+assert_contains "ecchi has its dedicated four-emoji pool" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
+assert_absent "Ecchi pool no longer contains melting face" "🫠" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
+read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
+assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
+
+# Both historic environment-variable names remain compatible aliases.
+zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
+read_until INFINITE_ALIASES_OK
+assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
+
 # Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
 zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
@@ -399,35 +427,6 @@ read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_GRADIENT_ACTIVE_
 assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-    assert_contains "${style} leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
-    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
-    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
-    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
-
-    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
-    read_until "FOLLOWUP_${style}"
-    assert_absent "${style} message is not replayed at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} does not jump back to an old screen coordinate" $'\e[10;1H' "$REPLY"
-done
-print -- "ok - all eight message styles animate in place without persistent graphics"
-
-# There is no longer a persistent graphic layer to clear; both clear paths
-# operate on ordinary terminal text and leave no background animation worker.
-zpty -w "$PTY_NAME" $'\x0c'
-drain_for 30
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L leaves no animation worker" "ACTIVE_0" "$REPLY"
-
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until SPECIAL_QUEUED_legendary
-read_until BASE_OUTPUT
-drain_for 60
-zpty -w "$PTY_NAME" 'clear'$'\n'
-read_until CLEAR_EXECUTED
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear leaves no persistent animation worker" "ACTIVE_0" "$REPLY"
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
 read_until INFINITE_ENABLED
