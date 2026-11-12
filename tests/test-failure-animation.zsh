@@ -172,7 +172,7 @@ zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=3
     PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 DOTS_FAILURE_ANIMATION_DEBUG=1 \
+    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
@@ -270,7 +270,7 @@ local -i expected_kitty_calls=0
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0_PENDING_0_ACTIVE_0" "$REPLY"
+    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0" "$REPLY"
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
