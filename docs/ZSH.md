@@ -78,14 +78,16 @@ Optional overrides:
 
 ~~~sh
 # Force a style while previewing or disable style randomization.
-DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow
+DOTS_FAILURE_STYLE=anime # auto, normal, anime, ecchi, sarcastic, dramatic, rainbow, legendary, mythic
 
 # Change probabilities.
-DOTS_FAILURE_RAINBOW_CHANCE=2
+DOTS_FAILURE_LEGENDARY_CHANCE=2 # 0..100; DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE are aliases
+DOTS_FAILURE_MYTHIC_CHANCE=1 # 0..1000 per mille; default 1 = 0.1%
+DOTS_FAILURE_GRADIENT_INTERVAL=0.10 # seconds per palette step; 16 steps = 1.6-second sweep
 DOTS_FAILURE_ANIMATION_CHANCE=50
 
 # Loop the emoji animation while the prompt is idle.
-DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1 # DOTS_FAILURE_ANIMATION_CONTINUOUS remains a backwards-compatible alias
 
 # Change the prompt marker the emoji is inserted before (default: ❯).
 DOTS_FAILURE_ANIMATION_PROMPT_MARKER='❯'

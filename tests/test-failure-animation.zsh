@@ -46,12 +46,40 @@ _dots_test_assert_pool() {
     _dots_failure_animation_pool_for_style "$style"
     print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
 }
+_dots_test_palette_probe() {
+    local first second reset
+    first="$(_dots_failure_animation_palette_sequence 0)"
+    second="$(_dots_failure_animation_palette_sequence 1)"
+    reset="$(_dots_failure_animation_palette_restore_sequence)"
+    [[ "$first" != "$second" ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    [[ "$first" == *$'\e]21;208=rgb:'* && "$first" == *';239=rgb:10/14/1f'$'\e\\'* ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    [[ "$reset" == $'\e]30101\e\\' ]] || { print -- PALETTE_PROBE_FAILED; return 1; }
+    print -- PALETTE_SEQUENCE_OK
+}
+_dots_test_render_gradient_message() {
+    local style="$1"
+    unset NO_COLOR
+    export KITTY_WINDOW_ID='terminal-dotfiles-test'
+    export DOTS_FAILURE_STYLE="$style"
+    export DOTS_FAILURE_MESSAGE_CHANCE=100
+    export DOTS_FAILURE_ANIMATION=1
+    dots_failure_message generic "gradient-banner-${style}"
+}
+_dots_test_gradient_status() {
+    local running=0
+    kill -0 "$_DOTS_FAILURE_ANIMATION_GRADIENT_PID" 2>/dev/null && running=1
+    print -r -- "GRADIENT_WORKER_STATUS_ACTIVE_${_DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE}_RUNNING_${running}"
+}
+_dots_test_stop_gradient() {
+    _dots_failure_animation_gradient_stop
+    print -r -- "GRADIENT_WORKER_STOPPED_ACTIVE_${_DOTS_FAILURE_ANIMATION_GRADIENT_ACTIVE}"
+}
 _dots_test_enable_continuous() {
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
+    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
     print -- CONTINUOUS_ENABLED
 }
 _dots_test_disable_continuous() {
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
+    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0
     print -r -- "CONTINUOUS_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
 }
 ZSH_INIT
@@ -60,7 +88,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
+    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=0 DOTS_FAILURE_GRADIENT_INTERVAL=0.05 \
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
@@ -124,21 +152,21 @@ assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
 # Normal, sarcastic and dramatic styles must share one pool; special styles
 # must each have their own pool.
 zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until "POOL_normal_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "ordinary styles use the common 12-emoji pool" "POOL_normal_12_" "$REPLY"
+read_until "POOL_normal_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until "POOL_sarcastic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "sarcastic uses the common pool" "POOL_sarcastic_12_" "$REPLY"
+read_until "POOL_sarcastic_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
 assert_contains "sarcastic pool includes the common reactions" "💀 😂 🤡 🪿" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until "POOL_dramatic_12_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
-assert_contains "dramatic uses the common pool" "POOL_dramatic_12_" "$REPLY"
+read_until "POOL_dramatic_13_👀 😳 🫠 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜"
+assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
 read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
 assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘"
-assert_contains "ecchi has its dedicated five-emoji pool" "POOL_ecchi_5_😏 🫠 ❤️ 🩷 💘" "$REPLY"
+read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
+assert_contains "ecchi excludes the sarcastic melting emoji" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
 zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
 read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
@@ -159,4 +187,29 @@ continuous_frames="${continuous_frames%%[^0-9]*}"
 (( continuous_frames > 36 )) || fail "continuous animation did not loop beyond one 24-frame cycle"
 print -- "ok - continuous animation loops beyond one frame sequence"
 
+# Palette updates recolour the original indexed text cells, including scrollback.
+zpty -w "$PTY_NAME" '_dots_test_palette_probe'$'\n'
+read_until PALETTE_SEQUENCE_OK
+assert_contains "Kitty OSC 21 rotates both dedicated gradients" "PALETTE_SEQUENCE_OK" "$REPLY"
+
+# The actual messages use indexed colors, so the terminal can repaint them from scrollback.
+zpty -w "$PTY_NAME" '_dots_test_render_gradient_message legendary'$'\n'
+read_until gradient-banner-legendary
+assert_contains "Legendary message uses its animated palette slots" $'\e[38;5;208m' "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_render_gradient_message mythic'$'\n'
+read_until gradient-banner-mythic
+assert_contains "Mythic message uses its own animated palette slots" $'\e[38;5;224m' "$REPLY"
+
+# The palette worker survives Enter so both submitted messages keep animating in history.
+zpty -w "$PTY_NAME" '_dots_test_gradient_status'$'\n'
+read_until GRADIENT_WORKER_STATUS
+assert_contains "gradient worker survives command submission" "GRADIENT_WORKER_STATUS_ACTIVE_1_RUNNING_1" "$REPLY"
+drain_for 8
+assert_contains "gradient worker keeps updating Kitty's palette" $'\e]21;208=' "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_stop_gradient'$'\n'
+read_until GRADIENT_WORKER_STOPPED
+assert_contains "gradient worker restores the saved Kitty palette" "GRADIENT_WORKER_STOPPED_ACTIVE_0" "$REPLY"
+assert_contains "palette stack is popped on cleanup" $'\e]30101\e\\' "$REPLY"
+
 print -- "All style-aware prompt animation integration tests passed."
+
