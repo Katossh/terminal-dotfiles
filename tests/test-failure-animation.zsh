@@ -50,6 +50,17 @@ _dots_test_render_prompt() {
     local rendered="$(_dots_failure_animation_render_prompt)"
     print -r -- "PROMPT_RENDERED:${rendered}"
 }
+_dots_test_render_duplicate_prompt() {
+    local saved_prompt="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
+    local saved_mode="$_DOTS_FAILURE_ANIMATION_PROMPT_MODE"
+    _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT='BASE_OUTPUT CODE=1 ❯ ❯ '
+    _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
+    _DOTS_FAILURE_ANIMATION_FRAME='😭'
+    local rendered="$(_dots_failure_animation_render_prompt)"
+    _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="$saved_prompt"
+    _DOTS_FAILURE_ANIMATION_PROMPT_MODE="$saved_mode"
+    print -r -- "PROMPT_DUPLICATE_RENDERED:${rendered}"
+}
 _dots_test_assert_pool() {
     local style="$1"
     _dots_failure_animation_pool_for_style "$style"
