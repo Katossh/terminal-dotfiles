@@ -217,6 +217,7 @@ _dots_failure_animation_query_cursor() {
 # scroll with the underlying terminal cells into scrollback.
 _dots_failure_animation_kitty_scrollback() {
     emulate -L zsh
+    [[ "${DOTS_FAILURE_ANIMATION_DEBUG:-0}" == 1 ]] && setopt xtrace
 
     local style="${1:-legendary}"
     local banner="${2-}"
