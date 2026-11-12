@@ -382,6 +382,26 @@ _dots_failure_animation_render_prompt() {
         rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
+    # Keep the emoji immediately before a single final input marker. Starship
+    # modules can leave earlier copies around the status code or other modules.
+    # Apply this only to Starship's prompt, never to the failure banner itself.
+    local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
+    if [[ -n "$marker" ]]; then
+        local marker_pattern="${(b)marker}"
+        if [[ "$rendered" == *"$marker"* ]]; then
+            local suffix="${rendered##*${marker_pattern}}"
+            local prefix="${rendered%${marker_pattern}*}"
+            prefix="${prefix//${marker_pattern}/}"
+            while [[ "$prefix" == *' ' ]]; do
+                prefix="${prefix% }"
+            done
+            rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
+        else
+            rendered="${rendered% }"
+            rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
+        fi
+    fi
+
     # The message occupies a stable prompt row above the path/input prompt.
     # ZLE owns all redraws and therefore preserves BUFFER and CURSOR while the
     # phase changes. Colour escapes are marked as zero-width prompt sequences.
@@ -394,19 +414,11 @@ _dots_failure_animation_render_prompt() {
                 "$_DOTS_FAILURE_ANIMATION_STYLE" \
                 "$_DOTS_FAILURE_GRADIENT_PHASE"
             gradient_prefix+="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE}"
-            (( line < line_count )) && gradient_prefix+=$'\n'
+            (( line < line_count )) && gradient_prefix+=$'\\n'
         done
-        rendered="${gradient_prefix}"$'\n'"${rendered}"
+        rendered="${gradient_prefix}"$'\\n'"${rendered}"
     fi
 
-    # Prompt emoji animation is independent from the failure-message gradient.
-    local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-    if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
-        local suffix="${rendered##*${(b)marker}}"
-        local marker_and_suffix="${marker}${suffix}"
-        local prefix="${rendered%${(b)marker_and_suffix}}"
-        rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
-    fi
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
 }
