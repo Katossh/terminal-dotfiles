@@ -112,7 +112,8 @@ _dots_test_snapshot_special_animation() {
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
     local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}"
+    local animation_log="$(<"$DOTS_TEST_ANIMATION_LOG")"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}_ANIMATION_LOG_${animation_log}"
 }
 
 clear() {
@@ -140,24 +141,45 @@ ZSH_INIT
 
 FAKE_BIN="$(mktemp -d)"
 KITTY_LOG="$FAKE_BIN/kitty.log"
+ANIMATION_LOG="$FAKE_BIN/animation.log"
 : > "$KITTY_LOG"
+: > "$ANIMATION_LOG"
 cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
 #!/usr/bin/env bash
 if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
     printf '1320x840\n'
     exit 0
 fi
+if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
+    image_file="${@: -1}"
+    [[ -s "$image_file" ]] || exit 1
+    [[ "$(head -c 6 "$image_file")" == GIF89a ]] || exit 1
+    frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
+    [[ "$frame_count" -ge 2 ]] || exit 1
+    printf 'ANIMATED_GIF_FRAMES_%s\n' "$frame_count" >> "${DOTS_TEST_ANIMATION_LOG:?}"
+fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
 FAKE_KITTY
 cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
 #!/usr/bin/env bash
-last=''
-for arg in "$@"; do last="$arg"; done
-case "$last" in
-    GIF:*) : > "${last#GIF:}" ;;
-    *) exit 1 ;;
-esac
+set -euo pipefail
+frames=()
+output=''
+for arg in "$@"; do
+    case "$arg" in
+        *.svg) frames+=("$arg") ;;
+        GIF:*) output="${arg#GIF:}" ;;
+    esac
+done
+[[ "${#frames[@]}" -eq 25 && -n "$output" ]] || exit 1
+if cmp -s "${frames[0]}" "${frames[24]}"; then
+    exit 1
+fi
+printf 'MAGICK_INPUT_FRAMES_%s\n' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
+# The fake only needs a GIF header and two frame descriptors; Kitty is mocked
+# below, while this assertion catches empty/static renderer output.
+printf 'GIF89a\\000\\000\\000\\000\\000\\000,\\000,\\000' > "$output"
 FAKE_MAGICK
 cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
 #!/usr/bin/env sh
@@ -168,7 +190,7 @@ chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \
-    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" \
+    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
@@ -279,6 +301,9 @@ for style in legendary mythic; do
     assert_contains "${style} overlay is layered above the text cells" "--z-index 1" "$REPLY"
     assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
     assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
+    assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
+    assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
+    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIF_FRAMES_2" "$REPLY"
 
     # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
