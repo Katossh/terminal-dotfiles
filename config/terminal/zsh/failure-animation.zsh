@@ -14,6 +14,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_PHASE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE=0
+typeset -gi _DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE=0
+typeset -gi _DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_TTY_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_LINES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=0
@@ -482,6 +484,7 @@ _dots_failure_animation_precmd() {
         # the next prompt is ready; never print the banner a second time.
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         if (( _DOTS_FAILURE_ANIMATION_TTY_FD >= 0 && _DOTS_FAILURE_ANIMATION_ANCHOR_ROW > 0 )); then
+            _DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE="$_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE"
             _DOTS_FAILURE_ANIMATION_PENDING=1
         fi
     elif _dots_failure_animation_infinite_enabled; then
@@ -540,6 +543,7 @@ _dots_failure_animation_line_finish() {
     if [[ ( "$_DOTS_FAILURE_ANIMATION_MODE" == legendary ||
             "$_DOTS_FAILURE_ANIMATION_MODE" == mythic ) &&
           -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]]; then
+        _DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
         _dots_failure_animation_cleanup 0 1
         return 0
     fi
