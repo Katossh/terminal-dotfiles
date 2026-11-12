@@ -111,10 +111,12 @@ _dots_test_snapshot_special_animation() {
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
+    local rendered_frames="$(command grep -o 'MAGICK_INPUT_FRAMES_25' "$DOTS_TEST_ANIMATION_LOG" | command wc -l)"
+    rendered_frames="${rendered_frames//[[:space:]]/}"
+    local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
+    animated_gifs="${animated_gifs//[[:space:]]/}"
     local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
-    local animation_log="$(<"$DOTS_TEST_ANIMATION_LOG")"
-    local gif_log="$(<"$DOTS_TEST_GIF_LOG")"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}_ANIMATION_LOG_${animation_log}_GIF_LOG_${gif_log}"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}_KITTY_LOG_${kitty_log}"
 }
 
 clear() {
@@ -322,9 +324,9 @@ for style in legendary mythic; do
     assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
     assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
     assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
-    assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIF_FRAMES_2_LOOP_1" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIF_FRAMES_2_LOOP_1" "$REPLY"
+    assert_contains "${style} renderer generates 25 distinct frames" "RENDERED_25_$expected_kitty_calls" "$REPLY"
+    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIFS_$expected_kitty_calls" "$REPLY"
+    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIFS_$expected_kitty_calls" "$REPLY"
 
     # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
