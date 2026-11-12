@@ -453,7 +453,7 @@ _dots_failure_animation_fd_handler() {
     zle && zle .reset-prompt
 }
 
-# Failure-message hooks render complete messages before the next prompt.
+# Failure-message hooks queue a gradient row before the next prompt.
 _dots_failure_animation_start() {
     emulate -L zsh
 
@@ -477,7 +477,7 @@ _dots_failure_animation_start() {
             _dots_failure_animation_start_gradient; then
             return 0
         fi
-        _dots_failure_animation_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
         _DOTS_FAILURE_ANIMATION_BANNER=''
         _DOTS_FAILURE_GRADIENT_LINES=()
         return 1
