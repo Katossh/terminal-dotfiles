@@ -44,7 +44,7 @@ Git and network access to GitHub are required for framework/plugin downloads. Fa
 
 ## Package installation
 
-The installer detects the native package manager and supports apt (Debian/Ubuntu derivatives), dnf (Fedora/RHEL derivatives), pacman (Arch derivatives), zypper (openSUSE), apk (Alpine), xbps (Void), FreeBSD pkg, and Homebrew. Alacritty is an optional package for supported native package managers and Nixpkgs. Noto Color Emoji is installed as a required font package where a verified package exists: Debian/Ubuntu `fonts-noto-color-emoji`, Fedora `google-noto-color-emoji-fonts`, Arch `noto-fonts-emoji`, Alpine `font-noto-emoji`, Void `noto-fonts-emoji`, FreeBSD `noto-emoji`, Homebrew Cask `font-noto-color-emoji`, and Nixpkgs `noto-fonts-color-emoji`. Homebrew uses its Cask integration; the official Alacritty cask is currently disabled by Homebrew after failing its Gatekeeper check, so dots skips it rather than bypassing macOS security.
+The installer detects the native package manager and supports apt (Debian/Ubuntu derivatives), dnf (Fedora/RHEL derivatives), pacman (Arch derivatives), zypper (openSUSE), apk (Alpine), xbps (Void), FreeBSD pkg, and Homebrew. Alacritty is an optional package for supported native package managers and Nixpkgs. Noto Color Emoji is installed as a required font package where a verified package exists: Debian/Ubuntu `fonts-noto-color-emoji`, Fedora `google-noto-color-emoji-fonts`, Arch `noto-fonts-emoji`, openSUSE `google-noto-coloremoji-fonts`, Alpine `font-noto-emoji`, Void `noto-fonts-emoji`, FreeBSD `noto-emoji`, Homebrew Cask `font-noto-color-emoji`, and Nixpkgs `noto-fonts-color-emoji`. Homebrew uses its Cask integration; the official Alacritty cask is currently disabled by Homebrew after failing its Gatekeeper check, so dots skips it rather than bypassing macOS security.
 
 On NixOS, dots install --packages installs the packages declared in manifest/packages.tsv into the invoking user's Nix profile using nix profile install. The NixOS module also registers Noto Color Emoji alongside JetBrainsMono Nerd Font through `fonts.packages`. On another Linux distribution, Nix is used as a fallback when no supported native package manager is detected but nix is available.
 
@@ -74,6 +74,10 @@ On an unfamiliar distribution without a supported package manager or Nix, dots i
 Alacritty is configured to stay close to the repository's Kitty profile: JetBrainsMono Nerd Font (regular/bold/italic/bold-italic) at 14 pt, 20,000 lines of scrollback, a blinking beam cursor, 90% opacity with compositor blur, borderless windows, Alt-based scrollback/search/font-size shortcuts, the same Ctrl+Shift+C/V clipboard shortcuts, and no middle-click selection paste. Noto Color Emoji is appended as a weak Fontconfig fallback, so JetBrains remains the primary font.
 
 Alacritty does not implement Kitty's native split/stack layouts, startup sessions, or Kitty kittens. Use tmux for pane layouts and persistent sessions. The Fontconfig rule lives under `~/.config/fontconfig/conf.d/` and affects Linux/BSD Fontconfig clients; macOS uses its native font fallback after the Noto font Cask is installed.
+
+## Font fallback
+
+The managed Fontconfig rule appends `Noto Color Emoji` as a weak, last-resort fallback only after `JetBrainsMono Nerd Font`. The terminal's primary font remains JetBrainsMono Nerd Font. After installation, check the actual font selected for a missing emoji glyph with `fc-match 'JetBrainsMono Nerd Font:charset=1f600'`; it should resolve to `Noto Color Emoji`.
 
 ## Personal overrides
 
