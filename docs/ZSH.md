@@ -43,57 +43,67 @@ The order in .zshrc is intentional:
 
 The disabled zsh-manydots-magic experiment is not part of the active setup.
 
-## Failure message styles
+## Failure messages
 
-Failed commands receive a short, randomized notice after the command completes. The default style weights are:
+Failed commands receive a randomized, data-driven notice after the command completes.
+The shell still captures command state, classifies failures, sanitises terminal input,
+and renders colours/animations. A Python standard-library helper loads the JSON catalog
+and performs rarity, style, character, and message selection; Python 3 is already a
+required runtime package.
 
-| Style | Chance |
-|---|---:|
-| Category-aware ordinary message | 48% |
-| Anime-inspired family (including ecchi) | 28% |
-| Sarcastic / meme message | 14% |
-| Dramatic message | 8% |
-| 24-bit rainbow message | 2% |
+Message data lives in the repository's top-level `messages/` directory. See
+[`messages/README.md`](../messages/README.md) for the character and collection formats,
+schema details, local overrides, and validation commands.
 
-Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, gold, lime, teal, sky blue, violet, and lavender accents. Emoji appear throughout the ordinary category-specific pools as well as the themed styles. The rainbow renderer uses twelve RGB colour stops and does not depend on lolcat or another external program.
+The selection pipeline is:
 
-The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with DOTS_FAILURE_STYLE=ecchi.
+1. Roll rarity first: Common, Uncommon, Rare, Epic, Legendary, or Mythic.
+2. Choose a style for the rolled rarity. Explicit styles still override automatic rolls.
+3. Filter the shared character pool by its inclusive rarity bounds and content eligibility.
+4. Select an eligible character, then one message belonging to that character.
+5. Apply the existing repeat escalation, anti-repeat selection, colour, and animation.
 
-The first interactive Zsh prompt plays one 12-frame emoji animation (~1 second), even before any command has failed. Later ordinary failure notices trigger another emoji animation on the configured 50% chance. Legendary and Mythic failures bypass that chance and use Kitty's graphics protocol: the shell places a transparent animated text overlay at the failure output position, then writes the real gradient-coloured message exactly once underneath it. Kitty drives the GIF animation itself and scrolls the image placement with the text cells, so it remains attached to the original notice in scrollback instead of being repainted at the current prompt. Legendary uses a metallic gold gradient from left to right; Mythic uses charcoal-to-silver. The underlying message remains ordinary terminal output; the graphic is a separate overlay. This path is enabled only in a direct Kitty session (not inside tmux) and requires Python 3 and ImageMagick to render the transparent animated overlay; both are declared as required runtime packages. Other terminals, tmux sessions, or systems without the renderer fall back to one static gradient message. `clear` and Ctrl+L clear Kitty graphics along with the visible screen. Normal, sarcastic, and dramatic messages share the general reaction pool; Anime, Ecchi, and Rainbow each use a dedicated pool. Ordinary emoji frames continue to use an asynchronous ZLE file-descriptor watcher.
+The default automatic Common style distribution remains 48% Normal, 28% Anime,
+14% Sarcastic, 8% Dramatic, with Rainbow's configured share reserved separately.
+As before, 65% of automatic Anime selections are converted to Ecchi. Ecchi messages
+can only be selected for characters whose profile has `adult_content_eligible: true`.
+Marin Kitagawa's built-in profile is non-sexual; a personal profile with the same ID
+cannot override that restriction.
 
-The animation pools are:
+The first interactive Zsh prompt plays one 12-frame emoji animation (~1 second), even
+before any command has failed. Later ordinary failure notices trigger another emoji
+animation on the configured chance. Legendary and Mythic failures bypass that chance
+and use Kitty's graphics protocol: a transparent animated text overlay is placed at
+the original failure output position, while the real gradient-coloured message is
+written exactly once underneath it. Kitty keeps the image placement attached to the
+same text cells in scrollback. This path is enabled only in a direct Kitty session
+(not inside tmux) and requires Python 3 and ImageMagick. Other terminals, tmux
+sessions, or systems without the renderer fall back to one static gradient message.
+Ordinary emoji frames continue to use the asynchronous ZLE file-descriptor watcher.
 
-| Message style | Emoji pool |
-|---|---|
-| Normal / Sarcastic / Dramatic | 👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠 |
-| Anime | 😭 🥰 🥺 💖 💗 💓 💕 |
-| Ecchi | 😏 ❤️ 🩷 💘 |
-| Rainbow | 🧡 💛 💚 💙 🤍 |
-
-
-
-Ordinary animation remains a changing emoji inserted immediately before the final Starship input marker (❯ by default); it never modifies the directory/path line or touches RPROMPT. Legendary and Mythic use a Kitty-only animated image overlay placed above the real text. Kitty's graphics protocol keeps placements in step with terminal text scrolling, including into scrollback; the shell does not run a frame loop, issue cursor-addressing redraws, or insert the banner into PROMPT. The overlay is created with `kitty +kitten icat` in write-only mode so it does not consume keyboard input. On non-Kitty terminals or when required rendering tools are unavailable, the message is printed once as a static gradient. Rare animations require an interactive TTY and respect `NO_COLOR` and `DOTS_FAILURE_ANIMATION=0.
-
-## Environment variables
+### Environment variables
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| `DOTS_FAILURE_STYLE` | `auto` | Selects `auto`, `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, `rainbow`, `legendary`, or `mythic`. Explicit rare styles force that style for previewing. |
+| `DOTS_FAILURE_STYLE` | `auto` | `auto`, `normal`, `anime`, `ecchi`, `sarcastic`, `dramatic`, `rainbow`, `legendary`, or `mythic`. Explicit rare styles force that rarity for previews. |
 | `DOTS_FAILURE_MESSAGE_CHANCE` | `100` | Percentage chance (0–100) that a failure notice is shown. |
-| `DOTS_FAILURE_RAINBOW_CHANCE` | `2` | Percentage chance (0–100) for the automatic Rainbow style. `DOTS_FAILURE_RARE_CHANCE` remains a legacy alias. |
-| `DOTS_FAILURE_LEGENDARY_CHANCE` | `100` | Automatic Legendary chance in basis points: 100 = 1%. |
-| `DOTS_FAILURE_MYTHIC_CHANCE` | `10` | Automatic Mythic chance in basis points: 10 = 0.1%. Mythic is rolled before Legendary; the combined rare-event chance is capped at 100%. |
-| `DOTS_FAILURE_ANIMATION_CHANCE` | `50` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic gradients bypass this setting. |
+| `DOTS_FAILURE_RAINBOW_CHANCE` | `2` | Percentage chance (0–100) for automatic Rainbow style. `DOTS_FAILURE_RARE_CHANCE` remains a legacy alias for this setting. |
+| `DOTS_FAILURE_MYTHIC_CHANCE` | `10` | Mythic rarity chance in basis points; 10 = 0.1%. |
+| `DOTS_FAILURE_LEGENDARY_CHANCE` | `100` | Legendary rarity chance in basis points; 100 = 1%. |
+| `DOTS_FAILURE_RARITY_EPIC_CHANCE` | `0` | Epic rarity chance in basis points. |
+| `DOTS_FAILURE_RARITY_RARE_CHANCE` | `0` | Rare rarity chance in basis points. This is distinct from the legacy Rainbow alias above. |
+| `DOTS_FAILURE_RARITY_UNCOMMON_CHANCE` | `0` | Uncommon rarity chance in basis points. |
+| `DOTS_FAILURE_ANIMATION_CHANCE` | `50` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic bypass this setting. |
 | `DOTS_FAILURE_ANIMATION_INTERVAL` | `0.08` | Delay between animation frames in seconds (valid range: 0.01–2.00). |
-| `DOTS_FAILURE_ANIMATION_INFINITE` | `0` | Set to `1`, `true`, `yes`, or `on` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |
-| `DOTS_FAILURE_EMOJI_ANIMATION_INFINITE` | `0` | Compatibility alias for the earlier main-branch name; used only when the newer Infinite variable is unset. |
-| `DOTS_FAILURE_ANIMATION_CONTINUOUS` | `0` | Older compatibility alias for Infinite mode; used only when both newer names are unset. |
-| `DOTS_FAILURE_ANIMATION_PROMPT_MARKER` | `❯` | Prompt character immediately after the ordinary animated emoji. |
-| `DOTS_FAILURE_ANIMATION` | `1` | Set to `0` to disable animation while keeping failure messages. Rare failures retain a static gradient. |
-| `DOTS_FAILURE_MESSAGE_ESCALATION` | `1` | Set to `0`, `false`, `no`, or `off` to disable repeated-failure escalation. |
+| `DOTS_FAILURE_ANIMATION_INFINITE` | `0` | Set to `1`, `true`, `yes`, or `on` to loop ordinary emoji animations while the prompt is idle. |
+| `DOTS_FAILURE_ANIMATION` | `1` | Set to `0` to disable animation while retaining static failure messages/gradients. |
+| `DOTS_FAILURE_MESSAGE_ESCALATION` | `1` | Set to `0`, `false`, `no`, or `off` to disable repeat escalation. |
+| `DOTS_FAILURE_DEBUG` | `0` | Set to `1` to print diagnostics for malformed or conflicting local message data. |
 | `NO_COLOR` | unset | Disables ANSI colours, including the rare-event gradient. |
 
-`DOTS_FAILURE_MESSAGE_CHANCE` controls whether a notice is shown at all. The Legendary and Mythic chance settings apply only when `DOTS_FAILURE_STYLE=auto`; explicitly selected styles are not replaced by rarity rolls.
+Rarity chances use basis points (1 basis point = 0.01%). Higher rarities are rolled first;
+the configured total is capped at 100%. The old `DOTS_FAILURE_RARE_CHANCE` name continues
+to mean Rainbow style probability; use `DOTS_FAILURE_RARITY_RARE_CHANCE` for the Rare tier.
 
 ## Command-not-found suggestions
 

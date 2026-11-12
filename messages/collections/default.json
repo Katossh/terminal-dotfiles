@@ -1,0 +1,1230 @@
+{
+  "schema_version": 1,
+  "id": "default",
+  "messages": [
+    {
+      "id": "not-found-base-1",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "👾 Warning! A cyber anomaly named \"{command}\" has disrupted the matrix, {username}."
+    },
+    {
+      "id": "not-found-base-2",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "📡 Signal lost: \"{command}\" does not exist in this shell's reality."
+    },
+    {
+      "id": "not-found-base-3",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🛸 Command \"{command}\" was not found. Perhaps it escaped the simulation."
+    },
+    {
+      "id": "not-found-base-4",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔎 No trace of \"{command}\" could be found. The search party has been dismissed."
+    },
+    {
+      "id": "not-found-base-5",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧭 PATH checked. \"{command}\" is still off the map."
+    },
+    {
+      "id": "not-found-base-6",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "✨ \"{command}\" may exist in another universe, but not this shell."
+    },
+    {
+      "id": "not-found-repeat-1",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "Still looking for \"{command}\"? The matrix insists it is not real."
+    },
+    {
+      "id": "not-found-repeat-2",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "We searched again. \"{command}\" remains missing, {username}."
+    },
+    {
+      "id": "not-found-severe-1",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "I admire your persistence, {username}. \"{command}\" is still imaginary."
+    },
+    {
+      "id": "not-found-severe-2",
+      "character_id": "terminal",
+      "category": "not_found",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "The anomaly is now ignoring us. Stop asking for \"{command}\"."
+    },
+    {
+      "id": "permission-base-1",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "⛔ Access denied. \"{command}\" is beyond your current clearance."
+    },
+    {
+      "id": "permission-base-2",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔒 The system refused \"{command}\". Your credentials did not impress it."
+    },
+    {
+      "id": "permission-base-3",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🚧 Permission denied for \"{command}\". This door is not opening for {username} today."
+    },
+    {
+      "id": "permission-base-4",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🛡️ \"{command}\" hit a permission wall. Check the owner and mode bits."
+    },
+    {
+      "id": "permission-repeat-1",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "The access policy has not changed since your last attempt."
+    },
+    {
+      "id": "permission-repeat-2",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "Still no clearance for \"{command}\". Asking again rarely helps."
+    },
+    {
+      "id": "permission-severe-1",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "Persistence is not a permission bit, {username}."
+    },
+    {
+      "id": "permission-severe-2",
+      "character_id": "terminal",
+      "category": "permission",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "The lock is not confused. It knows exactly who you are."
+    },
+    {
+      "id": "missing-path-base-1",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🗺️ Destination not found: \"{command}\" appears to exist only in your imagination."
+    },
+    {
+      "id": "missing-path-base-2",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "📁 The requested path \"{command}\" has vanished into the filesystem fog."
+    },
+    {
+      "id": "missing-path-base-3",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "No such location as \"{command}\". Check the map, explorer."
+    },
+    {
+      "id": "missing-path-base-4",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧭 The filesystem map has no entry for \"{command}\"."
+    },
+    {
+      "id": "missing-path-repeat-1",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "The path \"{command}\" has not materialised on the second attempt."
+    },
+    {
+      "id": "missing-path-severe-1",
+      "character_id": "terminal",
+      "category": "missing_path",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "The filesystem has confirmed: \"{command}\" is not here. Repeating the search won't summon it."
+    },
+    {
+      "id": "git-base-1",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌿 Git has encountered a plot twist while running \"{command}\"."
+    },
+    {
+      "id": "git-base-2",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧩 The repository disagrees with \"{command}\". Check its current state."
+    },
+    {
+      "id": "git-base-3",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Your branch has entered an existential crisis. Git rejected \"{command}\"."
+    },
+    {
+      "id": "git-base-4",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🪴 Git left a note about \"{command}\". Read status before changing anything else."
+    },
+    {
+      "id": "git-repeat-1",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "The repository has not changed its mind about \"{command}\"."
+    },
+    {
+      "id": "git-severe-1",
+      "character_id": "terminal",
+      "category": "git",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "The repository is still unhappy. Repeating \"{command}\" is not a recovery strategy."
+    },
+    {
+      "id": "nix-base-1",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "❄️ The derivation has rejected your offering: \"{command}\"."
+    },
+    {
+      "id": "nix-base-2",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Nix could not complete \"{command}\". The store remains unimpressed."
+    },
+    {
+      "id": "nix-base-3",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A flake of uncertainty has interrupted \"{command}\"."
+    },
+    {
+      "id": "nix-base-4",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧊 \"{command}\" hit an immutable store and an unhelpful evaluation error."
+    },
+    {
+      "id": "nix-repeat-1",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "The Nix evaluation still disagrees. Check the error above before rebuilding."
+    },
+    {
+      "id": "nix-severe-1",
+      "character_id": "terminal",
+      "category": "nix",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "Nix has made its position clear. Repeating the build is not new information."
+    },
+    {
+      "id": "network-base-1",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌐 The network has gone dark while running \"{command}\". Check the route before blaming the matrix."
+    },
+    {
+      "id": "network-base-2",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "📡 Network route unavailable for \"{command}\". DNS, proxy, VPN, or the remote service may be responsible."
+    },
+    {
+      "id": "network-base-3",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🛰️ Network signal lost during \"{command}\". The destination has not answered the call."
+    },
+    {
+      "id": "network-base-4",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌧️ A network timeout interrupted \"{command}\". Check latency before retrying."
+    },
+    {
+      "id": "network-repeat-1",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "The network still has no signal for \"{command}\". Repeating the request won't repair DNS or routing."
+    },
+    {
+      "id": "network-severe-1",
+      "character_id": "terminal",
+      "category": "network",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "{username}, the network is not going to reconnect out of embarrassment."
+    },
+    {
+      "id": "generic-base-1",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "⚠️ Command \"{command}\" failed. The terminal expected a different outcome."
+    },
+    {
+      "id": "generic-base-2",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💥 Something went sideways while running \"{command}\"."
+    },
+    {
+      "id": "generic-base-3",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The operation \"{command}\" did not go according to plan."
+    },
+    {
+      "id": "generic-base-4",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🛰️ Mission control reports that \"{command}\" did not complete successfully."
+    },
+    {
+      "id": "generic-base-5",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧯 \"{command}\" needs a rethink, not another identical attempt."
+    },
+    {
+      "id": "generic-base-6",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧪 The terminal recorded a failed experiment: \"{command}\"."
+    },
+    {
+      "id": "generic-base-7",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔬 \"{command}\" failed under observation. Inspect its exit status and stderr."
+    },
+    {
+      "id": "generic-base-8",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🎲 \"{command}\" rolled a critical failure. The logs contain the actual numbers."
+    },
+    {
+      "id": "generic-repeat-1",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "That did not work the first time. The second attempt has not helped."
+    },
+    {
+      "id": "generic-repeat-2",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "repeat",
+      "text": "Repeating \"{command}\" produced the same disappointing result."
+    },
+    {
+      "id": "generic-severe-1",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "This is no longer a surprise. It is a pattern."
+    },
+    {
+      "id": "generic-severe-2",
+      "character_id": "terminal",
+      "category": "generic",
+      "style": "normal",
+      "rarity": "common",
+      "severity": "severe",
+      "text": "{username}, the command has failed again. Perhaps read what it told you."
+    },
+    {
+      "id": "anime-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💢 B-baka! \"{command}\" isn't a command! It's not like I wanted you to type something else! {username}, honestly!"
+    },
+    {
+      "id": "anime-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "⚡ \"{command}\" has not awakened its true form. Check the spellbook above!"
+    },
+    {
+      "id": "anime-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🜂 The forbidden incantation \"{command}\" has no place in this realm."
+    },
+    {
+      "id": "anime-4",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "✨ By the power of PATH, I reject \"{command}\"!"
+    },
+    {
+      "id": "anime-5",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🐾 Nyaa~ \"{command}\" is missing. Did you summon the wrong familiar?"
+    },
+    {
+      "id": "anime-6",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌙 Even the stars cannot resolve \"{command}\" in this timeline."
+    },
+    {
+      "id": "anime-7",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔥 \"{command}\" has reached its final form: not executable."
+    },
+    {
+      "id": "anime-8",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌀 A space-time anomaly detected: \"{command}\" does not exist here!"
+    },
+    {
+      "id": "anime-9",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🎴 The PATH card for \"{command}\" has been drawn. It says: \"try another command.\""
+    },
+    {
+      "id": "anime-10",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💫 Senpai, \"{command}\" is not in the command registry."
+    },
+    {
+      "id": "anime-11",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🪽 The familiar searched every directory. \"{command}\" is nowhere to be found."
+    },
+    {
+      "id": "anime-12",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔮 The oracle foresaw this typo, but not a command named \"{command}\"."
+    },
+    {
+      "id": "anime-13",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🐉 \"{command}\" challenged the shell dragon and lost."
+    },
+    {
+      "id": "anime-14",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🎀 A little sparkle won't make \"{command}\" executable. Try again, senpai."
+    },
+    {
+      "id": "anime-15",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🍡 The command shrine has no offering for \"{command}\"."
+    },
+    {
+      "id": "anime-16",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌸 The spell is almost right. The command \"{command}\" is not."
+    },
+    {
+      "id": "marin-anime-1",
+      "character_id": "marin-kitagawa",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Hey, {username}! \"{command}\" didn't work—but we can figure it out together!"
+    },
+    {
+      "id": "mikasa-anime-1",
+      "character_id": "mikasa-ackerman",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Stay focused, {username}. \"{command}\" failed; inspect the error before moving."
+    },
+    {
+      "id": "yoruichi-anime-1",
+      "character_id": "yoruichi-shihoin",
+      "category": "any",
+      "style": "anime",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A little more finesse, {username}. \"{command}\" still needs debugging."
+    },
+    {
+      "id": "ecchi-1",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🐾 Nyaa~ \"{command}\" face-planted in front of the whole terminal. Check stderr, senpai."
+    },
+    {
+      "id": "ecchi-2",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Well, well... that was quite an entrance. Too bad \"{command}\" forgot to stick the landing."
+    },
+    {
+      "id": "ecchi-3",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💋 Darling, a non-zero exit code is hardly a love letter. Read the error above."
+    },
+    {
+      "id": "ecchi-4",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A velvet-gloved hand points at stderr. \"Start there, sweetheart.\""
+    },
+    {
+      "id": "ecchi-5",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Oh? That was your grand finale? The terminal seems unconvinced."
+    },
+    {
+      "id": "ecchi-6",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "👠 The vampire countess taps one heel: \"Try that again after reading the logs.\""
+    },
+    {
+      "id": "ecchi-7",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "\"Mmm... ambitious.\" The adult catgirl folds her arms. \"Now fix the command, nyaa~\""
+    },
+    {
+      "id": "ecchi-8",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "😼 Purrhaps inspect the flags before sending \"{command}\" back into battle."
+    },
+    {
+      "id": "ecchi-9",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A succubus has reviewed the output. Her verdict: less confidence, more debugging."
+    },
+    {
+      "id": "ecchi-10",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🍷 \"{command}\" is off tonight's menu, darling. Check the failure details first."
+    },
+    {
+      "id": "ecchi-11",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🦊 The kitsune hostess fans herself with nine tails. \"That error is entirely yours, senpai.\""
+    },
+    {
+      "id": "ecchi-12",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "\"Senpai, senpai...\" The adult anime diva sighs. \"Even I cannot flirt with that exit code.\""
+    },
+    {
+      "id": "ecchi-13",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The night-club sorceress dims the lights. The error message remains painfully readable."
+    },
+    {
+      "id": "ecchi-14",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🥀 Such elegance, such confidence, such a spectacularly unhelpful result. Inspect the output."
+    },
+    {
+      "id": "ecchi-15",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔮 The oracle has seen your next move: reading the first error instead of retrying blindly."
+    },
+    {
+      "id": "ecchi-16",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "With a lazy smile, the gothic enchantress asks: \"Did you really expect that to work?\""
+    },
+    {
+      "id": "ecchi-17",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🖤 The succubus is on strike until somebody checks the logs."
+    },
+    {
+      "id": "ecchi-18",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🫦 \"Careful, darling. The terminal remembers every failed attempt.\""
+    },
+    {
+      "id": "ecchi-19",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "\"Try again?\" The mature witch raises an eyebrow. \"Try understanding it first.\""
+    },
+    {
+      "id": "ecchi-20",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A mature kitsune gives one tail a flick: \"Check the arguments, then come back.\""
+    },
+    {
+      "id": "ecchi-21",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "⚡ The demon queen snaps her fingers. Nothing happens. \"Well? Read the error.\""
+    },
+    {
+      "id": "ecchi-22",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💄 The femme-fatale hacker fixes her lipstick. \"The bug is still there, darling.\""
+    },
+    {
+      "id": "ecchi-23",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Nocturnal verdict: \"{command}\" needs attention. The eyeliner, at least, is flawless."
+    },
+    {
+      "id": "ecchi-24",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🎀 A wink, a smirk, and a reminder: the useful clue is probably in stderr."
+    },
+    {
+      "id": "ecchi-25",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "\"That flag was a choice, sweetheart.\" The adult enchantress gestures toward the usage text."
+    },
+    {
+      "id": "ecchi-26",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🔥 The fire mage's spell fizzles. \"Even magic cannot replace a proper backtrace.\""
+    },
+    {
+      "id": "ecchi-27",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Another failed incantation. The adult sorceress suggests checking the first error line."
+    },
+    {
+      "id": "ecchi-28",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The demon queen looks over your shoulder. \"You did read the output, didn't you?\""
+    },
+    {
+      "id": "ecchi-29",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "💞 Nyaa~ even my nine tails can't untangle this one. Let's inspect the logs together."
+    },
+    {
+      "id": "ecchi-30",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "You brought the confidence; the terminal brought the evidence. Guess which one won?"
+    },
+    {
+      "id": "ecchi-31",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A rose falls onto the keyboard. The error remains. How stubbornly unromantic."
+    },
+    {
+      "id": "ecchi-32",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "\"Darling, the answer is above us.\" The vampire countess points at the terminal output."
+    },
+    {
+      "id": "ecchi-33",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🦇 The countess has no reflection, but this failure is staring right back at you."
+    },
+    {
+      "id": "ecchi-34",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A knowing wink from the adult kitsune: \"One careful diagnosis, then another attempt.\""
+    },
+    {
+      "id": "ecchi-35",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The prompt is not your accomplice, sweetheart. Check the command and its arguments."
+    },
+    {
+      "id": "ecchi-36",
+      "character_id": "night-host",
+      "category": "any",
+      "style": "ecchi",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Nyaa~ the terminal hissed, the cursor blinked, and your command still needs debugging."
+    },
+    {
+      "id": "sarcastic-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🫠 \"{command}\" failed. Bold strategy. Let's see if reading the error helps."
+    },
+    {
+      "id": "sarcastic-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "I would explain why \"{command}\" failed, but the terminal already did that above."
+    },
+    {
+      "id": "sarcastic-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "I've seen more convincing attempts than \"{command}\" on a broken keyboard."
+    },
+    {
+      "id": "sarcastic-4",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "☕ \"{command}\" has once again chosen the difficult path."
+    },
+    {
+      "id": "sarcastic-5",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "404: command not found. Your confidence, however, remains available."
+    },
+    {
+      "id": "sarcastic-6",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🤷 The command was so creative that even PATH couldn't recognize \"{command}\"."
+    },
+    {
+      "id": "sarcastic-7",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "Perhaps try a command other than \"{command}\" from this dimension next time."
+    },
+    {
+      "id": "sarcastic-8",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "sarcastic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🧯 Repeating the same failed command \"{command}\" is not what we call troubleshooting."
+    },
+    {
+      "id": "dramatic-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "☠️ The PATH has spoken. It says no to \"{command}\"."
+    },
+    {
+      "id": "dramatic-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "A darkness has fallen upon your PATH. \"{command}\" is missing."
+    },
+    {
+      "id": "dramatic-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "⚔️ \"{command}\" has fallen before the shell. Its quest ends here."
+    },
+    {
+      "id": "dramatic-4",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The terminal searched every corner for \"{command}\". Nothing answered."
+    },
+    {
+      "id": "dramatic-5",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🎭 Thus concludes the tragic tale of \"{command}\"."
+    },
+    {
+      "id": "dramatic-6",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "dramatic",
+      "rarity": "common",
+      "severity": "base",
+      "text": "The failure of \"{command}\" was foretold. The output above contains the prophecy."
+    },
+    {
+      "id": "rainbow-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "rainbow",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌈 \"{command}\" has entered its fabulous failure era. ✨"
+    },
+    {
+      "id": "rainbow-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "rainbow",
+      "rarity": "common",
+      "severity": "base",
+      "text": "🌈 The PATH is a spectrum. \"{command}\" is still missing. 🦄"
+    },
+    {
+      "id": "rainbow-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "rainbow",
+      "rarity": "common",
+      "severity": "base",
+      "text": "✨ The failure of \"{command}\" is brought to you in glorious 24-bit colour. 🌈"
+    },
+    {
+      "id": "legendary-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "legendary",
+      "rarity": "legendary",
+      "severity": "base",
+      "text": "🏆 The shell has witnessed a legendary failure: \"{command}\". The logs shall remember."
+    },
+    {
+      "id": "legendary-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "legendary",
+      "rarity": "legendary",
+      "severity": "base",
+      "text": "✨ A legendary misfire! \"{command}\" has bent the laws of the terminal."
+    },
+    {
+      "id": "legendary-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "legendary",
+      "rarity": "legendary",
+      "severity": "base",
+      "text": "🌟 A legendary event unlocked: \"{command}\" failed with extraordinary style."
+    },
+    {
+      "id": "mythic-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "mythic",
+      "rarity": "mythic",
+      "severity": "base",
+      "text": "🌠🌠 A mythic event: \"{command}\" vanished beneath a falling star. 🌠"
+    },
+    {
+      "id": "mythic-2",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "mythic",
+      "rarity": "mythic",
+      "severity": "base",
+      "text": "🌌 The stars aligned, then \"{command}\" failed anyway. 🌠✨"
+    },
+    {
+      "id": "mythic-3",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "mythic",
+      "rarity": "mythic",
+      "severity": "base",
+      "text": "☄️ A once-in-a-blue-moon failure! \"{command}\" has summoned the starfall. 🌠"
+    },
+    {
+      "id": "mythic-4",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "mythic",
+      "rarity": "mythic",
+      "severity": "base",
+      "text": "🌠🌟 The terminal records a mythic collapse: \"{command}\". 🌌"
+    },
+    {
+      "id": "uncommon-fallback-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "normal",
+      "rarity": "uncommon",
+      "severity": "base",
+      "text": "The failure of \"{command}\" has reached the uncommon tier. The useful details are still above."
+    },
+    {
+      "id": "rare-fallback-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "normal",
+      "rarity": "rare",
+      "severity": "base",
+      "text": "The failure of \"{command}\" has reached the rare tier. The useful details are still above."
+    },
+    {
+      "id": "epic-fallback-1",
+      "character_id": "terminal",
+      "category": "any",
+      "style": "normal",
+      "rarity": "epic",
+      "severity": "base",
+      "text": "The failure of \"{command}\" has reached the epic tier. The useful details are still above."
+    }
+  ]
+}
