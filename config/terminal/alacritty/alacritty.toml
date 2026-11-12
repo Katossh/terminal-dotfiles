@@ -28,7 +28,7 @@ blink_timeout = 0
 decorations = "None"
 opacity = 0.9
 blur = true
-padding = { x = 14, y = 8 }
+padding = { x = 10, y = 6 }
 dynamic_title = false
 option_as_alt = "Both"
 

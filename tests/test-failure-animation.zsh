@@ -50,6 +50,17 @@ _dots_test_render_prompt() {
     local rendered="$(_dots_failure_animation_render_prompt)"
     print -r -- "PROMPT_RENDERED:${rendered}"
 }
+_dots_test_render_duplicate_prompt() {
+    local saved_prompt="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
+    local saved_mode="$_DOTS_FAILURE_ANIMATION_PROMPT_MODE"
+    _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT='BASE_OUTPUT CODE=1 ❯ ❯ '
+    _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
+    _DOTS_FAILURE_ANIMATION_FRAME='😭'
+    local rendered="$(_dots_failure_animation_render_prompt)"
+    _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="$saved_prompt"
+    _DOTS_FAILURE_ANIMATION_PROMPT_MODE="$saved_mode"
+    print -r -- "PROMPT_DUPLICATE_RENDERED:${rendered}"
+}
 _dots_test_assert_pool() {
     local style="$1"
     _dots_failure_animation_pool_for_style "$style"
@@ -285,6 +296,13 @@ zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
 read_until "BASE_OUTPUT 😭 ❯"
 assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
 assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
+
+# A prompt that already contains duplicate markers (including one after the
+# status code) must still render a single final marker after the emoji.
+zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\n'
+read_until "PROMPT_DUPLICATE_RENDERED:"
+assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
+assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
 
 # Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
 zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'

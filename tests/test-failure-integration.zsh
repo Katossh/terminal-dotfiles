@@ -32,6 +32,14 @@ assert_contains() {
     print -- "ok - $label"
 }
 
+assert_absent() {
+    local label="$1"
+    local unexpected="$2"
+    local actual="$3"
+    [[ "$actual" != *"$unexpected"* ]] || fail "$label (unexpected '$unexpected' in: $actual)"
+    print -- "ok - $label"
+}
+
 capture_output() {
     local capture_file
     capture_file="$(mktemp "${TMPDIR:-/tmp}/dots-failure-integration.XXXXXX")" || return 1
@@ -80,6 +88,7 @@ assert_eq "failed status is retained" "1" "$DOTS_LAST_STATUS"
 typeset -g DOTS_TEST_CAPTURE=''
 capture_output _dots_failure_notice_precmd
 assert_contains "Git failure is rendered" "git status" "$DOTS_TEST_CAPTURE"
+assert_absent "failure notice does not repeat the prompt's exit status" "↳ exit status 1" "$DOTS_TEST_CAPTURE"
 capture_output _dots_failure_notice_precmd
 assert_eq "the same failure is not rendered twice" "" "$DOTS_TEST_CAPTURE"
 

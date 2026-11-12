@@ -329,11 +329,22 @@ _dots_failure_animation_render_prompt() {
     # Prompt emoji animation is independent from the in-place failure-message
     # renderer; message frames never become part of the editable prompt.
     local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-    if [[ -n "$marker" && "$rendered" == *"$marker"* ]]; then
-        local suffix="${rendered##*${(b)marker}}"
-        local marker_and_suffix="${marker}${suffix}"
-        local prefix="${rendered%${(b)marker_and_suffix}}"
-        rendered="${prefix}${_DOTS_FAILURE_ANIMATION_FRAME} ${marker_and_suffix}"
+    if [[ -n "$marker" ]]; then
+        local marker_pattern="${(b)marker}"
+        if [[ "$rendered" == *"$marker"* ]]; then
+            # Strip earlier copies as well: Starship modules can leave a marker
+            # before the final input marker (for example after the exit code).
+            local suffix="${rendered##*${marker_pattern}}"
+            local prefix="${rendered%${marker_pattern}*}"
+            prefix="${prefix//${marker_pattern}/}"
+            while [[ "$prefix" == *' ' ]]; do
+                prefix="${prefix% }"
+            done
+            rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
+        else
+            rendered="${rendered% }"
+            rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
+        fi
     fi
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
