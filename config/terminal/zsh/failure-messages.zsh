@@ -7,10 +7,10 @@
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
 #   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
-#   DOTS_FAILURE_RAINBOW_CHANCE=2         # 0..100; DOTS_FAILURE_RARE_CHANCE remains an alias
-#   DOTS_FAILURE_LEGENDARY_CHANCE=100     # basis points; 100 = 1%
-#   DOTS_FAILURE_MYTHIC_CHANCE=10         # basis points; 10 = 0.1%
-#   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; ordinary animations require an interactive TTY
+#   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
+#   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
+#   DOTS_FAILURE_GRADIENT_INTERVAL=0.10   # seconds per persistent palette step
+#   DOTS_FAILURE_ANIMATION_CHANCE=50      # 0..100; animations require an interactive TTY
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
@@ -65,10 +65,56 @@ _dots_failure_message_rainbow() {
     print -r -- $'\e[0m'
 }
 
+_dots_failure_message_gradient() {
+    emulate -L zsh
+
+    local style="${1:-legendary}"
+    local message="${2-}"
+    local palette_active="${3:-0}"
+    if [[ ! -t 1 || -n "${NO_COLOR:-}" || "${TERM:-dumb}" == dumb ]]; then
+        print -r -- "$message"
+        return 0
+    fi
+
+    local -a characters legendary_colors mythic_colors colors
+    characters=( "${(@s::)message}" )
+    legendary_colors=(
+        '255;91;132' '255;119;108' '255;150;92' '255;180;93'
+        '255;208;101' '236;224;105' '201;226;108' '163;222;122'
+        '125;217;154' '92;212;185' '84;198;223' '92;168;245'
+        '120;139;255' '160;123;255' '201;121;240' '237;120;189'
+    )
+    mythic_colors=(
+        '245;245;247' '229;230;234' '212;214;219' '194;197;204'
+        '176;179;189' '158;162;173' '140;145;158' '122;128;142'
+        '104;110;124' '87;93;108' '70;76;91' '54;60;75'
+        '41;47;62' '32;38;52' '24;29;42' '16;20;31'
+    )
+    if [[ "$style" == mythic ]]; then colors=( "${mythic_colors[@]}" ); else colors=( "${legendary_colors[@]}" ); fi
+
+    local -i character_index=0 character_count=${#characters[@]} color_index=1 palette_base=208
+    [[ "$style" == mythic ]] && palette_base=224
+    local character color
+    for character in "${characters[@]}"; do
+        if (( character_count > 1 )); then
+            color_index=$(( (character_index * 15 / (character_count - 1)) + 1 ))
+        fi
+        if [[ "$palette_active" == 1 ]]; then
+            printf '\e[38;5;%dm%s' "$((palette_base + color_index - 1))" "$character"
+        else
+            printf '\e[38;2;%sm%s' "${colors[color_index]}" "$character"
+        fi
+        (( character_index += 1 ))
+    done
+    printf '\e[0m\n'
+}
+
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Pass the final resolved style, plus optional rare-event banner text.
+    # Pass the final style and, for rare events, the complete banner plus detail.
+    # Return failure when no interactive animator is available so the caller
+    # can preserve the static fallback message.
     (( ${+functions[_dots_failure_animation_start]} )) || return 1
     _dots_failure_animation_start "${1:-normal}" "${2-}" "${3-}"
 }
@@ -99,14 +145,18 @@ dots_failure_message() {
 
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
-    # DOTS_FAILURE_RARE_CHANCE is retained as a backwards-compatible alias.
-    local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
+    # DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE remain aliases.
+    local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}}"
+    local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-1}"
     local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
-    case "$rainbow_chance" in
-        (''|*[!0-9]*) rainbow_chance=2 ;;
+    case "$legendary_chance" in
+        (''|*[!0-9]*) legendary_chance=2 ;;
+    esac
+    case "$mythic_chance" in
+        (''|*[!0-9]*) mythic_chance=1 ;;
     esac
     case "$animation_chance" in
         (''|*[!0-9]*) animation_chance=50 ;;
@@ -115,14 +165,18 @@ dots_failure_message() {
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
         chance="${chance#0}"
     done
-    while [[ "$rainbow_chance" == 0* && "$rainbow_chance" != 0 ]]; do
-        rainbow_chance="${rainbow_chance#0}"
+    while [[ "$legendary_chance" == 0* && "$legendary_chance" != 0 ]]; do
+        legendary_chance="${legendary_chance#0}"
+    done
+    while [[ "$mythic_chance" == 0* && "$mythic_chance" != 0 ]]; do
+        mythic_chance="${mythic_chance#0}"
     done
     while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do
         animation_chance="${animation_chance#0}"
     done
     (( chance > 100 )) && chance=100
-    (( rainbow_chance > 100 )) && rainbow_chance=100
+    (( legendary_chance > 100 )) && legendary_chance=100
+    (( mythic_chance > 1000 )) && mythic_chance=1000
     (( animation_chance > 100 )) && animation_chance=100
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
@@ -375,8 +429,8 @@ dots_failure_message() {
         elif (( rainbow_chance >= 100 )); then
             selected_style=rainbow
         else
-            # Reserve the configured rainbow share, then distribute the rest
-            # across the exact 48/28/14/8 proportions.
+            # Reserve the configured Rainbow share, then distribute the rest
+            # across the ordinary 48/28/14/8 style weights.
             style_roll=$(( (style_roll - rainbow_chance) * 98 / (100 - rainbow_chance) ))
             if (( style_roll < 48 )); then
                 selected_style=normal
@@ -396,8 +450,8 @@ dots_failure_message() {
         selected_style=ecchi
     fi
 
-    # Rare event chances use basis points (100 = 1%, 10 = 0.1%). Mythic is
-    # rolled first and takes priority; the two probability ranges do not overlap.
+    # Rare event chances use basis points (100 = 1%, 10 = 0.1%). Mythic
+    # is rolled first; the combined probability is capped at 100%.
     local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-10}"
     local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-100}"
     case "$mythic_chance" in
@@ -522,6 +576,23 @@ dots_failure_message() {
             )
             messages=("${style_messages[@]}")
             ;;
+        legendary)
+            style_messages=(
+                "🏆 The shell has witnessed a legendary failure: \"${command}\". The logs shall remember."
+                "✨ A legendary misfire! \"${command}\" has bent the laws of the terminal."
+                "🌟 A legendary event unlocked: \"${command}\" failed with extraordinary style."
+            )
+            messages=("${style_messages[@]}")
+            ;;
+        mythic)
+            style_messages=(
+                "🌠🌠 A mythic event: \"${command}\" vanished beneath a falling star. 🌠"
+                "🌌 The stars aligned, then \"${command}\" failed anyway. 🌠✨"
+                "☄️ A once-in-a-blue-moon failure! \"${command}\" has summoned the starfall. 🌠"
+                "🌠🌟 The terminal records a mythic collapse: \"${command}\". 🌌"
+            )
+            messages=("${style_messages[@]}")
+            ;;
         rainbow)
             rainbow_output=1
             style_messages=(
@@ -530,22 +601,6 @@ dots_failure_message() {
                 "✨ The failure of \"${command}\" is brought to you in glorious 24-bit colour. 🌈"
             )
             messages=("${style_messages[@]}")
-            ;;
-        legendary)
-            messages=(
-                "🌟 LEGENDARY ENCOUNTER — \"${command}\" has produced a failure worthy of the terminal's hall of fame."
-                "🏆 A legendary misfire: \"${command}\" has challenged the shell and left a mark."
-                "✨ LEGENDARY EVENT — \"${command}\" failed with extraordinary style. The logs will remember."
-                "⚜️ The terminal recognises a legendary failure. \"${command}\" will be spoken of for generations."
-            )
-            ;;
-        mythic)
-            messages=(
-                "🌠✨⭐ MYTHIC STARFALL ⭐✨🌠 — \"${command}\" has crossed beyond the known laws of the shell."
-                "🌌 🌠 A MYTHIC ANOMALY — \"${command}\" has fallen from a sky no debugger can chart. 🌠"
-                "💫🌠 THE MYTHIC TERMINAL HAS SPOKEN: \"${command}\" belongs to another reality. 🌠💫"
-                "🌠✨ A starfall marks this mythic failure: \"${command}\" has become terminal folklore. ⭐🌠"
-            )
             ;;
     esac
 
@@ -568,8 +623,9 @@ dots_failure_message() {
 
     local -i special_banner_queued=0
     if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
-        # Rare banners own their always-on gradient and bypass the ordinary
-        # emoji animation chance. If there is no interactive TTY, print plainly.
+        # Rare banners own their continuous gradient and bypass the ordinary
+        # emoji chance. Fall back to static gradient output when ZLE animation
+        # is unavailable, disabled, or suppressed by NO_COLOR.
         if _dots_failure_message_animate "$selected_style" "$selected_template" "$detail"; then
             special_banner_queued=1
         fi
@@ -580,11 +636,13 @@ dots_failure_message() {
     if (( ! special_banner_queued )); then
         if (( rainbow_output )); then
             _dots_failure_message_rainbow "$selected_template"
+        elif [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
+            _dots_failure_message_gradient "$selected_style" "$selected_template" 0
         else
-            printf '%s\n' "$selected_template"
+            printf '%s\\n' "$selected_template"
         fi
         if [[ -n "$detail" ]]; then
-            printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
+            printf '  %s↳ %s%s\\n' "$dim" "$detail" "$reset"
         fi
     fi
 
