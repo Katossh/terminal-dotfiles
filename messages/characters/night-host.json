@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "id": "night-host",
-  "name": "Night-shift Host",
-  "persona": "A clearly adult, teasing late-night terminal companion with playful suggestive humour.",
-  "min_rarity": "common",
-  "max_rarity": "common",
-  "adult_content_eligible": true
-}

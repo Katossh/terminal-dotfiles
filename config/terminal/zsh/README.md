@@ -8,7 +8,7 @@ The entry point is `dots/zshenv`. It sets XDG paths and `ZDOTDIR=$XDG_CONFIG_HOM
 - `aliases.zsh` — command aliases and the FZF/Neovim file preview helper.
 - `completion.zsh` — completion matching rules and cache settings; Oh My Zsh runs `compinit` once using an XDG cache file.
 - `command-state.zsh` — keeps the most recently completed command and exit status in shell memory.
-- `failure-classifier.zsh`, `failure-messages.zsh`, `failure-message-engine.py`, `failure-animation.zsh`, and `handlers.zsh` — classify failures, load JSON message collections, select by rarity/style/character, and render notices with non-blocking animations.
+- `failure-classifier.zsh`, `failure-messages.zsh`, `failure-message-engine.py`, `failure-animation.zsh`, and `handlers.zsh` — classify failures, load JSON message collections, select by rarity/style/character, animate message gradients in place, and keep prompt emoji animation asynchronous.
 - `command-suggestions.zsh` — caches command candidates and delegates fuzzy ranking to `dots-suggest` when available, with a pure-Zsh fallback.
 - `diagnostics.zsh` — provides `why` and `why --verbose` without rerunning the previous command.
 - `prompt.zsh` — initializes Starship; the appearance is configured in `config/starship.toml`.

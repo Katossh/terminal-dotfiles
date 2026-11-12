@@ -185,8 +185,11 @@ export DOTS_FAILURE_ANIMATION_CHANCE=100
 for style in normal sarcastic dramatic anime ecchi rainbow; do
     export DOTS_FAILURE_STYLE="$style"
     DOTS_TEST_ANIMATION_STYLE=''
+    DOTS_TEST_ANIMATION_BANNER=''
+    DOTS_TEST_ANIMATION_DETAIL=''
     capture_message generic "animation-style-$style"
     assert_eq "${style} style is passed to animation" "$style" "$DOTS_TEST_ANIMATION_STYLE"
+    assert_eq "${style} sends its selected template to the animator" "$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE" "$DOTS_TEST_ANIMATION_BANNER"
 done
 
 # Basis-point rare rolls are deterministic at 100%; Mythic has priority.
@@ -209,13 +212,14 @@ assert_contains "automatic Legendary retains command context" "automatic-legenda
 
 # Explicit style overrides are not replaced by automatic rarity rolls.
 export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_ANIMATION_CHANCE=100
 export DOTS_FAILURE_MYTHIC_CHANCE=10000
 export DOTS_FAILURE_LEGENDARY_CHANCE=0
 DOTS_TEST_ANIMATION_STYLE=''
 DOTS_TEST_ANIMATION_BANNER=''
 capture_message generic explicit-normal-style
-assert_eq "explicit Normal bypasses rare-event rolls" "normal" "$DOTS_TEST_ANIMATION_STYLE"
-assert_eq "explicit Normal queues no rare banner" "" "$DOTS_TEST_ANIMATION_BANNER"
+assert_eq "explicit Normal bypasses automatic rare-event rolls" "normal" "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "explicit Normal sends its selected template to the animator" "$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE" "$DOTS_TEST_ANIMATION_BANNER"
 
 # When the prompt animator is unavailable, rare messages retain their static fallback.
 export DOTS_FAILURE_STYLE=mythic

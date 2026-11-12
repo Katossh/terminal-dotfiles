@@ -27,7 +27,7 @@ class FailureMessageEngineTests(unittest.TestCase):
 
     def test_repository_defaults_validate(self) -> None:
         self.assertEqual(self.catalog["issues"], [])
-        self.assertEqual(len(self.catalog["characters"]), 5)
+        self.assertEqual(len(self.catalog["characters"]), 4)
         self.assertGreaterEqual(len(self.catalog["messages"]), 100)
 
     def test_schema_does_not_expose_explicit_field(self) -> None:
@@ -67,7 +67,7 @@ class FailureMessageEngineTests(unittest.TestCase):
             result = ENGINE.select_message(
                 self.catalog, "generic", "cargo test", "tester", rng=random.Random(8)
             )
-        self.assertEqual(result["character_id"], "night-host")
+        self.assertEqual(result["character_id"], "yoruichi-shihoin")
         self.assertTrue(self.catalog["characters"][result["character_id"]]["adult_content_eligible"])
         self.assertFalse(self.catalog["characters"]["marin-kitagawa"]["adult_content_eligible"])
 

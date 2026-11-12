@@ -19,7 +19,6 @@ apt	htop	optional
 apt	eza	optional
 apt	xdg-utils	optional
 apt	starship	optional
-apt	imagemagick	required
 apt	python3	required
 apt	alacritty	optional
 apt	fonts-noto-color-emoji	required
@@ -40,7 +39,6 @@ dnf	fastfetch	optional
 dnf	htop	optional
 dnf	eza	optional
 dnf	starship	optional
-dnf	ImageMagick	required
 dnf	python3	required
 dnf	alacritty	optional
 dnf	google-noto-color-emoji-fonts	required
@@ -61,7 +59,6 @@ pacman	fastfetch	optional
 pacman	htop	optional
 pacman	eza	optional
 pacman	starship	optional
-pacman	imagemagick	required
 pacman	python	required
 pacman	alacritty	optional
 pacman	noto-fonts-emoji	required
@@ -82,7 +79,6 @@ zypper	fastfetch	optional
 zypper	htop	optional
 zypper	eza	optional
 zypper	starship	optional
-zypper	ImageMagick	required
 zypper	python3	required
 zypper	alacritty	optional
 zypper	google-noto-coloremoji-fonts	required
@@ -103,7 +99,6 @@ apk	fastfetch	optional
 apk	htop	optional
 apk	eza	optional
 apk	starship	optional
-apk	imagemagick	required
 apk	python3	required
 apk	alacritty	optional
 apk	font-noto-emoji	required
@@ -124,7 +119,6 @@ xbps	fastfetch	optional
 xbps	htop	optional
 xbps	eza	optional
 xbps	starship	optional
-xbps	ImageMagick	required
 xbps	python3	required
 xbps	alacritty	optional
 xbps	noto-fonts-emoji	required
@@ -144,7 +138,6 @@ pkg	btop	optional
 pkg	fastfetch	optional
 pkg	htop	optional
 pkg	eza	optional
-pkg	ImageMagick7	required
 pkg	python3	required
 pkg	alacritty	optional
 pkg	noto-emoji	required
@@ -165,7 +158,6 @@ brew	fastfetch	optional
 brew	htop	optional
 brew	eza	optional
 brew	starship	optional
-brew	imagemagick	required
 brew	python	required
 brew-cask	alacritty	optional
 brew-cask	font-noto-color-emoji	required
@@ -187,7 +179,6 @@ nixpkgs	htop	optional
 nixpkgs	eza	optional
 nixpkgs	xdg-utils	optional
 nixpkgs	starship	optional
-nixpkgs	imagemagick	required
 nixpkgs	python3	required
 nixpkgs	alacritty	optional
 nixpkgs-fonts	nerd-fonts.jetbrains-mono	required

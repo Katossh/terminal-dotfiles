@@ -13,7 +13,7 @@
 #   DOTS_FAILURE_RARITY_RARE_CHANCE=0          # basis points (distinct from the Rainbow alias)
 #   DOTS_FAILURE_RARITY_UNCOMMON_CHANCE=0      # basis points
 #   DOTS_FAILURE_RAINBOW_CHANCE=2              # percentage; DOTS_FAILURE_RARE_CHANCE is its legacy alias
-#   DOTS_FAILURE_ANIMATION_CHANCE=50           # percentage chance for ordinary ZLE animation
+#   DOTS_FAILURE_ANIMATION_CHANCE=100          # percentage chance for in-place message gradient
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
@@ -229,19 +229,19 @@ dots_failure_message() {
     esac
 
     local -i special_banner_queued=0
-    if [[ "$selected_rarity" == legendary || "$selected_rarity" == mythic ]]; then
+    local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-100}"
+    case "$animation_chance" in
+        (''|*[!0-9]*) animation_chance=100 ;;
+    esac
+    while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do animation_chance="${animation_chance#0}"; done
+    (( animation_chance > 100 )) && animation_chance=100
+
+    # The current renderer animates the actual message in place. Legendary and
+    # Mythic are unconditional; all other styles obey the configured chance.
+    if [[ "$selected_rarity" == legendary || "$selected_rarity" == mythic ]] ||
+       (( RANDOM % 100 < animation_chance )); then
         if _dots_failure_message_animate "$selected_style" "$selected_template" "$detail"; then
             special_banner_queued=1
-        fi
-    else
-        local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
-        case "$animation_chance" in
-            (''|*[!0-9]*) animation_chance=50 ;;
-        esac
-        while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do animation_chance="${animation_chance#0}"; done
-        (( animation_chance > 100 )) && animation_chance=100
-        if (( RANDOM % 100 < animation_chance )); then
-            _dots_failure_message_animate "$selected_style"
         fi
     fi
 
