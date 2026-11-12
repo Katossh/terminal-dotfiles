@@ -118,7 +118,7 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_PHASE_${_DOTS_FAILURE_ANIMATION_PHASE}_START_PHASE_${_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_PHASE_${_DOTS_FAILURE_ANIMATION_PHASE}_PAUSED_${_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE}_RESUME_FROM_${_DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE}_START_PHASE_${_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
 }
 clear() {
     print -r -- CLEAR_EXECUTED
@@ -260,8 +260,6 @@ for style in legendary mythic; do
     typeset first_frames="${first_state##*LAST_FRAMES_}"
     first_frames="${first_frames%%[^0-9]*}"
     (( first_frames >= 5 )) || fail "${style} gradient rendered only ${first_frames} frames before inspection"
-    typeset first_phase="${first_state##*PHASE_}"
-    first_phase="${first_phase%%[^0-9]*}"
 
     # The next command must not cause a duplicate banner in the prompt. The
     # animation should resume repainting the same fixed output row afterwards.
@@ -278,9 +276,11 @@ for style in legendary mythic; do
     typeset second_frames="${second_state##*LAST_FRAMES_}"
     second_frames="${second_frames%%[^0-9]*}"
     (( second_frames >= 5 )) || fail "${style} animation did not resume after the follow-up command"
+    typeset resume_from_phase="${second_state##*RESUME_FROM_}"
+    resume_from_phase="${resume_from_phase%%[^0-9]*}"
     typeset second_start_phase="${second_state##*START_PHASE_}"
     second_start_phase="${second_start_phase%%[^0-9]*}"
-    [[ "$first_phase" == "$second_start_phase" ]] || fail "${style} resumed worker started at phase ${second_start_phase}, expected ${first_phase}"
+    [[ "$resume_from_phase" == "$second_start_phase" ]] || fail "${style} resumed worker started at phase ${second_start_phase}, expected saved pause phase ${resume_from_phase}"
 done
 print -- "ok - Legendary and Mythic gradients resume at their original output rows after commands"
 
