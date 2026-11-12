@@ -6,11 +6,14 @@
 #
 # Optional user configuration:
 #   DOTS_FAILURE_MESSAGE_CHANCE=100       # 0..100; percentage of failures shown
-#   DOTS_FAILURE_STYLE=auto              # normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
-#   DOTS_FAILURE_LEGENDARY_CHANCE=2      # 0..100; rainbow/rare names remain aliases
-#   DOTS_FAILURE_MYTHIC_CHANCE=1          # 0..1000 per mille; default 1 = 0.1%
-#   DOTS_FAILURE_GRADIENT_INTERVAL=0.08   # seconds between message gradient frames
-#   DOTS_FAILURE_ANIMATION_CHANCE=100     # 0..100; message gradient animation chance
+#   DOTS_FAILURE_STYLE=auto                    # auto|normal|anime|ecchi|sarcastic|dramatic|rainbow|legendary|mythic
+#   DOTS_FAILURE_MYTHIC_CHANCE=10              # basis points; default 10 = 0.1%
+#   DOTS_FAILURE_LEGENDARY_CHANCE=100          # basis points; default 100 = 1%
+#   DOTS_FAILURE_RARITY_EPIC_CHANCE=0          # basis points
+#   DOTS_FAILURE_RARITY_RARE_CHANCE=0          # basis points (distinct from the Rainbow alias)
+#   DOTS_FAILURE_RARITY_UNCOMMON_CHANCE=0      # basis points
+#   DOTS_FAILURE_RAINBOW_CHANCE=2              # percentage; DOTS_FAILURE_RARE_CHANCE is its legacy alias
+#   DOTS_FAILURE_ANIMATION_CHANCE=50           # percentage chance for ordinary ZLE animation
 #   DOTS_FAILURE_ANIMATION=0              # disable animation independently
 #   DOTS_FAILURE_MESSAGE_ESCALATION=1     # set to 0 to disable repeat escalation
 #   NO_COLOR=1                            # disable ANSI colours
