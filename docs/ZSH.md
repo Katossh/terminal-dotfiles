@@ -83,7 +83,7 @@ Ordinary prompt animation remains a changing emoji inserted immediately before t
 | `DOTS_FAILURE_RAINBOW_CHANCE` | `2` | Percentage chance (0–100) for the automatic Rainbow style. `DOTS_FAILURE_RARE_CHANCE` remains a legacy alias. |
 | `DOTS_FAILURE_LEGENDARY_CHANCE` | `100` | Automatic Legendary chance in basis points: 100 = 1%. |
 | `DOTS_FAILURE_MYTHIC_CHANCE` | `10` | Automatic Mythic chance in basis points: 10 = 0.1%. Mythic is rolled before Legendary; the combined rare-event chance is capped at 100%. |
-| `DOTS_FAILURE_ANIMATION_CHANCE` | `50` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic gradients bypass this setting. |
+| `DOTS_FAILURE_ANIMATION_CHANCE` | `100` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic gradients bypass this setting. |
 | `DOTS_FAILURE_ANIMATION_INTERVAL` | `0.08` | Delay between prompt emoji animation frames in seconds (valid range: 0.01–2.00). |
 | `DOTS_FAILURE_GRADIENT_INTERVAL` | `0.08` | Delay between failure-message gradient frames in seconds (valid range: 0.01–1.00). |
 | `DOTS_FAILURE_ANIMATION_INFINITE` | `0` | Set to `1`, `true`, `yes`, or `on` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |
