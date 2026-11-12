@@ -37,7 +37,6 @@ _dots_failure_animation_query_cursor() {
     banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
     _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=10
     _DOTS_FAILURE_ANIMATION_ANCHOR_COL=1
-    _DOTS_FAILURE_ANIMATION_ANCHOR_LINES="${#banner_lines}"
     return 0
 }
 
