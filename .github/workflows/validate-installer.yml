@@ -149,6 +149,8 @@ jobs:
           assert terminal["window"]["decorations"] == "None"
           assert terminal["window"]["blur"] is True
           assert terminal["general"]["ipc_socket"] is False
+          assert terminal["hints"]["enabled"][0]["hyperlinks"] is True
+          assert terminal["hints"]["enabled"][0]["action"] == "Copy"
           bindings = terminal["keyboard"]["bindings"]
           assert {"key": "T", "mods": "Alt", "action": "CreateNewTab"} in bindings
           assert {"key": "]", "mods": "Alt", "action": "SelectNextTab"} in bindings
