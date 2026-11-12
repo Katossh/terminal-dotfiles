@@ -39,7 +39,9 @@ _dots_failure_animation_infinite_enabled() {
 
     # CONTINUOUS remains a backwards-compatible alias. The new INFINITE
     # variable takes precedence when both are set.
-    local setting="${DOTS_FAILURE_ANIMATION_INFINITE-${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}}"
+    # Preserve both historic names: the Emoji-specific setting from main and
+    # the earlier Continuous alias. The PR32 name takes precedence.
+    local setting="${DOTS_FAILURE_ANIMATION_INFINITE-${DOTS_FAILURE_EMOJI_ANIMATION_INFINITE-${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}}}"
     setting="${setting:l}"
     case "$setting" in
         1|true|yes|on) return 0 ;;
@@ -288,7 +290,8 @@ _dots_failure_animation_start() {
 
     [[ -o interactive && -t 0 && -t 1 &&
         "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 1
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
+        -z "${NO_COLOR:-}" ]] || return 1
 
     local style="${1:-normal}"
     local banner="${2:-}"
