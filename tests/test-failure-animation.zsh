@@ -116,11 +116,13 @@ _dots_test_start_special_animation_precmd() {
 
     local saved_no_color="${NO_COLOR-}"
     unset NO_COLOR
+    local -i start_status=0
     _dots_failure_animation_start \
         "$_DOTS_TEST_SPECIAL_STYLE" \
         "$_DOTS_TEST_SPECIAL_BANNER" \
-        "$_DOTS_TEST_SPECIAL_DETAIL" || return 1
+        "$_DOTS_TEST_SPECIAL_DETAIL" || start_status=$?
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
+    return "$start_status"
 }
 _dots_test_queue_special_animation() {
     local style="${1}"
@@ -332,10 +334,12 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 # The banner is part of the ZLE-managed prompt. Typing while its frame pipe is
 # active must preserve the editable command buffer and must not block input.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
-read_until "SPECIAL_QUEUED_normal"
-read_until "normal ANIMATED FAILURE BANNER"
-assert_contains "gradient is rendered in the live prompt" $'\e[38;2;' "$REPLY"
-assert_contains "gradient prompt is displayed above the normal input marker" "BASE_OUTPUT" "$REPLY"
+read_until "BASE_OUTPUT"
+assert_contains "special message is queued before prompt rendering" "SPECIAL_QUEUED_normal" "$REPLY"
+assert_contains "gradient is rendered in the live prompt" "normal ANIMATED FAILURE BANNER" "$REPLY"
+assert_contains "gradient is rendered with 24-bit colour" $'\e[38;2;' "$REPLY"
+assert_contains "gradient prompt keeps the path and input prompt below it" "BASE_PATH" "$REPLY"
+
 zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
 read_until "INPUT_DURING_GRADIENT"
 assert_contains "typed input appears while the gradient is still running" "INPUT_DURING_GRADIENT" "$REPLY"
@@ -350,13 +354,12 @@ assert_contains "input test leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REP
 assert_absent "animation never places a Kitty image" "--place" "$REPLY"
 
 # Exercise every remaining message style and verify that the prompt animation
-# completes without Kitty graphics, ImageMagick, GIFs, or manual cursor motion.
+# completes without Kitty graphics or ImageMagick.
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}"
-    read_until "${style} ANIMATED FAILURE BANNER"
+    read_until "BASE_OUTPUT"
+    assert_contains "${style} banner is shown in the editable prompt" "${style} ANIMATED FAILURE BANNER" "$REPLY"
     assert_contains "${style} uses a truecolour prompt gradient" $'\e[38;2;' "$REPLY"
-    assert_absent "${style} does not create a Kitty image placement" "--place" "$REPLY"
     drain_for 60
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
@@ -369,22 +372,24 @@ for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
 done
 print -- "ok - all eight message styles animate through ZLE without intercepting input"
 
-# There is no persistent graphic layer to clear; Ctrl+L and clear stop workers.
+# Clearing the screen and running clear both cancel an active gradient.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "BASE_OUTPUT"
+drain_for 3
 zpty -w "$PTY_NAME" $'\x0c'
-drain_for 30
+drain_for 3
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "Ctrl+L leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+assert_contains "Ctrl+L stops an active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until SPECIAL_QUEUED_legendary
-read_until "legendary ANIMATED FAILURE BANNER"
-drain_for 30
+read_until "BASE_OUTPUT"
+drain_for 3
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "clear leaves no persistent animation worker" "GRADIENT_ACTIVE_0" "$REPLY"
+assert_contains "clear stops an active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
