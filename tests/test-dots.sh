@@ -196,16 +196,33 @@ grep -Fq 'profile install' "$NIX_TEST_LOG"
 grep -Fq 'nixpkgs#zsh' "$NIX_TEST_LOG"
 grep -Fq 'nixpkgs#neovim' "$NIX_TEST_LOG"
 grep -Fq 'nixpkgs#alacritty' "$NIX_TEST_LOG"
+
 for manager in apt dnf pacman zypper apk xbps pkg brew-cask nixpkgs; do
     awk -F '\t' -v manager="$manager" '$1 == manager && $2 == "alacritty" && $3 == "optional" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
 done
-for expected in \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
+
+expected_font_packages=(
+    $'apt\tfonts-noto-color-emoji\trequired'
+    $'dnf\tgoogle-noto-color-emoji-fonts\trequired'
+    $'pacman\tnoto-fonts-emoji\trequired'
+    $'zypper\tgoogle-noto-coloremoji-fonts\trequired'
+    $'apk\tfont-noto-emoji\trequired'
+    $'xbps\tnoto-fonts-emoji\trequired'
+    $'pkg\tnoto-emoji\trequired'
+    $'brew-cask\tfont-noto-color-emoji\trequired'
+    $'nixpkgs-fonts\tnoto-fonts-color-emoji\trequired'
+)
+for expected in "${expected_font_packages[@]}"; do
+    grep -Fqx -- "$expected" "$REPO_DIR/manifest/packages.tsv"
+done
+
+awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
 grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
 grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
+grep -Fq 'noto-fonts-color-emoji' "$REPO_DIR/nix/packages.nix"
 
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
+# Homebrew casks are distinct from formulae and must be installed and tracked.
+# Fake Homebrew supports the Alacritty app and Noto Color Emoji font casks.
 cat > "$TEST_ROOT/bin/brew" <<'BREW'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -238,11 +255,15 @@ STARSHIP
 chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
 export BREW_TEST_LOG="$TEST_ROOT/brew.log"
 export BREW_TEST_ROOT="$TEST_ROOT"
+
+# Disabled Alacritty cask is skipped; the font cask remains installable.
 PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
     "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
 ! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
 grep -Fq 'install --cask font-noto-color-emoji' "$BREW_TEST_LOG"
 grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
+
+# With the cask enabled, both packages are recorded and safely purgeable.
 PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
     "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
 grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
@@ -254,422 +275,5 @@ grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
 grep -Fq 'uninstall --cask font-noto-color-emoji' "$BREW_TEST_LOG"
 test ! -e "$TEST_ROOT/alacritty-installed"
 test ! -e "$TEST_ROOT/font-noto-color-emoji-installed"
-echo 'dots lifecycle tests passed'
-apt\tfonts-noto-color-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
 
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-dnf\tgoogle-noto-color-emoji-fonts\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-pacman\tnoto-fonts-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-apk\tfont-noto-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-xbps\tnoto-fonts-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-pkg\tnoto-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-brew-cask\tfont-noto-color-emoji\trequired' \
-    awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
-echo 'dots lifecycle tests passed'
-nixpkgs-fonts\tnoto-fonts-color-emoji\trequired'; do
-    grep -Fqx -- "$expected" "$REPO_DIR/manifest/packages.tsv"
-done
-awk -F '\t' '$1 == "nixpkgs" && $2 == "zsh" && $3 == "required" { found=1 } END { exit !found }' "$REPO_DIR/manifest/packages.tsv"
-grep -Fq 'builtins.readFile ../manifest/packages.tsv' "$REPO_DIR/nix/packages.nix"
-grep -Fq 'class == "optional"' "$REPO_DIR/nix/packages.nix"
-
-# Homebrew casks are distinct from formulae and must be installed and tracked
-# through the cask-specific commands. Fake Homebrew avoids touching the host.
-cat > "$TEST_ROOT/bin/brew" <<'BREW'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-printf '%s\\n' "$*" >> "${BREW_TEST_LOG:?}"
-case "${1:-} ${2:-}" in
-    "list --formula") exit 0 ;;
-    "list --cask") [[ -e "$BREW_TEST_ROOT/alacritty-installed" ]] ;;
-    "info --cask")
-        if [[ "${BREW_CASK_DISABLED:-0}" == 1 ]]; then
-            printf '%s\\n' 'Alacritty is disabled'
-        else
-            printf '%s\\n' 'Alacritty 0.17.0'
-        fi
-        ;;
-    "install --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        touch "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    "uninstall --cask")
-        [[ "${3:-}" == alacritty ]] || exit 1
-        rm -f "$BREW_TEST_ROOT/alacritty-installed"
-        ;;
-    *) exit 1 ;;
-esac
-BREW
-cat > "$TEST_ROOT/bin/starship" <<'STARSHIP'
-#!/usr/bin/env bash
-exit 0
-STARSHIP
-chmod +x "$TEST_ROOT/bin/brew" "$TEST_ROOT/bin/starship"
-export BREW_TEST_LOG="$TEST_ROOT/brew.log"
-export BREW_TEST_ROOT="$TEST_ROOT"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin BREW_CASK_DISABLED=1 DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-disabled.log"
-! grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'Optional package unavailable' "$TEST_ROOT/brew-disabled.log"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin DOTS_SKIP_DOWNLOADS=1 \
-    "$REPO_DIR/bin/dots" install --packages --yes > "$TEST_ROOT/brew-install.log"
-grep -Fq 'install --cask alacritty' "$BREW_TEST_LOG"
-grep -Fq 'brew-cask:alacritty' "$XDG_DATA_HOME/dots/state.tsv"
-PATH="$TEST_ROOT/bin:$PATH" DOTS_PLATFORM=Darwin \
-    "$REPO_DIR/bin/dots" uninstall --purge --yes > "$TEST_ROOT/brew-uninstall.log"
-grep -Fq 'uninstall --cask alacritty' "$BREW_TEST_LOG"
-test ! -e "$TEST_ROOT/alacritty-installed"
 echo 'dots lifecycle tests passed'
