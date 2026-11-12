@@ -330,10 +330,18 @@ assert_contains "Emoji-specific and Continuous variables remain Infinite aliases
 zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
+drain_for 5
 
 # The banner is part of the ZLE-managed prompt. Typing while its frame pipe is
 # active must preserve the editable command buffer and must not block input.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
+read_until "SPECIAL_QUEUED_normal"
+assert_contains "special message is queued before prompt rendering" "SPECIAL_QUEUED_normal" "$REPLY"
+read_until "normal ANIMATED FAILURE BANNER"
+assert_contains "gradient is rendered in the live prompt" "normal ANIMATED FAILURE BANNER" "$REPLY"
+assert_contains "gradient is rendered with 24-bit colour" $'\e[38;2;' "$REPLY"
+read_until "BASE_OUTPUT"
+assert_contains "gradient prompt keeps the path and input prompt below it" "BASE_PATH" "$REPLY"
 
 zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
 read_until "INPUT_DURING_GRADIENT"
@@ -351,7 +359,12 @@ assert_absent "animation never places a Kitty image" "--place" "$REPLY"
 # Exercise every remaining message style and verify that the prompt animation
 # completes without Kitty graphics or ImageMagick.
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}"
+    assert_contains "${style} queue is acknowledged" "SPECIAL_QUEUED_${style}" "$REPLY"
+    read_until "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} banner is shown in the editable prompt" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} uses a truecolour prompt gradient" $'\e[38;2;' "$REPLY"
     drain_for 60
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
@@ -365,7 +378,10 @@ done
 print -- "ok - all eight message styles animate through ZLE without intercepting input"
 
 # Clearing the screen and running clear both cancel an active gradient.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_legendary"
+read_until "legendary ANIMATED FAILURE BANNER"
+drain_for 3
 zpty -w "$PTY_NAME" $'\x0c'
 drain_for 3
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
@@ -373,7 +389,8 @@ read_until SPECIAL_STATE_GRADIENT_ACTIVE_
 assert_contains "Ctrl+L stops an active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "BASE_OUTPUT"
+read_until "SPECIAL_QUEUED_legendary"
+read_until "legendary ANIMATED FAILURE BANNER"
 drain_for 3
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
