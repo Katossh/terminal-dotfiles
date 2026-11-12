@@ -255,7 +255,7 @@ for style in legendary mythic; do
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} first worker is stopped for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
     assert_contains "${style} banner remains stored" "MODE_${style}_BANNER_1" "$REPLY"
-    assert_contains "${style} first worker has rendered frames" "LAST_STATE_finished" "$REPLY"
+    assert_contains "${style} first worker has rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
     typeset first_state="$REPLY"
     typeset first_frames="${first_state##*LAST_FRAMES_}"
     first_frames="${first_frames%%[^0-9]*}"
@@ -273,7 +273,7 @@ for style in legendary mythic; do
     read_until SPECIAL_STATE_ACTIVE_
     assert_contains "${style} resumed worker stops for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
     assert_contains "${style} banner remains stored after another command" "MODE_${style}_BANNER_1" "$REPLY"
-    assert_contains "${style} resumed worker rendered frames" "LAST_STATE_finished" "$REPLY"
+    assert_contains "${style} resumed worker rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
     typeset second_state="$REPLY"
     typeset second_frames="${second_state##*LAST_FRAMES_}"
     second_frames="${second_frames%%[^0-9]*}"
