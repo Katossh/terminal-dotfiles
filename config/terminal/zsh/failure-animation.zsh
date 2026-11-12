@@ -13,6 +13,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_PHASE=0
+typeset -gi _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_TTY_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_LINES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=0
@@ -457,7 +458,8 @@ _dots_failure_animation_begin() {
         _dots_failure_animation_infinite_enabled && infinite=1
     fi
 
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_PHASE")
+    _DOTS_FAILURE_ANIMATION_STREAM_START_PHASE="$_DOTS_FAILURE_ANIMATION_PHASE"
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$mode" "$infinite" "$_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
