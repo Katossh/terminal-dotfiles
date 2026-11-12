@@ -176,6 +176,7 @@ fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
 
+FAKE_KITTY
 cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
 #!/usr/bin/env bash
 set -euo pipefail
