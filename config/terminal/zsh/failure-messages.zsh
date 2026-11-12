@@ -112,11 +112,11 @@ _dots_failure_message_gradient() {
 _dots_failure_message_animate() {
     emulate -L zsh
 
-    # Called by the interactive failure notifier from precmd. Pass the final
-    # resolved style (including automatic Anime-to-Ecchi selection) so the
-    # prompt animation uses the matching emoji pool.
-    (( ${+functions[_dots_failure_animation_start]} )) || return 0
-    _dots_failure_animation_start "${1:-normal}"
+    # Pass the final style and, for rare events, the complete banner plus detail.
+    # Return failure when no interactive animator is available so the caller
+    # can preserve the static fallback message.
+    (( ${+functions[_dots_failure_animation_start]} )) || return 1
+    _dots_failure_animation_start "${1:-normal}" "${2-}" "${3-}"
 }
 
 dots_failure_message() {
@@ -145,18 +145,14 @@ dots_failure_message() {
 
     # Validate percentages before using them in arithmetic expressions.
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
-    # DOTS_FAILURE_RAINBOW_CHANCE and DOTS_FAILURE_RARE_CHANCE remain aliases.
-    local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}}"
-    local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-1}"
+    # DOTS_FAILURE_RARE_CHANCE remains an alias for the old Rainbow setting.
+    local rainbow_chance="${DOTS_FAILURE_RAINBOW_CHANCE:-${DOTS_FAILURE_RARE_CHANCE:-2}}"
     local animation_chance="${DOTS_FAILURE_ANIMATION_CHANCE:-50}"
     case "$chance" in
         (''|*[!0-9]*) chance=100 ;;
     esac
-    case "$legendary_chance" in
-        (''|*[!0-9]*) legendary_chance=2 ;;
-    esac
-    case "$mythic_chance" in
-        (''|*[!0-9]*) mythic_chance=1 ;;
+    case "$rainbow_chance" in
+        (''|*[!0-9]*) rainbow_chance=2 ;;
     esac
     case "$animation_chance" in
         (''|*[!0-9]*) animation_chance=50 ;;
@@ -165,18 +161,14 @@ dots_failure_message() {
     while [[ "$chance" == 0* && "$chance" != 0 ]]; do
         chance="${chance#0}"
     done
-    while [[ "$legendary_chance" == 0* && "$legendary_chance" != 0 ]]; do
-        legendary_chance="${legendary_chance#0}"
-    done
-    while [[ "$mythic_chance" == 0* && "$mythic_chance" != 0 ]]; do
-        mythic_chance="${mythic_chance#0}"
+    while [[ "$rainbow_chance" == 0* && "$rainbow_chance" != 0 ]]; do
+        rainbow_chance="${rainbow_chance#0}"
     done
     while [[ "$animation_chance" == 0* && "$animation_chance" != 0 ]]; do
         animation_chance="${animation_chance#0}"
     done
     (( chance > 100 )) && chance=100
-    (( legendary_chance > 100 )) && legendary_chance=100
-    (( mythic_chance > 1000 )) && mythic_chance=1000
+    (( rainbow_chance > 100 )) && rainbow_chance=100
     (( animation_chance > 100 )) && animation_chance=100
     if (( chance == 0 || RANDOM % 100 >= chance )); then
         return 0
@@ -424,17 +416,14 @@ dots_failure_message() {
     if [[ "$selected_style" == auto ]]; then
         automatic_style=1
         local -i style_roll=$((RANDOM % 100))
-        local -i mythic_roll=$(( RANDOM % 1000 ))
-        if (( mythic_roll < mythic_chance )); then
-            selected_style=mythic
-        elif (( style_roll < legendary_chance )); then
-            selected_style=legendary
-        elif (( legendary_chance >= 100 )); then
-            selected_style=legendary
+        if (( style_roll < rainbow_chance )); then
+            selected_style=rainbow
+        elif (( rainbow_chance >= 100 )); then
+            selected_style=rainbow
         else
-            # Reserve the legendary share, then distribute the rest across
-            # the ordinary 48/28/14/8 style weights.
-            style_roll=$(( (style_roll - legendary_chance) * 98 / (100 - legendary_chance) ))
+            # Reserve the configured Rainbow share, then distribute the rest
+            # across the ordinary 48/28/14/8 style weights.
+            style_roll=$(( (style_roll - rainbow_chance) * 98 / (100 - rainbow_chance) ))
             if (( style_roll < 48 )); then
                 selected_style=normal
             elif (( style_roll < 76 )); then
@@ -451,6 +440,38 @@ dots_failure_message() {
     # traditional anime archetypes remain available as a distinct override.
     if (( automatic_style )) && [[ "$selected_style" == anime ]] && (( RANDOM % 100 < 65 )); then
         selected_style=ecchi
+    fi
+
+    # Rare event chances use basis points (100 = 1%, 10 = 0.1%). Mythic
+    # is rolled first; the combined probability is capped at 100%.
+    local mythic_chance="${DOTS_FAILURE_MYTHIC_CHANCE:-10}"
+    local legendary_chance="${DOTS_FAILURE_LEGENDARY_CHANCE:-100}"
+    case "$mythic_chance" in
+        (''|*[!0-9]*) mythic_chance=10 ;;
+    esac
+    case "$legendary_chance" in
+        (''|*[!0-9]*) legendary_chance=100 ;;
+    esac
+    while [[ "$mythic_chance" == 0* && "$mythic_chance" != 0 ]]; do
+        mythic_chance="${mythic_chance#0}"
+    done
+    while [[ "$legendary_chance" == 0* && "$legendary_chance" != 0 ]]; do
+        legendary_chance="${legendary_chance#0}"
+    done
+    local -i mythic_chance_num=$mythic_chance
+    local -i legendary_chance_num=$legendary_chance
+    (( mythic_chance_num > 10000 )) && mythic_chance_num=10000
+    (( legendary_chance_num > 10000 )) && legendary_chance_num=10000
+    (( mythic_chance_num + legendary_chance_num > 10000 )) &&
+        legendary_chance_num=$(( 10000 - mythic_chance_num ))
+
+    if (( automatic_style && mythic_chance_num + legendary_chance_num > 0 )); then
+        local -i rarity_roll=$(( RANDOM % 10000 ))
+        if (( rarity_roll < mythic_chance_num )); then
+            selected_style=mythic
+        elif (( rarity_roll < mythic_chance_num + legendary_chance_num )); then
+            selected_style=legendary
+        fi
     fi
 
     local -i rainbow_output=0
@@ -592,32 +613,29 @@ dots_failure_message() {
     fi
     _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE="$selected_template"
 
+    local -i special_banner_queued=0
     if [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
-        local -i palette_animation_active=0
-        if [[ "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] &&
-            (( ${+functions[_dots_failure_animation_gradient_start]} )) &&
-            _dots_failure_animation_gradient_start "$selected_style"; then
-            palette_animation_active=1
+        # Rare banners own their continuous gradient and bypass the ordinary
+        # emoji chance. Fall back to static gradient output when ZLE animation
+        # is unavailable, disabled, or suppressed by NO_COLOR.
+        if _dots_failure_message_animate "$selected_style" "$selected_template" "$detail"; then
+            special_banner_queued=1
         fi
+    elif (( RANDOM % 100 < animation_chance )); then
+        _dots_failure_message_animate "$selected_style"
+    fi
 
-        if [[ "${DOTS_FAILURE_ANIMATION:-1}" == 0 ]]; then
-            printf '%s\n' "$selected_template"
-        else
-            _dots_failure_message_gradient "$selected_style" "$selected_template" "$palette_animation_active"
-        fi
-    else
-        if (( RANDOM % 100 < animation_chance )); then
-            _dots_failure_message_animate "$selected_style"
-        fi
-
+    if (( ! special_banner_queued )); then
         if (( rainbow_output )); then
             _dots_failure_message_rainbow "$selected_template"
+        elif [[ "$selected_style" == legendary || "$selected_style" == mythic ]]; then
+            _dots_failure_message_gradient "$selected_style" "$selected_template" 0
         else
             printf '%s\n' "$selected_template"
         fi
-    fi
-    if [[ -n "$detail" ]]; then
-        printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
+        if [[ -n "$detail" ]]; then
+            printf '  %s↳ %s%s\n' "$dim" "$detail" "$reset"
+        fi
     fi
 
     # Rendering a message must never replace the failed command's status.
