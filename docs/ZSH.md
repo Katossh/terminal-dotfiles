@@ -11,7 +11,7 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide why / why --verbose without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
-8. failure-animation.zsh — registers after Starship and animates ordinary emoji before the input marker; Legendary and Mythic failures receive continuously moving gradient banners above the prompt.
+8. failure-animation.zsh — registers after Starship and animates ordinary emoji before the input marker; Legendary and Mythic failures receive left-to-right gradient banners that persist across prompts until the screen is cleared.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -59,7 +59,7 @@ Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, g
 
 The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with DOTS_FAILURE_STYLE=ecchi.
 
-The first interactive Zsh prompt plays one 12-frame emoji animation (~1 second), even before any command has failed. Later ordinary failure notices trigger another emoji animation on the configured 50% chance. Legendary and Mythic failures bypass that chance and start a continuously moving gradient banner while the prompt is idle. Legendary sweeps a metallic gold gradient; Mythic uses a charcoal-to-silver gradient rather than rainbow colours. The gradient is rendered character by character and its phase advances asynchronously through ZLE; it stops when Enter is pressed. Normal, sarcastic, and dramatic messages share the general reaction pool; Anime, Ecchi, and Rainbow each use a dedicated pool. Frames are delivered through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
+The first interactive Zsh prompt plays one 12-frame emoji animation (~1 second), even before any command has failed. Later ordinary failure notices trigger another emoji animation on the configured 50% chance. Legendary and Mythic failures bypass that chance and start a continuously moving gradient banner while the prompt is idle. Legendary sweeps a metallic gold gradient from left to right; Mythic uses a charcoal-to-silver gradient rather than rainbow colours. The gradient is rendered character by character and its phase advances asynchronously through ZLE. Submitting a command pauses the current ZLE worker while the foreground command runs, but the rare banner remains in prompt state and its animation restarts at the next prompt. It stays until `clear` or Ctrl+L clears the screen. Normal, sarcastic, and dramatic messages share the general reaction pool; Anime, Ecchi, and Rainbow each use a dedicated pool. Frames are delivered through an asynchronous file-descriptor watcher, so typing and cursor movement remain responsive.
 
 The animation pools are:
 
@@ -72,7 +72,7 @@ The animation pools are:
 
 
 
-Ordinary animation remains a changing emoji inserted immediately before the final Starship input marker (❯ by default); it never modifies the directory/path line or touches RPROMPT. Legendary and Mythic instead render their complete message and optional detail as an animated banner above the original prompt. Their gradients use true-colour ANSI spans and Zsh prompt-width markers without changing Kitty's global palette. Both animation modes run only in an interactive TTY. When ZLE animation is unavailable, the rare message falls back to a static gradient; when output is redirected or TERM=dumb, it remains plain text. Pressing Enter stops the active animation.
+Ordinary animation remains a changing emoji inserted immediately before the final Starship input marker (❯ by default); it never modifies the directory/path line or touches RPROMPT. Legendary and Mythic instead render their complete message and optional detail as an animated banner above the original prompt. Their gradients use true-colour ANSI spans and Zsh prompt-width markers without changing Kitty's global palette. Both animation modes run only in an interactive TTY. When ZLE animation is unavailable, the rare message falls back to a static gradient; when output is redirected or TERM=dumb, it remains plain text. Enter pauses the current worker as Zsh hands control to the submitted command, then the banner resumes at the next prompt. `clear` and Ctrl+L explicitly dismiss the persistent banner. Previously printed copies in terminal scrollback are not rewritten; the live prompt banner is what continues animating.
 
 ## Environment variables
 
