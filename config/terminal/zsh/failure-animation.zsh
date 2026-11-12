@@ -269,11 +269,13 @@ _dots_failure_animation_render_anchor() {
         line="${banner_lines[index]}"
         _dots_failure_animation_gradient_line "$line" "$_DOTS_FAILURE_ANIMATION_MODE" "$_DOTS_FAILURE_ANIMATION_PHASE"
         row=$(( _DOTS_FAILURE_ANIMATION_ANCHOR_ROW + index - 1 ))
+        local cup=""
         if (( index == 1 )); then
-            print -rn -u "$fd" -- $'\e['"${row}";"${_DOTS_FAILURE_ANIMATION_ANCHOR_COL}"'H'
+            cup="$(builtin printf $'\e[%d;%dH' "$row" "$_DOTS_FAILURE_ANIMATION_ANCHOR_COL")"
         else
-            print -rn -u "$fd" -- $'\e['"${row}";1H'
+            cup="$(builtin printf $'\e[%d;1H' "$row")"
         fi
+        print -rn -u "$fd" -- "$cup"
         print -rn -u "$fd" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
     done
     print -rn -u "$fd" -- $'\e[?7h'
