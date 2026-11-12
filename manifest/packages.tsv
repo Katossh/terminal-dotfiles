@@ -18,6 +18,7 @@ apt	htop	optional
 apt	eza	optional
 apt	xdg-utils	optional
 apt	starship	optional
+apt	alacritty	optional
 dnf	zsh	required
 dnf	git	required
 dnf	tmux	required
@@ -35,6 +36,7 @@ dnf	fastfetch	optional
 dnf	htop	optional
 dnf	eza	optional
 dnf	starship	optional
+dnf	alacritty	optional
 pacman	zsh	required
 pacman	git	required
 pacman	tmux	required
@@ -52,6 +54,7 @@ pacman	fastfetch	optional
 pacman	htop	optional
 pacman	eza	optional
 pacman	starship	optional
+pacman	alacritty	optional
 zypper	zsh	required
 zypper	git	required
 zypper	tmux	required
@@ -69,6 +72,7 @@ zypper	fastfetch	optional
 zypper	htop	optional
 zypper	eza	optional
 zypper	starship	optional
+zypper	alacritty	optional
 apk	zsh	required
 apk	git	required
 apk	tmux	required
@@ -86,6 +90,7 @@ apk	fastfetch	optional
 apk	htop	optional
 apk	eza	optional
 apk	starship	optional
+apk	alacritty	optional
 xbps	zsh	required
 xbps	git	required
 xbps	tmux	required
@@ -103,6 +108,7 @@ xbps	fastfetch	optional
 xbps	htop	optional
 xbps	eza	optional
 xbps	starship	optional
+xbps	alacritty	optional
 pkg	zsh	required
 pkg	git	required
 pkg	tmux	required
@@ -119,6 +125,7 @@ pkg	btop	optional
 pkg	fastfetch	optional
 pkg	htop	optional
 pkg	eza	optional
+pkg	alacritty	optional
 brew	zsh	required
 brew	git	required
 brew	tmux	required
@@ -136,6 +143,7 @@ brew	fastfetch	optional
 brew	htop	optional
 brew	eza	optional
 brew	starship	optional
+brew-cask	alacritty	optional
 nixpkgs	zsh	required
 nixpkgs	git	required
 nixpkgs	tmux	required
@@ -154,4 +162,5 @@ nixpkgs	htop	optional
 nixpkgs	eza	optional
 nixpkgs	xdg-utils	optional
 nixpkgs	starship	optional
+nixpkgs	alacritty	optional
 nixpkgs-fonts	nerd-fonts.jetbrains-mono	required

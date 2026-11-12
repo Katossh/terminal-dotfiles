@@ -7,6 +7,7 @@ bat	tree	config/terminal/bat	config:bat	all
 fd	tree	config/terminal/fd	config:fd	all
 ripgrep	tree	config/terminal/ripgrep	config:ripgrep	all
 kitty	tree	config/terminal/kitty	config:kitty	all
+alacritty	tree	config/terminal/alacritty	config:alacritty	all
 btop	tree	config/terminal/btop	config:btop	all
 htop	tree	config/terminal/htop	config:htop	all
 fastfetch	tree	config/terminal/fastfetch	config:fastfetch	all

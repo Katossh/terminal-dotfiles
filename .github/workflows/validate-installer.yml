@@ -131,7 +131,17 @@ jobs:
           assert theme["mgr"]["syntect_theme"] == "~/.config/yazi/Catppuccin-frappe.tmTheme"
           assert theme["mode"]["normal_main"]["bg"] == "#85c1dc"
           assert (config / "Catppuccin-frappe.tmTheme").is_file()
-          print("Yazi config is valid: Neovim opener and Catppuccin Frappé Sapphire theme.")
+          alacritty = Path("config/terminal/alacritty")
+          terminal = tomllib.loads((alacritty / "alacritty.toml").read_text())
+          frappe = tomllib.loads((alacritty / "catppuccin-frappe.toml").read_text())
+
+          assert terminal["general"]["import"] == ["catppuccin-frappe.toml"]
+          assert terminal["font"]["normal"]["family"] == "JetBrainsMono Nerd Font"
+          assert frappe["colors"]["primary"]["background"] == "#303446"
+          assert frappe["colors"]["primary"]["foreground"] == "#c6d0f5"
+          assert frappe["colors"]["normal"]["blue"] == "#8caaee"
+          assert (alacritty / "LICENSE").is_file()
+          print("Yazi and Alacritty TOML configs are valid; both Catppuccin Frappé themes are present.")
           PY
 
       - name: Help and non-destructive dry run

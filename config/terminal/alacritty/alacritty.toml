@@ -1,0 +1,20 @@
+# Alacritty configuration.
+# The relative import works with both the default and custom XDG_CONFIG_HOME.
+
+[general]
+import = ["catppuccin-frappe.toml"]
+live_config_reload = true
+
+[font]
+normal = { family = "JetBrainsMono Nerd Font", style = "Regular" }
+size = 14.0
+
+[scrolling]
+history = 20000
+
+[cursor]
+style = { shape = "Beam", blinking = "On" }
+
+[window]
+opacity = 0.9
+padding = { x = 8, y = 8 }

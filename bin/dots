@@ -375,12 +375,12 @@ package_installed() {
         xbps) xbps-query -l "$package" 2>/dev/null | grep -q "^ii $package-" ;;
         pkg) pkg info -e "$package" >/dev/null 2>&1 ;;
         brew) brew list --formula "$package" >/dev/null 2>&1 ;;
+        brew-cask) brew list --cask "$package" >/dev/null 2>&1 ;;
         *) return 1 ;;
     esac
 }
-
 package_available() {
-    local manager="$1" package="$2"
+    local manager="$1" package="$2" package_info
     case "$manager" in
         apt) apt-cache show "$package" >/dev/null 2>&1 ;;
         dnf) dnf -q repoquery --available "$package" >/dev/null 2>&1 ;;
@@ -390,10 +390,13 @@ package_available() {
         xbps) xbps-query -Rs "$package" 2>/dev/null | grep -Fq "$package-" ;;
         pkg) pkg search -x "$package" >/dev/null 2>&1 ;;
         brew) brew info --formula "$package" >/dev/null 2>&1 ;;
+        brew-cask)
+            package_info="$(brew info --cask "$package" 2>&1)" || return 1
+            ! grep -iq 'disabled' <<< "$package_info"
+            ;;
         *) return 1 ;;
     esac
 }
-
 install_package_batch() {
     local manager="$1"
     shift
@@ -408,10 +411,10 @@ install_package_batch() {
         xbps) root_command xbps-install -y "$@" ;;
         pkg) root_command pkg install -y "$@" ;;
         brew) brew install "$@" ;;
+        brew-cask) brew install --cask "$@" ;;
         *) return 1 ;;
     esac
 }
-
 refresh_package_index() {
     case "$1" in
         apt) root_command apt-get update ;;
@@ -458,8 +461,8 @@ install_nix_packages() {
 }
 
 install_packages() {
-    local manager package class was
-    local -a required optional
+    local manager pkg_manager package class was install_manager
+    local -a required optional cask_required cask_optional
     local before="$STATE_DIR/packages-before-$$.tsv"
     manager="$(detect_package_manager)"
     if [[ "$manager" == nixos || "$manager" == nix ]]; then
@@ -474,29 +477,46 @@ install_packages() {
     : > "$before"
     required=()
     optional=()
+    cask_required=()
+    cask_optional=()
     refresh_package_index "$manager"
     while IFS=$'\t' read -r pkg_manager package class; do
         [[ -z "$pkg_manager" || "$pkg_manager" == \#* ]] && continue
-        [[ "$pkg_manager" == "$manager" ]] || continue
-        if package_installed "$manager" "$package"; then
-            printf '%s\talready\n' "$package" >> "$before"
+        if [[ "$pkg_manager" == "$manager" ]]; then
+            install_manager="$manager"
+        elif [[ "$manager" == brew && "$pkg_manager" == brew-cask ]]; then
+            install_manager=brew-cask
         else
-            printf '%s\tnew\n' "$package" >> "$before"
-            if [[ "$class" == required ]]; then required+=("$package")
-            elif package_available "$manager" "$package"; then optional+=("$package")
-            else info "Optional package unavailable in configured repositories: $package"; fi
+            continue
+        fi
+        if package_installed "$install_manager" "$package"; then
+            printf '%s\t%s\talready\n' "$install_manager" "$package" >> "$before"
+        else
+            printf '%s\t%s\tnew\n' "$install_manager" "$package" >> "$before"
+            if [[ "$class" == required ]]; then
+                if [[ "$install_manager" == brew-cask ]]; then cask_required+=("$package")
+                else required+=("$package"); fi
+            elif package_available "$install_manager" "$package"; then
+                if [[ "$install_manager" == brew-cask ]]; then cask_optional+=("$package")
+                else optional+=("$package"); fi
+            else
+                info "Optional package unavailable in configured repositories: $package ($install_manager)"
+            fi
         fi
     done < "$PACKAGES_MANIFEST"
-    ((${#required[@]})) && install_package_batch "$manager" "${required[@]}"
-    ((${#optional[@]})) && install_package_batch "$manager" "${optional[@]}"
-    while IFS=$'\t' read -r package was; do
+    (("${#required[@]}")) && install_package_batch "$manager" "${required[@]}"
+    (("${#optional[@]}")) && install_package_batch "$manager" "${optional[@]}"
+    (("${#cask_required[@]}")) && install_package_batch brew-cask "${cask_required[@]}"
+    (("${#cask_optional[@]}")) && install_package_batch brew-cask "${cask_optional[@]}"
+    while IFS=$'\t' read -r pkg_manager package was; do
         [[ "$was" == new ]] || continue
-        if package_installed "$manager" "$package"; then record_state package "$manager:$package" "$package"; fi
+        if package_installed "$pkg_manager" "$package"; then
+            record_state package "$pkg_manager:$package" "$package"
+        fi
     done < "$before"
     rm -f "$before"
     if ! command -v starship >/dev/null 2>&1 && [[ ! -x "$LOCAL_BIN/starship" ]]; then install_starship_upstream; fi
-}
-create_compat_command() {
+}create_compat_command() {
     local target_command="$1" alias_name="$2" actual_path
     command -v "$alias_name" >/dev/null 2>&1 && return 0
     actual_path="$(command -v "$target_command" 2>/dev/null || true)"
@@ -1016,10 +1036,10 @@ remove_package() {
         xbps) root_command xbps-remove -y "$package" ;;
         pkg) root_command pkg remove -y "$package" ;;
         brew) brew uninstall "$package" ;;
+        brew-cask) brew uninstall --cask "$package" ;;
         *) warn "Cannot remove package from unknown manager: $manager"; return 1 ;;
     esac
 }
-
 prune_empty_dirs() {
     local dir="$1"
     [[ "$DRY_RUN" == 1 ]] && return 0

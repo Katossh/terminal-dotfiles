@@ -87,6 +87,8 @@ The package manifest contains entries for apt, dnf, pacman, zypper, apk, xbps, F
 - Required packages are requested directly; optional packages are installed only when available.
 - Package operations may request administrator privileges through sudo or doas. Configuration linking and Git downloads run as the normal user.
 
+Alacritty is listed as an optional application package for the supported package managers and Nixpkgs. `dots install --packages` installs it when available; its configuration and Catppuccin Frappé theme are linked even with `--no-packages`. Homebrew's official cask is currently disabled because it fails Gatekeeper checks, so the installer will skip it instead of weakening macOS security.
+
 ## NixOS
 
 dots install --packages installs declared packages into the current user's Nix profile. It does not modify /etc/nixos, generate a host configuration or execute nixos-rebuild.
