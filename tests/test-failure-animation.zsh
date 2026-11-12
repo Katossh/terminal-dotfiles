@@ -109,7 +109,7 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    local kitty_calls="$(command grep -c '^+kitten icat ' "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
+    local kitty_calls="$(command grep -c '^KITTY_GIF_RESULT_' "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
     local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
     local animation_log="$(<"$DOTS_TEST_ANIMATION_LOG")"
@@ -152,29 +152,30 @@ if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size
 fi
 if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
     image_file="${@: -1}"
-    printf 'KITTY_GIF_CANDIDATE_%s\n' "$image_file" >> "${DOTS_TEST_KITTY_LOG:?}"
-    [[ -s "$image_file" ]] || {
-        printf 'KITTY_GIF_REJECTED_EMPTY\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-        exit 1
-    }
-    [[ "$(head -c 6 "$image_file")" == GIF89a ]] || {
-        printf 'KITTY_GIF_REJECTED_HEADER\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-        exit 1
-    }
-    frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-    [[ "$frame_count" -ge 2 ]] || {
-        printf 'KITTY_GIF_REJECTED_FRAME_COUNT_%s\n' "$frame_count" >> "${DOTS_TEST_KITTY_LOG:?}"
-        exit 1
-    }
-    grep -aq 'NETSCAPE2.0' "$image_file" || {
-        printf 'KITTY_GIF_REJECTED_NO_LOOP_EXTENSION\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-        exit 1
-    }
-    printf 'ANIMATED_GIF_FRAMES_%s\nANIMATED_GIF_LOOPING\n' "$frame_count" >> "${DOTS_TEST_KITTY_LOG:?}"
+    frame_count=0
+    looping=0
+    gif_status=valid
+    if [[ ! -s "$image_file" ]]; then
+        gif_status=empty
+    elif [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
+        gif_status=header
+    else
+        frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
+        frame_count="${frame_count//[[:space:]]/}"
+        if (( frame_count < 2 )); then
+            gif_status=frames
+        elif grep -aq 'NETSCAPE2.0' "$image_file"; then
+            looping=1
+        else
+            gif_status=loop-extension
+        fi
+    fi
+    printf 'KITTY_GIF_RESULT_%s_FRAMES_%s_LOOP_%s\n' "$gif_status" "$frame_count" "$looping" >> "${DOTS_TEST_KITTY_LOG:?}"
+    [[ "$gif_status" == valid ]] || exit 1
 fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-FAKE_KITTY
+
 cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -322,8 +323,8 @@ for style in legendary mythic; do
     assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
     assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
     assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIF_FRAMES_2" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIF_LOOPING" "$REPLY"
+    assert_contains "${style} passes a multi-frame GIF to Kitty" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
+    assert_contains "${style} generated GIF loops indefinitely" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
 
     # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
