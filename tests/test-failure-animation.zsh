@@ -96,8 +96,11 @@ _dots_test_queue_special_animation() {
         return 1
     }
     unset NO_COLOR
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test"
+    local start_status=0
+    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test" || start_status=$?
+    print -r -- "START_RESULT_${start_status}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_SET_$([[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && print 1 || print 0)_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_INTERACTIVE_$([[ -o interactive ]] && print 1 || print 0)_TTY0_$([[ -t 0 ]] && print 1 || print 0)_TTY1_$([[ -t 1 ]] && print 1 || print 0)_NO_COLOR_${NO_COLOR-}"
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
+    (( start_status == 0 )) || return 1
     print -r -- "STREAM_PROBE_OK_${style}"
     print -r -- "SPECIAL_QUEUED_${style}"
 }
