@@ -156,7 +156,8 @@ if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
     [[ "$(head -c 6 "$image_file")" == GIF89a ]] || exit 1
     frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
     [[ "$frame_count" -ge 2 ]] || exit 1
-    printf 'ANIMATED_GIF_FRAMES_%s\n' "$frame_count" >> "${DOTS_TEST_ANIMATION_LOG:?}"
+    grep -aq 'NETSCAPE2.0' "$image_file" || exit 1
+    printf 'ANIMATED_GIF_FRAMES_%s\nANIMATED_GIF_LOOPING\n' "$frame_count" >> "${DOTS_TEST_ANIMATION_LOG:?}"
 fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
@@ -179,7 +180,12 @@ fi
 printf 'MAGICK_INPUT_FRAMES_%s\n' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
 # The fake only needs a GIF header and two frame descriptors; Kitty is mocked
 # below, while this assertion catches empty/static renderer output.
-printf 'GIF89a\\000\\000\\000\\000\\000\\000,\\000,\\000' > "$output"
+printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff' > "$output"
+printf '\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' >> "$output"
+for _ in 1 2; do
+    printf '\x21\xf9\x04\x00\x08\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00' >> "$output"
+done
+printf '\x3b' >> "$output"
 FAKE_MAGICK
 cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
 #!/usr/bin/env sh
@@ -304,6 +310,7 @@ for style in legendary mythic; do
     assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
     assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
     assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIF_FRAMES_2" "$REPLY"
+    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIF_LOOPING" "$REPLY"
 
     # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
