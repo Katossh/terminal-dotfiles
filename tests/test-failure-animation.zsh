@@ -109,12 +109,12 @@ _dots_test_queue_special_animation() {
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    local kitty_calls="$(command grep -c '^KITTY_GIF_RESULT_' "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
+    local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
     kitty_calls="${kitty_calls//[[:space:]]/}"
-    local kitty_log animation_log
-    kitty_log=$(command tr '\n' '|' < "$DOTS_TEST_KITTY_LOG")
-    animation_log=$(command tr '\n' '|' < "$DOTS_TEST_ANIMATION_LOG")
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}_ANIMATION_LOG_${animation_log}"
+    local kitty_log="$(<"$DOTS_TEST_KITTY_LOG")"
+    local animation_log="$(<"$DOTS_TEST_ANIMATION_LOG")"
+    local gif_log="$(<"$DOTS_TEST_GIF_LOG")"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}_ANIMATION_LOG_${animation_log}_GIF_LOG_${gif_log}"
 }
 
 clear() {
@@ -143,8 +143,10 @@ ZSH_INIT
 FAKE_BIN="$(mktemp -d)"
 KITTY_LOG="$FAKE_BIN/kitty.log"
 ANIMATION_LOG="$FAKE_BIN/animation.log"
+GIF_LOG="$FAKE_BIN/gif.log"
 : > "$KITTY_LOG"
 : > "$ANIMATION_LOG"
+: > "$GIF_LOG"
 cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
 #!/usr/bin/env bash
 if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
@@ -153,30 +155,28 @@ if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size
 fi
 if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
     image_file="${@: -1}"
-    frame_count=0
-    looping=0
-    gif_status=valid
     if [[ ! -s "$image_file" ]]; then
-        gif_status=empty
-    elif [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
-        gif_status=header
-    else
-        frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-        frame_count="${frame_count//[[:space:]]/}"
-        if (( frame_count < 2 )); then
-            gif_status=frames
-        elif grep -aq 'NETSCAPE2.0' "$image_file"; then
-            looping=1
-        else
-            gif_status=loop-extension
-        fi
+        printf 'GIF_REJECTED_EMPTY|' >> "${DOTS_TEST_GIF_LOG:?}"
+        exit 1
     fi
-    printf 'KITTY_GIF_RESULT_%s_FRAMES_%s_LOOP_%s\n' "$gif_status" "$frame_count" "$looping" >> "${DOTS_TEST_KITTY_LOG:?}"
-    [[ "$gif_status" == valid ]] || exit 1
+    if [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
+        printf 'GIF_REJECTED_HEADER|' >> "${DOTS_TEST_GIF_LOG:?}"
+        exit 1
+    fi
+    frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
+    frame_count="${frame_count//[[:space:]]/}"
+    if (( frame_count < 2 )); then
+        printf 'GIF_REJECTED_FRAMES_%s|' "$frame_count" >> "${DOTS_TEST_GIF_LOG:?}"
+        exit 1
+    fi
+    if ! grep -aq 'NETSCAPE2.0' "$image_file"; then
+        printf 'GIF_REJECTED_LOOP_EXTENSION|' >> "${DOTS_TEST_GIF_LOG:?}"
+        exit 1
+    fi
+    printf 'ANIMATED_GIF_FRAMES_%s_LOOP_1|' "$frame_count" >> "${DOTS_TEST_GIF_LOG:?}"
 fi
 printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
 printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-
 FAKE_KITTY
 cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
 #!/usr/bin/env bash
@@ -193,9 +193,7 @@ done
 if cmp -s "${frames[0]}" "${frames[24]}"; then
     exit 1
 fi
-printf 'MAGICK_INPUT_FRAMES_%s\n' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
-# The fake only needs a GIF header and two frame descriptors; Kitty is mocked
-# below, while this assertion catches empty/static renderer output.
+printf 'MAGICK_INPUT_FRAMES_%s|' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
 printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff' > "$output"
 printf '\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' >> "$output"
 for _ in 1 2; do
@@ -212,7 +210,7 @@ chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \
-    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" \
+    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" DOTS_TEST_GIF_LOG="$GIF_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
@@ -325,530 +323,8 @@ for style in legendary mythic; do
     assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
     assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
     assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
-
-    # A later command must not repaint old screen coordinates or duplicate the notice.
-    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
-    read_until "FOLLOWUP_${style}"
-    assert_absent "${style} banner is not re-emitted at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} animation does not move beneath the input line" $'\e[10;1H' "$REPLY"
-
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} does not create another graphic on the next prompt" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} leaves no shell-side animation worker" "ACTIVE_0" "$REPLY"
-done
-print -- "ok - Legendary and Mythic overlays are emitted once and stay attached to Kitty scrollback"
-
-# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
-zpty -w "$PTY_NAME" $'\x0c'
-drain_for 30
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
-
-# The clear command is also detected before it runs, so the next prompt stays clean.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until SPECIAL_QUEUED_legendary
-read_until BASE_OUTPUT
-drain_for 60
-zpty -w "$PTY_NAME" 'clear'$'\n'
-read_until CLEAR_EXECUTED
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
-# Infinite emoji mode loops while idle; accepting a command stops it.
-zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
-read_until INFINITE_ENABLED
-assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
-read_until INFINITE_DISABLED
-assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
-typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
-infinite_frames="${infinite_frames%%[^0-9]*}"
-[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
-(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
-print -- "ok - infinite emoji animation loops beyond one frame sequence"
-
-print -- "All style-aware and rare-event prompt animation integration tests passed."
-\\n'/|}"
-    animation_log="${animation_log//
-}
-
-clear() {
-    print -r -- CLEAR_EXECUTED
-}
-_dots_test_enable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=1
-    print -- INFINITE_ENABLED
-}
-_dots_test_disable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=0
-    print -r -- "INFINITE_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
-}
-_dots_test_legacy_infinite_aliases() {
-    unset DOTS_FAILURE_ANIMATION_INFINITE
-    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
-    _dots_failure_animation_infinite_enabled || return 1
-    unset DOTS_FAILURE_EMOJI_ANIMATION_INFINITE
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
-    _dots_failure_animation_infinite_enabled || return 1
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
-    print -- INFINITE_ALIASES_OK
-}
-ZSH_INIT
-
-FAKE_BIN="$(mktemp -d)"
-KITTY_LOG="$FAKE_BIN/kitty.log"
-ANIMATION_LOG="$FAKE_BIN/animation.log"
-: > "$KITTY_LOG"
-: > "$ANIMATION_LOG"
-cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
-#!/usr/bin/env bash
-if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
-    printf '1320x840\n'
-    exit 0
-fi
-if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
-    image_file="${@: -1}"
-    frame_count=0
-    looping=0
-    gif_status=valid
-    if [[ ! -s "$image_file" ]]; then
-        gif_status=empty
-    elif [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
-        gif_status=header
-    else
-        frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-        frame_count="${frame_count//[[:space:]]/}"
-        if (( frame_count < 2 )); then
-            gif_status=frames
-        elif grep -aq 'NETSCAPE2.0' "$image_file"; then
-            looping=1
-        else
-            gif_status=loop-extension
-        fi
-    fi
-    printf 'KITTY_GIF_RESULT_%s_FRAMES_%s_LOOP_%s\n' "$gif_status" "$frame_count" "$looping" >> "${DOTS_TEST_KITTY_LOG:?}"
-    [[ "$gif_status" == valid ]] || exit 1
-fi
-printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
-printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-
-FAKE_KITTY
-cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
-#!/usr/bin/env bash
-set -euo pipefail
-frames=()
-output=''
-for arg in "$@"; do
-    case "$arg" in
-        *.svg) frames+=("$arg") ;;
-        GIF:*) output="${arg#GIF:}" ;;
-    esac
-done
-[[ "${#frames[@]}" -eq 25 && -n "$output" ]] || exit 1
-if cmp -s "${frames[0]}" "${frames[24]}"; then
-    exit 1
-fi
-printf 'MAGICK_INPUT_FRAMES_%s\n' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
-# The fake only needs a GIF header and two frame descriptors; Kitty is mocked
-# below, while this assertion catches empty/static renderer output.
-printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff' > "$output"
-printf '\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' >> "$output"
-for _ in 1 2; do
-    printf '\x21\xf9\x04\x00\x08\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00' >> "$output"
-done
-printf '\x3b' >> "$output"
-FAKE_MAGICK
-cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
-#!/usr/bin/env sh
-printf 'JetBrainsMono Nerd Font\n'
-FAKE_FONT
-chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
-
-trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
-
-zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \
-    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" \
-    DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
-    "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
-
-read_until() {
-    local needle="$1"
-    local -i tries=0
-    local output='' data=''
-    while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        [[ "$output" == *"$needle"* ]] && break
-        command sleep 0.05
-        (( tries += 1 ))
-    done
-    REPLY="$output"
-}
-
-drain_for() {
-    local -i rounds="$1"
-    local output='' data=''
-    while (( rounds > 0 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        command sleep 0.02
-        rounds=$(( rounds - 1 ))
-    done
-    REPLY="$output"
-}
-
-# Wait for the clean shell, then load the modules as the real .zshrc does.
-local_startup=''
-typeset chunk=''
-typeset -i attempt=0
-while (( attempt < 40 )); do
-    if zpty -r -t "$PTY_NAME" chunk; then local_startup+="$chunk"; fi
-    [[ -n "$local_startup" ]] && break
-    command sleep 0.05
-    (( attempt += 1 ))
-done
-if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach its prompt"; fi
-print -- "ok - clean interactive child shell reached its prompt"
-
-zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "❯"
-assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
-assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
-[[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
-print -- "ok - initial animation leaves the path line untouched"
-
-# Let the shorter initial one-shot animation finish before submitting another command.
-drain_for 100
-zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
-read_until STATE_SNAPSHOT
-assert_contains "startup animation finishes all 12 frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_12 LAST_STATE_stream-complete" "$REPLY"
-assert_contains "startup uses the shared style" "STYLE_normal" "$REPLY"
-assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
-
-# Deterministically render a frame and verify it is directly before the input marker.
-zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
-read_until "BASE_OUTPUT 😭 ❯"
-assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
-assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
-
-# Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
-zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until "POOL_normal_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until "POOL_sarcastic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
-assert_contains "sarcastic pool includes melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until "POOL_dramatic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
-read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
-assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
-assert_contains "ecchi has its dedicated four-emoji pool" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
-assert_absent "Ecchi pool no longer contains melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
-read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
-assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
-
-# Both historic environment-variable names remain compatible aliases.
-zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
-read_until INFINITE_ALIASES_OK
-assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
-
-# Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
-zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
-read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
-
-# Exercise both rare styles using one Kitty graphics placement per failure.
-local -i expected_kitty_calls=0
-for style in legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0" "$REPLY"
-
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    (( expected_kitty_calls += 1 ))
-    assert_contains "${style} creates exactly one scrollback graphic" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} overlay uses absolute cell placement" "--place" "$REPLY"
-    assert_contains "${style} overlay is layered above the text cells" "--z-index 1" "$REPLY"
-    assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
-    assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
-    assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
-    assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
-
-    # A later command must not repaint old screen coordinates or duplicate the notice.
-    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
-    read_until "FOLLOWUP_${style}"
-    assert_absent "${style} banner is not re-emitted at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} animation does not move beneath the input line" $'\e[10;1H' "$REPLY"
-
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} does not create another graphic on the next prompt" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} leaves no shell-side animation worker" "ACTIVE_0" "$REPLY"
-done
-print -- "ok - Legendary and Mythic overlays are emitted once and stay attached to Kitty scrollback"
-
-# Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
-zpty -w "$PTY_NAME" $'\x0c'
-drain_for 30
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L clears the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
-
-# The clear command is also detected before it runs, so the next prompt stays clean.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until SPECIAL_QUEUED_legendary
-read_until BASE_OUTPUT
-drain_for 60
-zpty -w "$PTY_NAME" 'clear'$'\n'
-read_until CLEAR_EXECUTED
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear command dismisses the persistent banner" "MODE_emoji_BANNER_0" "$REPLY"
-# Infinite emoji mode loops while idle; accepting a command stops it.
-zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
-read_until INFINITE_ENABLED
-assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
-read_until INFINITE_DISABLED
-assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
-typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
-infinite_frames="${infinite_frames%%[^0-9]*}"
-[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
-(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
-print -- "ok - infinite emoji animation loops beyond one frame sequence"
-
-print -- "All style-aware and rare-event prompt animation integration tests passed."
-\\n'/|}"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_KITTY_LOG_${kitty_log}_ANIMATION_LOG_${animation_log}"
-}
-
-clear() {
-    print -r -- CLEAR_EXECUTED
-}
-_dots_test_enable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=1
-    print -- INFINITE_ENABLED
-}
-_dots_test_disable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=0
-    print -r -- "INFINITE_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
-}
-_dots_test_legacy_infinite_aliases() {
-    unset DOTS_FAILURE_ANIMATION_INFINITE
-    export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
-    _dots_failure_animation_infinite_enabled || return 1
-    unset DOTS_FAILURE_EMOJI_ANIMATION_INFINITE
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
-    _dots_failure_animation_infinite_enabled || return 1
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
-    print -- INFINITE_ALIASES_OK
-}
-ZSH_INIT
-
-FAKE_BIN="$(mktemp -d)"
-KITTY_LOG="$FAKE_BIN/kitty.log"
-ANIMATION_LOG="$FAKE_BIN/animation.log"
-: > "$KITTY_LOG"
-: > "$ANIMATION_LOG"
-cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
-#!/usr/bin/env bash
-if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
-    printf '1320x840\n'
-    exit 0
-fi
-if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
-    image_file="${@: -1}"
-    frame_count=0
-    looping=0
-    gif_status=valid
-    if [[ ! -s "$image_file" ]]; then
-        gif_status=empty
-    elif [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
-        gif_status=header
-    else
-        frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-        frame_count="${frame_count//[[:space:]]/}"
-        if (( frame_count < 2 )); then
-            gif_status=frames
-        elif grep -aq 'NETSCAPE2.0' "$image_file"; then
-            looping=1
-        else
-            gif_status=loop-extension
-        fi
-    fi
-    printf 'KITTY_GIF_RESULT_%s_FRAMES_%s_LOOP_%s\n' "$gif_status" "$frame_count" "$looping" >> "${DOTS_TEST_KITTY_LOG:?}"
-    [[ "$gif_status" == valid ]] || exit 1
-fi
-printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
-printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-
-FAKE_KITTY
-cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
-#!/usr/bin/env bash
-set -euo pipefail
-frames=()
-output=''
-for arg in "$@"; do
-    case "$arg" in
-        *.svg) frames+=("$arg") ;;
-        GIF:*) output="${arg#GIF:}" ;;
-    esac
-done
-[[ "${#frames[@]}" -eq 25 && -n "$output" ]] || exit 1
-if cmp -s "${frames[0]}" "${frames[24]}"; then
-    exit 1
-fi
-printf 'MAGICK_INPUT_FRAMES_%s\n' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
-# The fake only needs a GIF header and two frame descriptors; Kitty is mocked
-# below, while this assertion catches empty/static renderer output.
-printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff' > "$output"
-printf '\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' >> "$output"
-for _ in 1 2; do
-    printf '\x21\xf9\x04\x00\x08\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00' >> "$output"
-done
-printf '\x3b' >> "$output"
-FAKE_MAGICK
-cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
-#!/usr/bin/env sh
-printf 'JetBrainsMono Nerd Font\n'
-FAKE_FONT
-chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
-
-trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
-
-zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \
-    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" \
-    DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
-    "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
-
-read_until() {
-    local needle="$1"
-    local -i tries=0
-    local output='' data=''
-    while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        [[ "$output" == *"$needle"* ]] && break
-        command sleep 0.05
-        (( tries += 1 ))
-    done
-    REPLY="$output"
-}
-
-drain_for() {
-    local -i rounds="$1"
-    local output='' data=''
-    while (( rounds > 0 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        command sleep 0.02
-        rounds=$(( rounds - 1 ))
-    done
-    REPLY="$output"
-}
-
-# Wait for the clean shell, then load the modules as the real .zshrc does.
-local_startup=''
-typeset chunk=''
-typeset -i attempt=0
-while (( attempt < 40 )); do
-    if zpty -r -t "$PTY_NAME" chunk; then local_startup+="$chunk"; fi
-    [[ -n "$local_startup" ]] && break
-    command sleep 0.05
-    (( attempt += 1 ))
-done
-if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach its prompt"; fi
-print -- "ok - clean interactive child shell reached its prompt"
-
-zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "❯"
-assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
-assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
-[[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
-print -- "ok - initial animation leaves the path line untouched"
-
-# Let the shorter initial one-shot animation finish before submitting another command.
-drain_for 100
-zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
-read_until STATE_SNAPSHOT
-assert_contains "startup animation finishes all 12 frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_12 LAST_STATE_stream-complete" "$REPLY"
-assert_contains "startup uses the shared style" "STYLE_normal" "$REPLY"
-assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
-
-# Deterministically render a frame and verify it is directly before the input marker.
-zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
-read_until "BASE_OUTPUT 😭 ❯"
-assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
-assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
-
-# Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
-zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until "POOL_normal_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until "POOL_sarcastic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
-assert_contains "sarcastic pool includes melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until "POOL_dramatic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
-read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
-assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
-assert_contains "ecchi has its dedicated four-emoji pool" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
-assert_absent "Ecchi pool no longer contains melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
-read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
-assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
-
-# Both historic environment-variable names remain compatible aliases.
-zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
-read_until INFINITE_ALIASES_OK
-assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
-
-# Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
-zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
-read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
-
-# Exercise both rare styles using one Kitty graphics placement per failure.
-local -i expected_kitty_calls=0
-for style in legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0" "$REPLY"
-
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
-    (( expected_kitty_calls += 1 ))
-    assert_contains "${style} creates exactly one scrollback graphic" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
-    assert_contains "${style} overlay uses absolute cell placement" "--place" "$REPLY"
-    assert_contains "${style} overlay is layered above the text cells" "--z-index 1" "$REPLY"
-    assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
-    assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
-    assert_contains "${style} animation uses Kitty's GIF decoder" "--engine=builtin" "$REPLY"
-    assert_contains "${style} renderer generates 25 distinct frames" "MAGICK_INPUT_FRAMES_25" "$REPLY"
-    assert_contains "${style} passes a multi-frame GIF to Kitty" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
-    assert_contains "${style} generated GIF loops indefinitely" "KITTY_GIF_RESULT_valid_FRAMES_2_LOOP_1" "$REPLY"
+    assert_contains "${style} passes a multi-frame GIF to Kitty" "ANIMATED_GIF_FRAMES_2_LOOP_1" "$REPLY"
+    assert_contains "${style} generated GIF loops indefinitely" "ANIMATED_GIF_FRAMES_2_LOOP_1" "$REPLY"
 
     # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
