@@ -333,9 +333,9 @@ _dots_failure_animation_kitty_scrollback() {
 
     local line
     for line in "${banner_lines[@]}"; do
-        _dots_failure_animation_gradient_line "$line" "$style" 0
-        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW"
-        print -rn -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- $'\r\n'
+        # The transparent image is the gradient. Keep real, selectable text
+        # underneath it; do not invoke the shell ANSI renderer a second time.
+        print -r -u "$_DOTS_FAILURE_ANIMATION_TTY_FD" -- "$line"
     done
 
     local tty_fd="$_DOTS_FAILURE_ANIMATION_TTY_FD"
