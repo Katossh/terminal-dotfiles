@@ -97,29 +97,25 @@ _dots_test_render_gradients() {
     print -- GRADIENTS_OK
 }
 _dots_test_queue_special_animation() {
-    local style="$1"
-    local probe=''
+    local style="${1}"
     local saved_no_color="${NO_COLOR-}"
-    probe="$(_dots_failure_animation_stream "$style" "$style" 1 | command head -n 3)"
-    [[ "$probe" == $'0\n4\n8' ]] || {
-        print -r -- "STREAM_PROBE_FAILED_${style}_${(qqq)probe}"
-        return 1
-    }
     unset NO_COLOR
     _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "↳ live gradient test" || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_MODE" == "$style" &&
-       -n "$_DOTS_FAILURE_ANIMATION_BANNER" &&
-       "$_DOTS_FAILURE_ANIMATION_PENDING" == 1 ]] || return 1
     if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
-    print -r -- "ENQUEUE_STATE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_1_PENDING_1"
-    print -r -- "STREAM_PROBE_OK_${style}"
-    print -r -- "SPECIAL_QUEUED_${style}"
+    local banner_set=0
+    [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
+    print -r -- "ENQUEUE_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
+    print -r -- "SPECIAL_QUEUED_$style"
 }
 _dots_test_snapshot_special_animation() {
     local banner_set=0
     [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}_LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}_PHASE_${_DOTS_FAILURE_ANIMATION_PHASE}_PAUSED_${_DOTS_FAILURE_ANIMATION_LAST_PAUSED_PHASE}_RESUME_FROM_${_DOTS_FAILURE_ANIMATION_RESUME_FROM_PHASE}_START_PHASE_${_DOTS_FAILURE_ANIMATION_STREAM_START_PHASE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_${banner_set}"
+    local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
+    kitty_calls="${kitty_calls//[[:space:]]/}"
+    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_$kitty_calls"
+    [[ -s "$DOTS_TEST_KITTY_LOG" ]] && print -r -- "KITTY_LOG:$(<"$DOTS_TEST_KITTY_LOG")"
 }
+
 clear() {
     print -r -- CLEAR_EXECUTED
 }
@@ -143,12 +139,40 @@ _dots_test_legacy_infinite_aliases() {
 }
 ZSH_INIT
 
-trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
+FAKE_BIN="$(mktemp -d)"
+KITTY_LOG="$FAKE_BIN/kitty.log"
+: > "$KITTY_LOG"
+cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
+#!/usr/bin/env bash
+if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
+    printf '1320x840\n'
+    exit 0
+fi
+printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
+printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
+FAKE_KITTY
+cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
+#!/usr/bin/env bash
+last=''
+for arg in "$@"; do last="$arg"; done
+case "$last" in
+    GIF:*) : > "${last#GIF:}" ;;
+    *) exit 1 ;;
+esac
+FAKE_MAGICK
+cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
+#!/usr/bin/env sh
+printf 'JetBrainsMono Nerd Font\n'
+FAKE_FONT
+chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
 
-zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-    DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
+trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
+
+zpty -b "$PTY_NAME" env TERM=xterm-kitty KITTY_WINDOW_ID=123 COLUMNS=120 LINES=30 \\
+    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" \\
+    DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \\
+    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \\
+    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \\
     "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
 
 read_until() {
@@ -241,58 +265,34 @@ zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 
-# Exercise both rare banners at their original terminal output rows.
+# Exercise both rare styles using one Kitty graphics placement per failure.
+local -i expected_kitty_calls=0
 for style in legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} enqueue retains the selected rare banner" "ENQUEUE_STATE_${style}_BANNER_1_PENDING_1" "$REPLY"
-    read_until "BASE_OUTPUT"
-    drain_for 80
-    assert_contains "${style} frames repaint the saved screen row" $'\e[10;1H' "$REPLY"
+    assert_contains "${style} uses Kitty's terminal-owned animation path" "ENQUEUE_MODE_emoji_BANNER_0_PENDING_0_ACTIVE_0" "$REPLY"
 
-    # Keep a live, unfinished input line on screen while multiple frames run.
-    # Cursor save/restore must leave the editable command visible and intact.
-    zpty -w "$PTY_NAME" "typing_while_${style}_animates"
-    drain_for 80
-    assert_contains "${style} animation preserves partially typed input" "typing_while_${style}_animates" "$REPLY"
-    assert_contains "${style} repaint saves the live ZLE cursor" $'\0337' "$REPLY"
-    assert_contains "${style} repaint restores the live ZLE cursor" $'\0338' "$REPLY"
-    zpty -w "$PTY_NAME" $'\025'
-    drain_for 20
-
-    # This inspection command submits Enter and pauses the current worker.
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} first worker is stopped for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
-    assert_contains "${style} banner remains stored" "MODE_${style}_BANNER_1" "$REPLY"
-    assert_contains "${style} first worker has rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
-    typeset first_state="$REPLY"
-    typeset first_frames="${first_state##*LAST_FRAMES_}"
-    first_frames="${first_frames%%[^0-9]*}"
-    (( first_frames >= 5 )) || fail "${style} gradient rendered only ${first_frames} frames before inspection"
+    (( expected_kitty_calls += 1 ))
+    assert_contains "${style} creates exactly one scrollback graphic" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
+    assert_contains "${style} overlay uses absolute cell placement" "--place" "$REPLY"
+    assert_contains "${style} overlay is layered above the text cells" "--z-index 1" "$REPLY"
+    assert_contains "${style} animation loops inside Kitty" "--loop -1" "$REPLY"
+    assert_contains "${style} animation uses the streaming graphics protocol" "--transfer-mode=stream" "$REPLY"
 
-    # The next command must not cause a duplicate banner in the prompt. The
-    # animation should resume repainting the same fixed output row afterwards.
+    # A later command must not repaint old screen coordinates or duplicate the notice.
     zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
     read_until "FOLLOWUP_${style}"
-    drain_for 80
-    assert_contains "${style} animation resumes at its original screen row" $'\e[10;1H' "$REPLY"
+    assert_absent "${style} banner is not re-emitted at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
+    assert_absent "${style} animation does not move beneath the input line" $'\e[10;1H' "$REPLY"
+
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
     read_until SPECIAL_STATE_ACTIVE_
-    assert_contains "${style} resumed worker stops for inspection" "SPECIAL_STATE_ACTIVE_0" "$REPLY"
-    assert_contains "${style} banner remains stored after another command" "MODE_${style}_BANNER_1" "$REPLY"
-    assert_contains "${style} resumed worker rendered frames" "LAST_STATE_frame-rendered" "$REPLY"
-    typeset second_state="$REPLY"
-    typeset second_frames="${second_state##*LAST_FRAMES_}"
-    second_frames="${second_frames%%[^0-9]*}"
-    (( second_frames >= 5 )) || fail "${style} animation did not resume after the follow-up command"
-    typeset resume_from_phase="${second_state##*RESUME_FROM_}"
-    resume_from_phase="${resume_from_phase%%[^0-9]*}"
-    typeset second_start_phase="${second_state##*START_PHASE_}"
-    second_start_phase="${second_start_phase%%[^0-9]*}"
-    [[ "$resume_from_phase" == "$second_start_phase" ]] || fail "${style} resumed worker started at phase ${second_start_phase}, expected saved pause phase ${resume_from_phase}"
+    assert_contains "${style} does not create another graphic on the next prompt" "KITTY_CALLS_$expected_kitty_calls" "$REPLY"
+    assert_contains "${style} leaves no shell-side animation worker" "ACTIVE_0" "$REPLY"
 done
-print -- "ok - Legendary and Mythic gradients resume at their original output rows after commands"
+print -- "ok - Legendary and Mythic overlays are emitted once and stay attached to Kitty scrollback"
 
 # Ctrl+L invokes the wrapped clear-screen widget and dismisses a persistent banner.
 zpty -w "$PTY_NAME" $'\x0c'
