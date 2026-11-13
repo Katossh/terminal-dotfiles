@@ -489,7 +489,7 @@ _dots_failure_animation_fd_handler() {
             # after the stream reaches EOF so every phase gets rendered.
             if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
                 _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
-                zle -U $'\n'
+                zle _dots_failure_animation_replay_accept_widget
             fi
             return 0
         fi
@@ -615,6 +615,10 @@ _dots_failure_animation_precmd() {
     fi
 }
 
+_dots_failure_animation_replay_accept_widget() {
+    zle -U $'\n'
+}
+
 _dots_failure_animation_accept_line_widget() {
     emulate -L zsh
 
@@ -705,6 +709,7 @@ if [[ -o interactive ]]; then
     # FD frame updates use a ZLE widget; the banner uses prompt-safe colour
     # spans, never a raw ANSI message or terminal graphics overlay.
     zle -N _dots_failure_animation_gradient_render_widget
+    zle -N _dots_failure_animation_replay_accept_widget
     # Enter waits for the last gradient frame instead of interrupting it.
     zle -N accept-line _dots_failure_animation_accept_line_widget
     # Wrap the built-in widget so Ctrl+L clears the banner too.
