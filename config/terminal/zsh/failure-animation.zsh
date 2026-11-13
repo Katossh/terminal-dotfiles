@@ -181,6 +181,8 @@ _dots_failure_animation_producer() {
             if (( cycle == 0 && tick < gradient_ticks )); then
                 phase=$(( ((tick + 1) * 4) % 100 ))
             fi
+            [[ -n "${DOTS_TEST_DIAG_LOG:-}" ]] &&
+                print -r -- "P ${EPOCHREALTIME:-} ${tick}" >> "$DOTS_TEST_DIAG_LOG"
             print -r -- "$index $phase" || return 0
         done
 
@@ -430,6 +432,8 @@ _dots_failure_animation_fd_handler() {
 
     local fd="${1:-}"
     local line emoji phase
+    [[ -n "${DOTS_TEST_DIAG_LOG:-}" ]] &&
+        print -r -- "H ${EPOCHREALTIME:-} ${_DOTS_FAILURE_ANIMATION_FRAMES}" >> "$DOTS_TEST_DIAG_LOG"
     if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" line; then
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
         _dots_failure_animation_cleanup

@@ -18,6 +18,7 @@ INIT_FILE="$TMP_DIR/init.zsh"
 START_FILE="$TMP_DIR/start.sh"
 RAW_FILE="$TMP_DIR/raw.terminal"
 STATE_FILE="$TMP_DIR/state.log"
+DIAG_LOG="$TMP_DIR/diag.log"
 PALETTE_DIR="$TMP_DIR/palettes"
 SNAP_RAW="$TMP_DIR/screen.raw"
 COLS=100
@@ -48,6 +49,10 @@ fail() {
     if [[ -f "$STATE_FILE" ]]; then
         print -u2 -- "--- state (last 20) ---"
         tail -n 20 "$STATE_FILE" >&2 || true
+    fi
+    if [[ -n "${DIAG_LOG:-}" && -f "$DIAG_LOG" ]]; then
+        print -u2 -- "--- animation trace (last 60) ---"
+        tail -n 60 "$DIAG_LOG" >&2 || true
     fi
     exit 1
 }
@@ -113,6 +118,7 @@ DOTS_TEST_PALETTE_DIR=${DOTS_TEST_PALETTE_DIR:?}
 
 setopt promptsubst
 unset NO_COLOR
+zmodload zsh/datetime 2>/dev/null || true
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_ANIMATION_CHANCE=100
 export DOTS_FAILURE_STYLE=normal
@@ -285,6 +291,7 @@ chmod +x "$START_FILE"
 zpty -b "$PTY_NAME" env \
     TERM=xterm-256color \
     DOTS_TEST_STATE_FILE="$STATE_FILE" \
+    DOTS_TEST_DIAG_LOG="$DIAG_LOG" \
     DOTS_TEST_PALETTE_DIR="$PALETTE_DIR" \
     DOTS_TEST_ZSH_DIR="$ZSH_DIR" \
     "$START_FILE" ||
