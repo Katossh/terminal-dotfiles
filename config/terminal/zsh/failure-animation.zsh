@@ -352,9 +352,20 @@ _dots_failure_animation_render_gradient_message() {
     _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE="$message"
 }
 
-# This is a ZLE widget callback (-F -w). zle -M writes to the independent
-# message area below the edit line and preserves BUFFER and CURSOR.
-_dots_failure_animation_gradient_fd_widget() {
+# The regular FD callback follows the same lifecycle as the working prompt
+# animation watcher. It delegates display work to a ZLE widget so message
+# updates remain isolated from the shell's command buffer and cursor.
+_dots_failure_animation_gradient_render_widget() {
+    emulate -L zsh
+    setopt localoptions no_ignore_braces
+
+    if _dots_failure_animation_render_gradient_message; then
+        zle -R
+        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
+    fi
+}
+
+_dots_failure_animation_gradient_fd_handler() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
@@ -370,12 +381,7 @@ _dots_failure_animation_gradient_fd_widget() {
     _DOTS_FAILURE_GRADIENT_PHASE=$(( phase % 100 ))
     (( _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
-    if _dots_failure_animation_render_gradient_message; then
-        # FD callbacks run at a low level; redraw the edit line first, then
-        # write the persistent message so the refresh cannot erase it.
-        zle -R
-        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
-    fi
+    zle _dots_failure_animation_gradient_render_widget
 }
 
 _dots_failure_animation_start_gradient() {
@@ -407,7 +413,7 @@ _dots_failure_animation_start_gradient() {
     }
 
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
-    if zle -F -w "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_widget; then
+    if zle -F "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_handler; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
         return 0
     fi
@@ -669,7 +675,7 @@ if [[ -o interactive ]]; then
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
     # FD frame updates use a ZLE widget; the banner itself is a ZLE message,
     # never part of PROMPT or a direct terminal overlay.
-    zle -N _dots_failure_animation_gradient_fd_widget
+    zle -N _dots_failure_animation_gradient_render_widget
     # Wrap the built-in widget so Ctrl+L clears the message too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
