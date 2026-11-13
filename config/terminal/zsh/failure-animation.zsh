@@ -328,7 +328,7 @@ _dots_failure_animation_gradient_cleanup() {
     fi
 }
 
-_dots_failure_animation_gradient_fd_handler() {
+_dots_failure_animation_gradient_fd_widget() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
@@ -360,7 +360,7 @@ _dots_failure_animation_start_gradient() {
 
     exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL")
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
-    if zle -F "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_handler; then
+    if zle -F -w "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_widget; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
         return 0
     fi
@@ -603,6 +603,9 @@ if [[ -o interactive ]]; then
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zsh-hook preexec _dots_failure_animation_preexec
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
+    # FD callbacks that repaint the prompt must run as widgets, so ZLE
+    # preserves the active edit buffer and cursor during asynchronous frames.
+    zle -N _dots_failure_animation_gradient_fd_widget
     # Wrap the built-in widget so Ctrl+L clears the persistent banner too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
