@@ -410,6 +410,9 @@ drain_for 120
 # Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
 zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+print -r -- "GRADIENT_TRACE_BEGIN"
+command cat "$GRADIENT_LOG"
+print -r -- "GRADIENT_TRACE_END"
 assert_contains "the complete input buffer survives all gradient frames" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
 assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
