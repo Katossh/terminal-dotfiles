@@ -82,7 +82,18 @@ jobs:
             tests/test-failure-messages.zsh \
             tests/test-failure-integration.zsh \
             tests/test-failure-animation.zsh; do
-            zsh "$test"
+            log="${RUNNER_TEMP}/$(basename "$test").log"
+            if zsh "$test" >"$log" 2>&1; then
+              cat "$log"
+            else
+              cat "$log"
+              message="$(tail -n 80 "$log")"
+              message="${message//'%'/%25}"
+              message="${message//$'\n'/%0A}"
+              message="${message//$'\r'/%0D}"
+              printf '::error title=Zsh test failed: %s::%s\n' "$test" "$message"
+              exit 1
+            fi
           done
 
       - name: ShellCheck
