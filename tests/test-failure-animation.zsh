@@ -157,7 +157,7 @@ _dots_test_start_queued_gradient() {
     _DOTS_TEST_GRADIENT_START_STATUS=$?
     print -r -- "GRADIENT_PRECMD_STATUS_${_DOTS_TEST_GRADIENT_START_STATUS}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_FD_${_DOTS_FAILURE_ANIMATION_FD}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}"
 }
-precmd_functions+=( _dots_test_start_queued_gradient )
+precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
 _dots_test_snapshot_special_animation() {
     local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
@@ -393,6 +393,7 @@ drain_for 5
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
+assert_contains "failure hook starts before the animation precmd watcher" "GRADIENT_PRECMD_STATUS_0_ACTIVE_1_FD_" "$REPLY"
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
