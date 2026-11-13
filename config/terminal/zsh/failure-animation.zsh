@@ -381,24 +381,12 @@ _dots_failure_animation_start_gradient() {
     setopt localoptions no_ignore_braces
 
     _dots_failure_animation_gradient_cleanup
-    if [[ ! -o interactive ]]; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-not-interactive'
-        return 1
-    fi
-    if [[ ! -t 0 || ! -t 1 ]]; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-not-tty'
-        return 1
-    fi
-    if [[ "${TERM:-dumb}" == dumb ]]; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-term-dumb'
-        return 1
-    fi
-    if [[ "${DOTS_FAILURE_ANIMATION:-1}" == 0 ]]; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-disabled'
-        return 1
-    fi
-    if [[ -n "${NO_COLOR:-}" ]]; then
-        _DOTS_FAILURE_ANIMATION_STATE="gradient-fallback-no-color-${NO_COLOR}"
+
+    # The caller is the zle-line-init hook. The queueing function already
+    # validated the interactive TTY and colour policy before scheduling this
+    # work; ZLE may temporarily use different stdin/stdout descriptors here.
+    if ! zle; then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-zle-inactive'
         return 1
     fi
 
@@ -406,6 +394,7 @@ _dots_failure_animation_start_gradient() {
         _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-pipe-open'
         return 1
     }
+
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
     if zle -F -w "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_widget; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
