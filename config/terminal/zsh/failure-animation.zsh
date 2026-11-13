@@ -420,16 +420,17 @@ _dots_failure_animation_render_prompt() {
         rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
-    # Keep the single failure banner on its own prompt row. Its prompt-safe
-    # colour spans are rendered by ZLE, not printed as message text.
+    # The banner is a separate prompt row. Its %{...%} colour spans are
+    # treated as zero-width by ZLE, unlike ANSI bytes passed to zle -M.
     if [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
-        rendered="${_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}"
+        rendered="${_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}"$'\n'"${rendered}"
+    fi
+
+    # Keep the ordinary prompt emoji immediately before the input marker.
     local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
     if [[ -n "$marker" ]]; then
         local marker_pattern="${(b)marker}"
         if [[ "$rendered" == *"$marker"* ]]; then
-            # Strip earlier copies as well: Starship modules can leave a marker
-            # before the final input marker (for example after the exit code).
             local suffix="${rendered##*${marker_pattern}}"
             local prefix="${rendered%${marker_pattern}*}"
             prefix="${prefix//${marker_pattern}/}"
@@ -442,10 +443,10 @@ _dots_failure_animation_render_prompt() {
             rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
         fi
     fi
+
     _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
     print -rn -- "$rendered"
-}
-_dots_failure_animation_cleanup() {
+}_dots_failure_animation_cleanup() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
