@@ -625,19 +625,9 @@ _dots_failure_animation_reset() {
 _dots_failure_animation_preexec() {
     emulate -L zsh
 
-    # zle-line-finish can run during editor transitions while the buffer is
-    # still editable. Keep the gradient alive there; stop it only once Zsh
-    # enters preexec, which means the user actually submitted a command.
-    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )) || [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
-        _dots_failure_animation_cleanup
-        _DOTS_FAILURE_GRADIENT_PENDING=0
-        _DOTS_FAILURE_GRADIENT_LINES=()
-        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
-        _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
-        _DOTS_FAILURE_ANIMATION_MODE='emoji'
-        _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    fi
-
+    # Do not cancel the failure gradient when a command is submitted. The
+    # worker keeps writing frame numbers while the foreground command runs;
+    # ZLE consumes the buffered frames when the next prompt becomes active.
     local -a command_words
     command_words=( "${(@z)1}" )
     case "${command_words[1]:-}" in
