@@ -135,12 +135,24 @@ _dots_test_render_gradients() {
     print -- GRADIENTS_OK
 }
 typeset -g _DOTS_TEST_SPECIAL_STYLE=''
+typeset -gi _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
+typeset -gi _DOTS_TEST_GRADIENT_START_STATUS=99
 _dots_test_queue_special_animation() {
     local style="$1"
-    local -i start_status=0
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "live gradient test" || start_status=$?
-    print -r -- "SPECIAL_QUEUED_${style}_START_${start_status}_PENDING_${_DOTS_FAILURE_GRADIENT_PENDING}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
+    _DOTS_TEST_SPECIAL_STYLE="$style"
+    _DOTS_TEST_GRADIENT_REQUEST_PENDING=1
+    print -r -- "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
 }
+_dots_test_start_queued_gradient() {
+    (( _DOTS_TEST_GRADIENT_REQUEST_PENDING )) || return 0
+    _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
+    _dots_failure_animation_start \
+        "$_DOTS_TEST_SPECIAL_STYLE" \
+        "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
+        "live gradient test"
+    _DOTS_TEST_GRADIENT_START_STATUS=$?
+}
+precmd_functions+=( _dots_test_start_queued_gradient )
 _dots_test_snapshot_special_animation() {
     local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
@@ -370,9 +382,9 @@ drain_for 5
 
 # The failure banner is emitted through ZLE's independent message area.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
-read_until "SPECIAL_QUEUED_normal_START_0_PENDING_1"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient is queued before ZLE starts" "SPECIAL_QUEUED_normal_START_0_PENDING_1" "$REPLY"
-assert_contains "normal gradient reuses the active shared FD watcher" "SPECIAL_QUEUED_normal_START_0_PENDING_1_ACTIVE_1" "$REPLY"
+assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
@@ -404,7 +416,7 @@ assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
 # Every message style uses the same independent ZLE message channel.
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}_START_0_PENDING_1"
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
     assert_contains "${style} gradient is queued before ZLE starts" "SPECIAL_QUEUED_${style}_START_0_PENDING_1" "$REPLY"
     read_until_visible "${style} ANIMATED FAILURE BANNER"
     assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
@@ -421,7 +433,7 @@ print -- "ok - all eight styles animate without blocking or replacing input"
 
 # Clear operations must cancel an active message and its worker.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_0_PENDING_1"
+read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
 read_until_visible "legendary ANIMATED FAILURE BANNER"
 zpty -w "$PTY_NAME" $'\x0c'
 drain_for 5
