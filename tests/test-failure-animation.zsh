@@ -371,27 +371,27 @@ read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
 drain_for 5
 
-# The banner is painted by ZLE above the prompt. Typing must remain responsive
-# and the fully typed command must survive the entire animation.
+# Failure gradients are shown in ZLE's message area beneath the editable prompt.
+# Typing must remain responsive and the full edit buffer must survive all frames.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal"
 assert_contains "normal gradient request is queued" "SPECIAL_QUEUED_normal" "$REPLY"
-read_until_visible "normal ANIMATED FAILURE BANNER"
-assert_contains "normal message is rendered above the editable prompt" "normal ANIMATED FAILURE BANNER" "$REPLY"
-assert_contains "path line remains visible below the gradient banner" "BASE_PATH" "$REPLY"
-assert_contains "normal gradient uses 24-bit colour" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 read_until_visible "BASE_OUTPUT"
-assert_contains "input prompt remains present below the banner" "BASE_OUTPUT" "$REPLY"
+assert_contains "the original path and input prompt remain intact" "BASE_PATH" "$REPLY"
+assert_contains "the input marker remains available during animation" "BASE_OUTPUT" "$REPLY"
+read_until_visible "normal ANIMATED FAILURE BANNER"
+assert_contains "normal message is rendered in ZLE's message area" "normal ANIMATED FAILURE BANNER" "$REPLY"
+assert_contains "normal gradient uses 24-bit colour" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
 zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
 read_until_visible "INPUT_DURING_GRADIENT"
 assert_contains "keystrokes are echoed while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
 drain_for 120
 
-# Inspect the actual ZLE buffer after the last frame without submitting it.
+# Inspect the actual ZLE buffer after the final frame without submitting it.
 zpty -w "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-assert_contains "the command remains in ZLE BUFFER after animation" \
+assert_contains "the complete command remains in ZLE BUFFER after animation" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
 
 zpty -w "$PTY_NAME" $'\n'
@@ -403,13 +403,13 @@ assert_contains "the input test completes all 25 gradient frames" "FRAMES_25" "$
 assert_contains "the input test leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 assert_absent "the gradient never places a Kitty image" "--place" "$REPLY"
 
-# All other styles use the same input-safe ZLE renderer and their own palettes.
+# All other styles use the same independent ZLE message renderer and palettes.
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}"
     assert_contains "${style} gradient request is queued" "SPECIAL_QUEUED_${style}" "$REPLY"
     read_until_visible "${style} ANIMATED FAILURE BANNER"
-    assert_contains "${style} message is rendered in the prompt" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} message appears in ZLE's message area" "${style} ANIMATED FAILURE BANNER" "$REPLY"
     assert_contains "${style} uses truecolour output" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
     drain_for 120
 
@@ -423,7 +423,7 @@ for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
 done
 print -- "ok - all eight message styles animate without intercepting user input"
 
-# Clear operations must cancel an active animation.
+# Clear operations must cancel an active animation and its message.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
 read_until "SPECIAL_QUEUED_legendary"
 read_until_visible "legendary ANIMATED FAILURE BANNER"
@@ -441,6 +441,7 @@ read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
 read_until SPECIAL_STATE_GRADIENT_ACTIVE_
 assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
 read_until INFINITE_ENABLED
