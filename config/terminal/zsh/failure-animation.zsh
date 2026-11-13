@@ -489,7 +489,7 @@ _dots_failure_animation_fd_handler() {
             # return after EOF, when every frame has been rendered.
             if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
                 _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
-                zle _dots_failure_animation_replay_accept_widget
+                zle .accept-line
             fi
             return 0
         fi
@@ -615,12 +615,6 @@ _dots_failure_animation_precmd() {
     fi
 }
 
-_dots_failure_animation_replay_accept_widget() {
-    # The terminal's Enter key is carriage return. Re-inject that key so the
-    # current keymap runs the wrapped accept-line widget.
-    zle -U $'\r'
-}
-
 _dots_failure_animation_accept_line_widget() {
     emulate -L zsh
 
@@ -709,7 +703,6 @@ if [[ -o interactive ]]; then
     # FD frame updates use a ZLE widget; the banner uses prompt-safe colour
     # spans, never a raw ANSI message or terminal graphics overlay.
     zle -N _dots_failure_animation_gradient_render_widget
-    zle -N _dots_failure_animation_replay_accept_widget
     zle -N accept-line _dots_failure_animation_accept_line_widget
     # Wrap the built-in widget so Ctrl+L clears the banner too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
