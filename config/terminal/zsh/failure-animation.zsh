@@ -384,28 +384,13 @@ _dots_failure_animation_gradient_fd_handler() {
     zle _dots_failure_animation_gradient_render_widget
 }
 
+# Start the timer and register its reader before ZLE starts. This mirrors
+# the working prompt emoji watcher and keeps process/FD setup out of widgets.
 _dots_failure_animation_start_gradient() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
     _dots_failure_animation_gradient_cleanup
-
-    # The caller is the zle-line-init hook. The queueing function already
-    # validated the interactive TTY and colour policy before scheduling this
-    # work; ZLE may temporarily use different stdin/stdout descriptors here.
-    if ! zle; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-zle-inactive'
-        return 1
-    fi
-
-    # Paint phase zero immediately; the private pipe advances through the
-    # remaining 24 phases without touching PROMPT or BUFFER.
-    _DOTS_FAILURE_GRADIENT_PHASE=0
-    if _dots_failure_animation_render_gradient_message; then
-        _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=1
-        zle -R
-        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
-    fi
 
     exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL") || {
         _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-pipe-open'
@@ -423,24 +408,18 @@ _dots_failure_animation_start_gradient() {
     return 1
 }
 
-# This hook runs after the prompt is about to enter ZLE, unlike precmd where
-# failure messages are selected. Register the timer pipe only inside ZLE.
+# Paint phase zero after the next prompt enters ZLE. The timer and FD watcher
+# have already been created by the precmd path, outside the editor widget.
 _dots_failure_animation_gradient_line_init() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
 
     (( _DOTS_FAILURE_GRADIENT_PENDING )) || return 0
     _DOTS_FAILURE_GRADIENT_PENDING=0
-
-    if _dots_failure_animation_start_gradient; then
-        return 0
-    fi
-
-    # If async registration is unavailable, retain a static gradient message.
-    local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
-    _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
     _DOTS_FAILURE_GRADIENT_PHASE=0
+
     if _dots_failure_animation_render_gradient_message; then
+        _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=1
         zle -R
         zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
@@ -547,10 +526,15 @@ _dots_failure_animation_start() {
     if [[ -n "$banner" ]]; then
         _DOTS_FAILURE_ANIMATION_MODE='gradient'
         if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail"; then
-            # precmd runs before ZLE is active. Defer FD registration until
-            # the line-init widget enters the editor.
+            # precmd is outside ZLE: start the timer and register its FD now.
+            # The line-init hook only paints phase zero on the next prompt.
             _DOTS_FAILURE_GRADIENT_PENDING=1
-            _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+            if _dots_failure_animation_start_gradient; then
+                _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+            else
+                local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+                _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
+            fi
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_MODE='emoji'
