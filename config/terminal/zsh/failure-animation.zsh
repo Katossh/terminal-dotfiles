@@ -381,12 +381,31 @@ _dots_failure_animation_start_gradient() {
     setopt localoptions no_ignore_braces
 
     _dots_failure_animation_gradient_cleanup
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
-        -z "${NO_COLOR:-}" ]] || return 1
+    if [[ ! -o interactive ]]; then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-not-interactive'
+        return 1
+    fi
+    if [[ ! -t 0 || ! -t 1 ]]; then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-not-tty'
+        return 1
+    fi
+    if [[ "${TERM:-dumb}" == dumb ]]; then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-term-dumb'
+        return 1
+    fi
+    if [[ "${DOTS_FAILURE_ANIMATION:-1}" == 0 ]]; then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-disabled'
+        return 1
+    fi
+    if [[ -n "${NO_COLOR:-}" ]]; then
+        _DOTS_FAILURE_ANIMATION_STATE="gradient-fallback-no-color-${NO_COLOR}"
+        return 1
+    fi
 
-    exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL") || return 1
+    exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL") || {
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-pipe-open'
+        return 1
+    }
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
     if zle -F -w "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_widget; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
@@ -412,6 +431,8 @@ _dots_failure_animation_gradient_line_init() {
     fi
 
     # If async registration is unavailable, retain a static gradient message.
+    local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+    _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
     _DOTS_FAILURE_GRADIENT_PHASE=0
     if _dots_failure_animation_render_gradient_message; then
         zle -R
