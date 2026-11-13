@@ -14,6 +14,8 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
 typeset -gi _DOTS_FAILURE_GRADIENT_FD=-1
+typeset -gi _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=0
+typeset -gi _DOTS_FAILURE_GRADIENT_LAST_FD=-1
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
@@ -386,13 +388,20 @@ _dots_failure_animation_start_gradient() {
         "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
         -z "${NO_COLOR:-}" ]] || return 1
 
-    exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL")
+    exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL") || {
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-pipe-open-failed'
+        _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=$?
+        return 1
+    }
+    _DOTS_FAILURE_GRADIENT_LAST_FD="$_DOTS_FAILURE_GRADIENT_FD"
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
     if zle -F -w "$_DOTS_FAILURE_GRADIENT_FD" _dots_failure_animation_gradient_fd_widget; then
+        _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=0
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
         return 0
     fi
 
+    _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=$?
     _DOTS_FAILURE_ANIMATION_STATE='gradient-registration-failed'
     _dots_failure_animation_gradient_cleanup
     return 1
@@ -411,7 +420,10 @@ _dots_failure_animation_gradient_line_init() {
         return 0
     fi
 
-    # If async registration is unavailable, retain a static gradient message.
+    # If async registration is unavailable, retain a static gradient message
+    # and preserve the failure reason for diagnostics.
+    local registration_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+    _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${registration_reason}"
     _DOTS_FAILURE_GRADIENT_PHASE=0
     if _dots_failure_animation_render_gradient_message; then
         zle -R
