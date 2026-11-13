@@ -529,11 +529,16 @@ _dots_failure_animation_start() {
     if [[ -n "$banner" ]]; then
         _DOTS_FAILURE_ANIMATION_MODE='gradient'
         if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail"; then
-            # Queue the banner. The precmd hook owns worker startup and FD
-            # registration, whether the request came from a failure hook or
-            # from a shell function used by the PTY integration test.
+            # This function runs before ZLE: start and register the timer now,
+            # then let zle-line-init paint the first frame. This also works when
+            # the failure notice is queued by a later precmd hook.
             _DOTS_FAILURE_GRADIENT_PENDING=1
-            _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+            if _dots_failure_animation_start_gradient; then
+                _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+            else
+                local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+                _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
+            fi
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_MODE='emoji'
