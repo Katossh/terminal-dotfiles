@@ -368,9 +368,10 @@ _dots_failure_animation_gradient_fd_widget() {
     (( _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES += 1 ))
     _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
     if _dots_failure_animation_render_gradient_message; then
-        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
-        # FD callbacks run at a low level; force ZLE to paint the message.
+        # FD callbacks run at a low level; redraw the edit line first, then
+        # write the persistent message so the refresh cannot erase it.
         zle -R
+        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
 }
 
