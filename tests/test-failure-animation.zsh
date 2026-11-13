@@ -25,11 +25,17 @@ zmodload zsh/zpty 2>/dev/null || {
 
 cat > "$INIT_FILE" <<'ZSH_INIT'
 setopt promptsubst
+unset NO_COLOR
 STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT ❯ '
 PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
+_dots_test_report_buffer_widget() {
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}"
+}
+zle -N _dots_test_report_buffer_widget
+bindkey '^T' _dots_test_report_buffer_widget
 
 # Deterministic visible-screen coordinates for PTY integration tests.
 _dots_failure_animation_query_cursor() {
@@ -41,6 +47,16 @@ _dots_failure_animation_query_cursor() {
 }
 
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.05
+
+_dots_test_gradient_stream_probe() {
+    local probe
+    probe="$(_dots_failure_animation_gradient_stream 0.001 | command awk 'NR == 1 { first = $0 } { last = $0 } END { print NR ":" first ":" last }')"
+    [[ "$probe" == '24:4:96' ]] || {
+        print -r -- "GRADIENT_STREAM_PROBE_FAILED:$probe"
+        return 1
+    }
+    print -r -- "GRADIENT_STREAM_PROBE_OK:$probe"
+}
 
 _dots_test_snapshot() {
     print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} STYLE_${_DOTS_FAILURE_ANIMATION_STYLE} RPROMPT_${RPROMPT}"
@@ -118,17 +134,23 @@ _dots_test_render_gradients() {
     _DOTS_FAILURE_ANIMATION_BANNER=''
     print -- GRADIENTS_OK
 }
+typeset -g _DOTS_TEST_SPECIAL_STYLE=''
+typeset -gi _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
 _dots_test_queue_special_animation() {
-    local style="${1}"
-    local saved_no_color="${NO_COLOR-}"
-    unset NO_COLOR
-    _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "live gradient test" || return 1
-    if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
-    local banner_set=0
-    [[ -n "$_DOTS_FAILURE_ANIMATION_BANNER" ]] && banner_set=1
-    print -r -- "ENQUEUE_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_BANNER_$banner_set_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
-    print -r -- "SPECIAL_QUEUED_$style"
+    local style="$1"
+    _DOTS_TEST_SPECIAL_STYLE="$style"
+    _DOTS_TEST_GRADIENT_REQUEST_PENDING=1
+    print -r -- "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
 }
+_dots_test_start_queued_gradient() {
+    (( _DOTS_TEST_GRADIENT_REQUEST_PENDING )) || return 0
+    _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
+    _dots_failure_animation_start \
+        "$_DOTS_TEST_SPECIAL_STYLE" \
+        "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
+        "live gradient test"
+}
+precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
 _dots_test_snapshot_special_animation() {
     local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
     local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
@@ -137,9 +159,8 @@ _dots_test_snapshot_special_animation() {
     rendered_frames="${rendered_frames//[[:space:]]/}"
     local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
     animated_gifs="${animated_gifs//[[:space:]]/}"
-    print -r -- "SPECIAL_STATE_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PENDING_${_DOTS_FAILURE_ANIMATION_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
+    print -r -- "SPECIAL_STATE_GRADIENT_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PENDING_${_DOTS_FAILURE_GRADIENT_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
 }
-
 clear() {
     print -r -- CLEAR_EXECUTED
 }
@@ -251,6 +272,21 @@ read_until() {
     done
     REPLY="$output"
 }
+# Match visible text while preserving raw ANSI output for colour assertions.
+read_until_visible() {
+    local needle="$1"
+    local -i tries=0
+    local output='' data='' visible=''
+    while (( tries < 120 )); do
+        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;]*m", "", sys.stdin.read()))')"
+        [[ "$visible" == *"$needle"* ]] && break
+        command sleep 0.05
+        (( tries += 1 ))
+    done
+    _DOTS_TEST_LAST_RAW_OUTPUT="$output"
+    REPLY="$visible"
+}
 
 drain_for() {
     local -i rounds="$1"
@@ -326,6 +362,11 @@ zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
 read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
+# The standalone phase producer must emit exactly 24 ordered phases.
+zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'$'\n'
+read_until GRADIENT_STREAM_PROBE_OK
+assert_contains "gradient worker emits 24 ordered phase values" "GRADIENT_STREAM_PROBE_OK:24:4:96" "$REPLY"
+
 # Both historic environment-variable names remain compatible aliases.
 zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
 read_until INFINITE_ALIASES_OK
@@ -335,49 +376,78 @@ assert_contains "Emoji-specific and Continuous variables remain Infinite aliases
 zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
 assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
+drain_for 5
 
-# Both rare styles animate their actual text, repainting the same terminal
-# rows. The final message stays as plain output; no Kitty image can scroll it.
-for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+# The failure banner is emitted through ZLE's independent message area.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
+
+read_until_visible "BASE_OUTPUT"
+assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
+assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
+read_until_visible "normal ANIMATED FAILURE BANNER"
+assert_contains "normal gradient message becomes visible in ZLE" "normal ANIMATED FAILURE BANNER" "$REPLY"
+assert_contains "normal gradient uses 24-bit colour" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}"
-    assert_contains "${style} renders truecolour gradient text" $'\e[38;2;' "$REPLY"
-    assert_contains "${style} clears and repaints the same rows" $'\e[2K' "$REPLY"
-    assert_contains "${style} uses relative cursor movement" $'\e[1A' "$REPLY"
-    assert_absent "${style} does not create a Kitty image placement" "--place" "$REPLY"
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
 
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_ACTIVE_
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "${style} leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
-    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
-    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
-    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
-
-    zpty -w "$PTY_NAME" "print -r -- FOLLOWUP_${style}"$'\n'
-    read_until "FOLLOWUP_${style}"
-    assert_absent "${style} message is not replayed at the next prompt" "ANIMATED FAILURE BANNER" "$REPLY"
-    assert_absent "${style} does not jump back to an old screen coordinate" $'\e[10;1H' "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
 done
-print -- "ok - all eight message styles animate in place without persistent graphics"
+print -- "ok - all eight styles animate without blocking or replacing input"
 
-# There is no longer a persistent graphic layer to clear; both clear paths
-# operate on ordinary terminal text and leave no background animation worker.
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
+read_until_visible "legendary ANIMATED FAILURE BANNER"
 zpty -w "$PTY_NAME" $'\x0c'
-drain_for 30
+drain_for 5
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "Ctrl+L leaves no animation worker" "ACTIVE_0" "$REPLY"
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until SPECIAL_QUEUED_legendary
-read_until BASE_OUTPUT
-drain_for 60
+read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
+read_until_visible "legendary ANIMATED FAILURE BANNER"
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_ACTIVE_
-assert_contains "clear leaves no persistent animation worker" "ACTIVE_0" "$REPLY"
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 # Infinite emoji mode loops while idle; accepting a command stops it.
 zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
 read_until INFINITE_ENABLED

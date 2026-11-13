@@ -11,7 +11,7 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide why / why --verbose without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
-8. failure-animation.zsh — registers after Starship, animates ordinary emoji before the input marker, and paints Legendary/Mythic gradients in place at the original failure-output location.
+8. failure-animation.zsh — registers after Starship, animates ordinary emoji before the input marker, and renders failure-message gradients in ZLE's independent message area below the editable command line.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -59,7 +59,7 @@ Messages now use a broader 24-bit RGB palette, with pink, rose, coral, orange, g
 
 The 28% anime share includes traditional anime archetypes and a separate ecchi pool with adult-coded, suggestive humour; 65% of automatic anime selections use that pool. It is deliberately non-explicit and does not use school-age characters. You can force it with DOTS_FAILURE_STYLE=ecchi.
 
-The first interactive Zsh prompt still plays one 12-frame emoji animation (~1 second), even before any command has failed. Failure messages animate their actual text with a moving 24-bit colour gradient: Legendary uses metallic gold, Mythic uses charcoal-to-silver, Rainbow sweeps through the spectrum, Anime and Ecchi use pink/violet palettes, and everyday styles use a restrained Catppuccin-inspired gradient. Legendary and Mythic always animate; other styles use the configurable `DOTS_FAILURE_ANIMATION_CHANCE` (default 100%). The effect is rendered synchronously at the message's output position by repainting the same terminal rows, then the final coloured text is left as ordinary selectable output. There is no Kitty image overlay, background animation process, or persistent screen placement, so scrolling the terminal cannot drag a live animation away from its message. The renderer works in Kitty, Alacritty, tmux, and other ANSI-compatible terminals without Python or ImageMagick. Set `DOTS_FAILURE_GRADIENT_INTERVAL` to change the frame delay; set `DOTS_FAILURE_ANIMATION=0` or `NO_COLOR` to disable coloured animation. Normal, sarcastic, and dramatic messages share the general reaction pool; Anime, Ecchi, and Rainbow each use a dedicated pool. The independent prompt emoji animation continues to use an asynchronous ZLE file-descriptor watcher.
+The first interactive Zsh prompt still plays one 12-frame emoji animation (~1 second), even before any command has failed. Failure messages animate their actual text with a moving 24-bit colour gradient: Legendary uses metallic gold, Mythic uses charcoal-to-silver, Rainbow sweeps through the spectrum, Anime and Ecchi use pink/violet palettes, and everyday styles use a restrained Catppuccin-inspired gradient. Legendary and Mythic always animate; other styles use the configurable `DOTS_FAILURE_ANIMATION_CHANCE` (default 100%). The message is displayed in ZLE's independent message area beneath the active edit line; it is never inserted into `PROMPT`. The gradient reuses the same file-descriptor watcher as the prompt emoji animation. Its background worker sends phase numbers through a private pipe, and the shared ZLE callback forwards them to a dedicated render widget, which updates the message with `zle -M`. The worker never reads stdin or writes to the terminal; ZLE owns rendering and preserves the input buffer and cursor. After 25 frames, the final gradient remains as an ordinary terminal message until later output replaces it. The renderer works in Kitty, Alacritty, tmux, and other ANSI-compatible terminals without Python, ImageMagick, or Kitty graphics placements. Set `DOTS_FAILURE_GRADIENT_INTERVAL` to change the frame delay; set `DOTS_FAILURE_ANIMATION=0` or `NO_COLOR` to disable coloured animation. Normal, sarcastic, and dramatic messages share the general reaction pool; Anime, Ecchi, and Rainbow each use a dedicated pool. Prompt emoji and failure-gradient animations share one asynchronous ZLE file-descriptor watcher.
 
 The animation pools are:
 
@@ -72,7 +72,7 @@ The animation pools are:
 
 
 
-Ordinary animation remains a changing emoji inserted immediately before the final Starship input marker (❯ by default); it never modifies the directory/path line or touches RPROMPT. Legendary and Mythic use a Kitty-only animated image overlay placed above the real text. Kitty's graphics protocol keeps placements in step with terminal text scrolling, including into scrollback; the shell does not run a frame loop, issue cursor-addressing redraws, or insert the banner into PROMPT. The overlay is created with `kitty +kitten icat` in write-only mode so it does not consume keyboard input. On non-Kitty terminals or when required rendering tools are unavailable, the message is printed once as a static gradient. Rare animations require an interactive TTY and respect `NO_COLOR` and `DOTS_FAILURE_ANIMATION=0.
+Ordinary prompt animation remains a changing emoji inserted immediately before the final Starship input marker (❯ by default); it never modifies the directory/path line or touches RPROMPT. Failure-message gradients use ZLE's separate message area below the editable command line, not `PROMPT`, a terminal graphics overlay, or a direct-writing background process. Each frame is rendered by a ZLE widget using `zle -R` and `zle -M`, preserving `BUFFER` and `CURSOR`. Submitting a command stops the frame worker while leaving its final message as ordinary terminal output. Gradient animation requires an interactive TTY and respects `NO_COLOR` and `DOTS_FAILURE_ANIMATION=0`.
 
 ## Environment variables
 
@@ -83,8 +83,9 @@ Ordinary animation remains a changing emoji inserted immediately before the fina
 | `DOTS_FAILURE_RAINBOW_CHANCE` | `2` | Percentage chance (0–100) for the automatic Rainbow style. `DOTS_FAILURE_RARE_CHANCE` remains a legacy alias. |
 | `DOTS_FAILURE_LEGENDARY_CHANCE` | `100` | Automatic Legendary chance in basis points: 100 = 1%. |
 | `DOTS_FAILURE_MYTHIC_CHANCE` | `10` | Automatic Mythic chance in basis points: 10 = 0.1%. Mythic is rolled before Legendary; the combined rare-event chance is capped at 100%. |
-| `DOTS_FAILURE_ANIMATION_CHANCE` | `50` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic gradients bypass this setting. |
-| `DOTS_FAILURE_ANIMATION_INTERVAL` | `0.08` | Delay between animation frames in seconds (valid range: 0.01–2.00). |
+| `DOTS_FAILURE_ANIMATION_CHANCE` | `100` | Percentage chance (0–100) that an ordinary failure notice triggers an emoji animation. Legendary/Mythic gradients bypass this setting. |
+| `DOTS_FAILURE_ANIMATION_INTERVAL` | `0.08` | Delay between prompt emoji animation frames in seconds (valid range: 0.01–2.00). |
+| `DOTS_FAILURE_GRADIENT_INTERVAL` | `0.08` | Delay between failure-message gradient frames in seconds (valid range: 0.01–1.00). |
 | `DOTS_FAILURE_ANIMATION_INFINITE` | `0` | Set to `1`, `true`, `yes`, or `on` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |
 | `DOTS_FAILURE_EMOJI_ANIMATION_INFINITE` | `0` | Compatibility alias for the earlier main-branch name; used only when the newer Infinite variable is unset. |
 | `DOTS_FAILURE_ANIMATION_CONTINUOUS` | `0` | Older compatibility alias for Infinite mode; used only when both newer names are unset. |
