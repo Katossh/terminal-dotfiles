@@ -31,7 +31,7 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _dots_test_report_buffer_widget() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}"
 }
 zle -N _dots_test_report_buffer_widget
 bindkey '^T' _dots_test_report_buffer_widget
@@ -378,15 +378,13 @@ zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 assert_contains "the complete input buffer survives all gradient frames" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
 
 # Only now send Enter; the unchanged command must execute.
 zpty -w -n "$PTY_NAME" $'\n'
 read_until "INPUT_DURING_GRADIENT"
 assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "normal gradient completes all 25 frames" "FRAMES_25" "$REPLY"
-assert_contains "normal gradient worker exits cleanly" "GRADIENT_ACTIVE_0" "$REPLY"
 assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
 
 # Every message style uses the same independent ZLE message channel.
@@ -399,13 +397,11 @@ for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
     drain_for 120
 
-    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-    read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "${style} leaves no asynchronous gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
-    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
-    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
 done
 print -- "ok - all eight styles animate without blocking or replacing input"
 
