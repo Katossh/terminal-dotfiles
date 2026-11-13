@@ -454,6 +454,7 @@ _dots_failure_animation_cleanup() {
     setopt localoptions no_ignore_braces
 
     local redraw="${1:-0}"
+    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CLEANUP:active=$_DOTS_FAILURE_ANIMATION_ACTIVE:gradient=$_DOTS_FAILURE_GRADIENT_ACTIVE:fd=$_DOTS_FAILURE_ANIMATION_FD:redraw=$redraw" >> "$DOTS_TEST_GRADIENT_LOG"
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
         _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
         _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
@@ -613,6 +614,7 @@ _dots_failure_animation_precmd() {
 
 _dots_failure_animation_reset() {
     emulate -L zsh
+    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "RESET:active=$_DOTS_FAILURE_ANIMATION_ACTIVE" >> "$DOTS_TEST_GRADIENT_LOG"
 
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
@@ -647,6 +649,7 @@ _dots_failure_animation_clear_screen_widget() {
 }
 
 _dots_failure_animation_line_finish() {
+    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "LINE_FINISH:active=$_DOTS_FAILURE_ANIMATION_ACTIVE:gradient=$_DOTS_FAILURE_GRADIENT_ACTIVE" >> "$DOTS_TEST_GRADIENT_LOG"
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
