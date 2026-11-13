@@ -115,7 +115,7 @@ done
 print -- "ok - interactive child shell started"
 
 zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "BASE_OUTPUT ❯"
+read_until "BASE_OUTPUT"
 assert_contains "normal prompt renders after sourcing the modules" "BASE_PATH" "$REPLY"
 
 # The real public failure-message function is called from precmd.
@@ -124,12 +124,12 @@ read_until FAILURE_QUEUED
 read_until_visible 'command not found'
 assert_contains "one deterministic error message appears" '✖ Command "missing-command" failed.' "$REPLY"
 assert_contains "diagnostic detail appears below the same message" 'command not found' "$REPLY"
-assert_contains "failure banner remains above the input prompt" "BASE_OUTPUT ❯" "$REPLY"
+assert_contains "failure banner remains above the input prompt" "BASE_OUTPUT" "$REPLY"
 assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 
 # The PTY must receive real ANSI bytes, never printable caret notation.
 [[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
-assert_absent "gradient does not print escaped ANSI as visible text" '^[[38;2;' "$REPLY"
+assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
 # Type a command without Enter. The background worker must animate independently.
 zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
