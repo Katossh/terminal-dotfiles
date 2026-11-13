@@ -68,6 +68,9 @@ jobs:
             zsh -n "$script"
           done
 
+      - name: Check terminal-model helper syntax
+        run: python3 -m py_compile tests/helpers/vt_screen.py
+
       - name: Zsh module tests
         run: |
           export PATH="$PWD/rust/dots-suggest/target/debug:$PATH"

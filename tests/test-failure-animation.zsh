@@ -1,20 +1,99 @@
 #!/usr/bin/env zsh
-setopt errexit nounset
+# End-to-end tests for the asynchronous prompt animation.
+#
+# The suite drives a real interactive Zsh through zsh/zpty and models the
+# resulting raw terminal stream with tests/helpers/vt_screen.py. That lets the
+# tests assert what a terminal would actually display: the gradient block is
+# above the edit line, frames redraw in place instead of adding scrollback
+# lines, typed input survives animation frames, and the final banner remains as
+# ordinary output exactly once.
+setopt nounset
 
 REPO_DIR="${0:A:h:h}"
 ZSH_DIR="$REPO_DIR/config/terminal/zsh"
-INIT_FILE="$(mktemp)"
-PTY_NAME="dots_failure_animation_test"
+VT_HELPER="$REPO_DIR/tests/helpers/vt_screen.py"
+PTY_NAME="dots_failure_animation_test_$$"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dots-failure-animation.XXXXXX")" || exit 1
+INIT_FILE="$TMP_DIR/init.zsh"
+START_FILE="$TMP_DIR/start.sh"
+RAW_FILE="$TMP_DIR/raw.terminal"
+STATE_FILE="$TMP_DIR/state.log"
+PALETTE_DIR="$TMP_DIR/palettes"
+SNAP_RAW="$TMP_DIR/screen.raw"
+COLS=100
+ROWS=30
+LAST_PID=''
+RAW=''
+: > "$RAW_FILE"
+: > "$STATE_FILE"
+mkdir -p "$PALETTE_DIR"
+export PYTHONIOENCODING=utf-8
 
-fail() { print -u2 -r -- "not ok - $*"; exit 1; }
+cleanup() {
+    if [[ -n "${LAST_PID:-}" ]]; then
+        kill -TERM "$LAST_PID" 2>/dev/null || true
+    fi
+    zpty -d "$PTY_NAME" 2>/dev/null || true
+    rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT INT TERM
+
+fail() {
+    print -u2 -r -- "not ok - $*"
+    if [[ -f "$RAW_FILE" && -f "$VT_HELPER" ]]; then
+        print -u2 -- "--- visible screen ---"
+        python3 "$VT_HELPER" --input "$RAW_FILE" --cols "$COLS" --rows "$ROWS" \
+            --query screen 2>/dev/null | sed -n '1,35p' >&2 || true
+    fi
+    if [[ -f "$STATE_FILE" ]]; then
+        print -u2 -- "--- state (last 20) ---"
+        tail -n 20 "$STATE_FILE" >&2 || true
+    fi
+    exit 1
+}
+
 assert_contains() {
     local label="$1" needle="$2" haystack="$3"
-    [[ "$haystack" == *"$needle"* ]] || fail "$label (missing: $needle; captured: $haystack)"
+    [[ "$haystack" == *"$needle"* ]] ||
+        fail "$label (missing: $needle; captured: $haystack)"
     print -- "ok - $label"
 }
+
 assert_absent() {
     local label="$1" needle="$2" haystack="$3"
-    [[ "$haystack" != *"$needle"* ]] || fail "$label (unexpected: $needle; captured: $haystack)"
+    [[ "$haystack" != *"$needle"* ]] ||
+        fail "$label (unexpected: $needle; captured: $haystack)"
+    print -- "ok - $label"
+}
+
+snap_value() {
+    local key="$1" line="$2"
+    local rest="${line#*|$key=}"
+    if [[ "$rest" == "$line" ]]; then
+        REPLY=''
+        return 1
+    fi
+    REPLY="${rest%%|*}"
+    return 0
+}
+
+assert_field() {
+    local label="$1" key="$2" expected="$3" line="$4"
+    snap_value "$key" "$line" ||
+        fail "$label (missing field $key; snapshot: $line)"
+    [[ "$REPLY" == "$expected" ]] ||
+        fail "$label (expected $key='$expected', got '$REPLY'; snapshot: $line)"
+    print -- "ok - $label"
+}
+
+assert_int_field() {
+    local label="$1" key="$2" minimum="$3" line="$4"
+    snap_value "$key" "$line" ||
+        fail "$label (missing field $key; snapshot: $line)"
+    [[ "$REPLY" == <-> ]] ||
+        fail "$label ($key is not an integer: '$REPLY'; snapshot: $line)"
+    (( REPLY >= minimum )) ||
+        fail "$label (expected $key >= $minimum, got $REPLY; snapshot: $line)"
     print -- "ok - $label"
 }
 
@@ -22,445 +101,936 @@ zmodload zsh/zpty 2>/dev/null || {
     print -- "skip - zsh/zpty is unavailable"
     exit 0
 }
+command -v python3 >/dev/null 2>&1 || {
+    print -u2 -- "python3 is required for the terminal screen model"
+    exit 1
+}
 
 cat > "$INIT_FILE" <<'ZSH_INIT'
+DOTS_TEST_ZSH_DIR=${DOTS_TEST_ZSH_DIR:?}
+DOTS_TEST_STATE_FILE=${DOTS_TEST_STATE_FILE:?}
+DOTS_TEST_PALETTE_DIR=${DOTS_TEST_PALETTE_DIR:?}
+
 setopt promptsubst
 unset NO_COLOR
-STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT ❯ '
-PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
+export DOTS_FAILURE_MESSAGE_CHANCE=100
+export DOTS_FAILURE_ANIMATION_CHANCE=100
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MESSAGE_ESCALATION=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_RAINBOW_CHANCE=0
+export DOTS_FAILURE_ANIMATION=1
+export DOTS_FAILURE_ANIMATION_INTERVAL=0.02
+export DOTS_FAILURE_GRADIENT_INTERVAL=0.02
+
+PROMPT=$'BASE_PATH\nBASE_STATUS\nBASE_OUTPUT ❯ '
 RPROMPT='BASE_RPROMPT'
-source "$ZSH_DIR/failure-messages.zsh"
-source "$ZSH_DIR/failure-animation.zsh"
-_dots_test_report_buffer_widget() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}"
-}
-zle -N _dots_test_report_buffer_widget
-bindkey '^T' _dots_test_report_buffer_widget
 
-# Deterministic visible-screen coordinates for PTY integration tests.
-_dots_failure_animation_query_cursor() {
-    local -a banner_lines
-    banner_lines=( "${(@f)_DOTS_FAILURE_ANIMATION_BANNER}" )
-    _DOTS_FAILURE_ANIMATION_ANCHOR_ROW=10
-    _DOTS_FAILURE_ANIMATION_ANCHOR_COL=1
-    return 0
-}
+source "$DOTS_TEST_ZSH_DIR/command-state.zsh"
+source "$DOTS_TEST_ZSH_DIR/failure-classifier.zsh"
+source "$DOTS_TEST_ZSH_DIR/failure-messages.zsh"
+source "$DOTS_TEST_ZSH_DIR/command-suggestions.zsh"
+source "$DOTS_TEST_ZSH_DIR/diagnostics.zsh"
+source "$DOTS_TEST_ZSH_DIR/handlers.zsh"
+source "$DOTS_TEST_ZSH_DIR/failure-animation.zsh"
 
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.05
+autoload -Uz compinit
+compinit -u -D 2>/dev/null || true
+dots-test-command() { print -r -- "DOTS_TEST_COMMAND:$*" }
+_dots_test_complete() { compadd -- alpha beta gamma delta }
+compdef _dots_test_complete dots-test-command 2>/dev/null || true
 
-_dots_test_gradient_stream_probe() {
-    local probe
-    probe="$(_dots_failure_animation_gradient_stream 0.001 | command awk 'NR == 1 { first = $0 } { last = $0 } END { print NR ":" first ":" last }')"
-    [[ "$probe" == '24:4:96' ]] || {
-        print -r -- "GRADIENT_STREAM_PROBE_FAILED:$probe"
-        return 1
-    }
-    print -r -- "GRADIENT_STREAM_PROBE_OK:$probe"
+_dots_state() {
+    print -r -- "$*" >> "$DOTS_TEST_STATE_FILE"
 }
 
 _dots_test_snapshot() {
-    print -r -- "STATE_SNAPSHOT ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE} STYLE_${_DOTS_FAILURE_ANIMATION_STYLE} RPROMPT_${RPROMPT}"
+    _dots_state "SNAP|buf=${BUFFER}|cursor=${CURSOR}|active=${_DOTS_FAILURE_ANIMATION_ACTIVE}|fd=${_DOTS_FAILURE_ANIMATION_FD}|pid=${_DOTS_FAILURE_ANIMATION_PRODUCER_PID}|gf=${_DOTS_FAILURE_ANIMATION_GRADIENT_FRAMES}|lastgf=${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}|phase=${_DOTS_FAILURE_ANIMATION_GRADIENT_PHASE}|frames=${_DOTS_FAILURE_ANIMATION_FRAMES}|lastframes=${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}|mode=${_DOTS_FAILURE_ANIMATION_MODE}|style=${_DOTS_FAILURE_ANIMATION_STYLE}|state=${_DOTS_FAILURE_ANIMATION_STATE}|last=${_DOTS_FAILURE_ANIMATION_LAST_STATE}|frame=${_DOTS_FAILURE_ANIMATION_FRAME}|rprompt=${RPROMPT}"
 }
-_dots_test_render_prompt() {
-    _DOTS_FAILURE_ANIMATION_FRAME='😭'
-    local rendered="$(_dots_failure_animation_render_prompt)"
-    print -r -- "PROMPT_RENDERED:${rendered}"
+zle -N _dots_test_snapshot
+bindkey '^T' _dots_test_snapshot
+
+_dots_test_queue() {
+    local style="$1"
+    local suffix="${2:-}"
+    local marker_style="${style:u}"
+    local banner="GRADIENT_BANNER_MARKER_${marker_style}"
+    local detail="GRADIENT_DETAIL_MARKER_${marker_style}"
+    if [[ -n "$suffix" ]]; then
+        banner+="_${suffix:u}"
+        detail+="_${suffix:u}"
+    fi
+    _dots_failure_animation_start "$style" "$banner" "$detail" || return 1
+    print -r -- "QUEUED:${style}:${suffix}"
 }
-_dots_test_render_duplicate_prompt() {
+
+_dots_test_set_style() {
+    export DOTS_FAILURE_STYLE="$1"
+    print -r -- "STYLE_SET:$1"
+}
+
+_dots_test_pool() {
+    local style="$1"
+    _dots_failure_animation_pool_for_style "$style"
+    _dots_state "POOL|${style}|${#_DOTS_FAILURE_ANIMATION_POOL}|${(j: :)${_DOTS_FAILURE_ANIMATION_POOL}}"
+    print -r -- "POOL_READY:$style"
+}
+
+_dots_test_hooks() {
+    local -i precmd=0 preexec=0 linefinish=0
+    local fn
+    for fn in ${precmd_functions[@]}; do
+        [[ "$fn" == _dots_failure_animation_precmd ]] && precmd=$(( precmd + 1 ))
+    done
+    for fn in ${preexec_functions[@]}; do
+        [[ "$fn" == _dots_failure_animation_preexec ]] && preexec=$(( preexec + 1 ))
+    done
+    local -a hook_widgets
+    zstyle -a zle-line-finish widgets hook_widgets
+    for fn in ${hook_widgets[@]}; do
+        [[ "$fn" == *:_dots_failure_animation_line_finish ]] && linefinish=$(( linefinish + 1 ))
+    done
+    _dots_state "HOOKS|precmd=${precmd}|preexec=${preexec}|linefinish=${linefinish}|loaded=${_DOTS_FAILURE_ANIMATION_LOADED}|prompt=${PROMPT}"
+    print -r -- HOOKS_READY
+}
+
+_dots_test_phase_zero() {
+    local -i start_status=0
+    _dots_failure_animation_start normal 'GRADIENT_PHASE_ZERO' 'GRADIENT_PHASE_ZERO_DETAIL' ||
+        start_status=$?
+    _dots_state "PHASE0|rc=${start_status}|gf=${_DOTS_FAILURE_ANIMATION_GRADIENT_FRAMES}|phase=${_DOTS_FAILURE_ANIMATION_GRADIENT_PHASE}|mode=${_DOTS_FAILURE_ANIMATION_MODE}|pending=${_DOTS_FAILURE_ANIMATION_PENDING}"
+    _dots_failure_animation_reset
+    print -r -- PHASE_ZERO_READY
+}
+
+_dots_test_gradient_motion() {
+    local first='' second=''
+    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 0
+    first="$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE"
+    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 20
+    second="$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE"
+    local first_color="${first#*38;2;}"
+    first_color="${first_color%%m*}"
+    local second_color="${second#*38;2;}"
+    second_color="${second_color%%m*}"
+    local -i same=1
+    [[ "$first" == "$second" ]] || same=0
+    _dots_state "GRADIENT_MOTION|same=${same}|first=${first_color}|second=${second_color}"
+    print -r -- GRADIENT_MOTION_READY
+}
+
+_dots_test_duplicate_prompt() {
     local saved_prompt="$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT"
     local saved_mode="$_DOTS_FAILURE_ANIMATION_PROMPT_MODE"
     _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT='BASE_OUTPUT CODE=1 ❯ ❯ '
     _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
     _DOTS_FAILURE_ANIMATION_FRAME='😭'
-    local rendered="$(_dots_failure_animation_render_prompt)"
+    local rendered
+    rendered="$(_dots_failure_animation_render_prompt)"
     _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="$saved_prompt"
     _DOTS_FAILURE_ANIMATION_PROMPT_MODE="$saved_mode"
-    print -r -- "PROMPT_DUPLICATE_RENDERED:${rendered}"
+    _dots_state "DUPLICATE_PROMPT|${rendered}"
+    print -r -- DUPLICATE_PROMPT_READY
 }
-_dots_test_assert_pool() {
-    local style="$1"
-    _dots_failure_animation_pool_for_style "$style"
-    print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
-}
-_dots_test_render_gradients() {
-    local rendered=''
 
-    _dots_failure_animation_gradient_line 'LEGENDARY BANNER' legendary 0
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'L'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'Y'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'B'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'R'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *$'\e[38;2;74;50;12m'* ]] || return 1
-
-    _dots_failure_animation_gradient_line '🌠 MYTHIC STARFALL 🌠' mythic 0
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'M'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'C'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'S'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'R'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *$'\e[38;2;15;17;21m'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" != *$'\e[38;2;255;0;0m'* ]] || return 1
-    local first_frame=''
-    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 0
-    first_frame="$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE"
-    local first_color_zero="${first_frame#*38;2;}"
-    first_color_zero="${first_color_zero%%m*}"
-    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 20
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" != "$first_frame" ]] || return 1
-    local first_color_twenty="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE#*38;2;}"
-    first_color_twenty="${first_color_twenty%%m*}"
-    # At phase 20 the leftmost character has advanced into the later part
-    # of the palette; adding the phase would move the highlight the other way.
-    [[ "$first_color_zero" == '74;50;12' &&
-       "$first_color_twenty" == '190;145;55' ]] || return 1
-
-    _DOTS_FAILURE_ANIMATION_MODE='mythic'
-    _DOTS_FAILURE_ANIMATION_BANNER='🌠 MYTHIC STARFALL 🌠'
-    rendered="$(_dots_failure_animation_render_prompt)"
-    [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
-
-    local palette_style expected_color
-    for palette_style in normal anime ecchi rainbow; do
-        _dots_failure_animation_gradient_line 'PALETTE CHECK' "$palette_style" 0
-        case "$palette_style" in
-            normal) expected_color='36;123;160' ;;
-            anime) expected_color='255;190;220' ;;
-            ecchi) expected_color='120;24;70' ;;
-            rainbow) expected_color='255;82;82' ;;
-        esac
-        [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW" == *$'\e[38;2;'$expected_color'm'* ]] || return 1
+_dots_test_palettes() {
+    local style message
+    message=${(l:120::X:)}
+    for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+        _dots_failure_animation_gradient_line "$message" "$style" 0
+        print -rn -- "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW" \
+            > "$DOTS_TEST_PALETTE_DIR/$style.raw"
     done
+    print -r -- PALETTES_READY
+}
 
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    print -- GRADIENTS_OK
-}
-typeset -g _DOTS_TEST_SPECIAL_STYLE=''
-typeset -gi _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
-_dots_test_queue_special_animation() {
-    local style="$1"
-    _DOTS_TEST_SPECIAL_STYLE="$style"
-    _DOTS_TEST_GRADIENT_REQUEST_PENDING=1
-    print -r -- "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
-}
-_dots_test_start_queued_gradient() {
-    (( _DOTS_TEST_GRADIENT_REQUEST_PENDING )) || return 0
-    _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
-    _dots_failure_animation_start \
-        "$_DOTS_TEST_SPECIAL_STYLE" \
-        "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
-        "live gradient test"
-}
-precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
-_dots_test_snapshot_special_animation() {
-    local banner_frames="$_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES"
-    local kitty_calls="$(command wc -l < "$DOTS_TEST_KITTY_LOG" 2>/dev/null)"
-    kitty_calls="${kitty_calls//[[:space:]]/}"
-    local rendered_frames="$(command grep -o 'MAGICK_INPUT_FRAMES_25' "$DOTS_TEST_ANIMATION_LOG" | command wc -l)"
-    rendered_frames="${rendered_frames//[[:space:]]/}"
-    local animated_gifs="$(command grep -o 'ANIMATED_GIF_FRAMES_2_LOOP_1' "$DOTS_TEST_GIF_LOG" | command wc -l)"
-    animated_gifs="${animated_gifs//[[:space:]]/}"
-    print -r -- "SPECIAL_STATE_GRADIENT_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_FRAMES_${banner_frames}_PENDING_${_DOTS_FAILURE_GRADIENT_PENDING}_KITTY_CALLS_${kitty_calls}_RENDERED_25_${rendered_frames}_ANIMATED_GIFS_${animated_gifs}"
-}
-clear() {
-    print -r -- CLEAR_EXECUTED
-}
-_dots_test_enable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=1
-    print -- INFINITE_ENABLED
-}
-_dots_test_disable_infinite() {
-    export DOTS_FAILURE_ANIMATION_INFINITE=0
-    print -r -- "INFINITE_DISABLED ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE} LAST_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_FRAMES} LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
-}
-_dots_test_legacy_infinite_aliases() {
-    unset DOTS_FAILURE_ANIMATION_INFINITE
+_dots_test_infinite_aliases() {
+    unset DOTS_FAILURE_ANIMATION_INFINITE DOTS_FAILURE_EMOJI_ANIMATION_INFINITE DOTS_FAILURE_ANIMATION_CONTINUOUS
+    local -i found=0
     export DOTS_FAILURE_EMOJI_ANIMATION_INFINITE=1
-    _dots_failure_animation_infinite_enabled || return 1
+    _dots_failure_animation_infinite_enabled && found=$(( found + 1 ))
     unset DOTS_FAILURE_EMOJI_ANIMATION_INFINITE
     export DOTS_FAILURE_ANIMATION_CONTINUOUS=1
-    _dots_failure_animation_infinite_enabled || return 1
-    export DOTS_FAILURE_ANIMATION_CONTINUOUS=0
-    print -- INFINITE_ALIASES_OK
+    _dots_failure_animation_infinite_enabled && found=$(( found + 1 ))
+    unset DOTS_FAILURE_ANIMATION_CONTINUOUS
+    _dots_state "INFINITE_ALIASES|ok=${found}"
+    print -r -- INFINITE_ALIASES_READY
 }
+
+_dots_test_enable_infinite() {
+    export DOTS_FAILURE_ANIMATION_INFINITE=1
+    print -r -- INFINITE_ENABLED
+}
+
+_dots_test_disable_infinite() {
+    unset DOTS_FAILURE_ANIMATION_INFINITE
+    _dots_state "INFINITE_DISABLED|active=${_DOTS_FAILURE_ANIMATION_ACTIVE}|lastframes=${_DOTS_FAILURE_ANIMATION_LAST_FRAMES}|last=${_DOTS_FAILURE_ANIMATION_LAST_STATE}"
+    print -r -- INFINITE_DISABLED
+}
+
+_dots_state "ENV|columns=${COLUMNS}|lines=${LINES}|term=${TERM}"
 ZSH_INIT
 
-FAKE_BIN="$(mktemp -d)"
-KITTY_LOG="$FAKE_BIN/kitty.log"
-ANIMATION_LOG="$FAKE_BIN/animation.log"
-GIF_LOG="$FAKE_BIN/gif.log"
-: > "$KITTY_LOG"
-: > "$ANIMATION_LOG"
-: > "$GIF_LOG"
-cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
-#!/usr/bin/env bash
-if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
-    printf '1320x840\n'
-    exit 0
-fi
-if [[ "${1:-}" == +kitten && "${2:-}" == icat ]]; then
-    image_file="${@: -1}"
-    if [[ ! -s "$image_file" ]]; then
-        printf 'GIF_REJECTED_EMPTY|' >> "${DOTS_TEST_GIF_LOG:?}"
-        exit 1
-    fi
-    if [[ "$(head -c 6 "$image_file")" != GIF89a ]]; then
-        printf 'GIF_REJECTED_HEADER|' >> "${DOTS_TEST_GIF_LOG:?}"
-        exit 1
-    fi
-    frame_count="$(LC_ALL=C tr -cd ',' < "$image_file" | wc -c)"
-    frame_count="${frame_count//[[:space:]]/}"
-    if (( frame_count < 2 )); then
-        printf 'GIF_REJECTED_FRAMES_%s|' "$frame_count" >> "${DOTS_TEST_GIF_LOG:?}"
-        exit 1
-    fi
-    if ! grep -aq 'NETSCAPE2.0' "$image_file"; then
-        printf 'GIF_REJECTED_LOOP_EXTENSION|' >> "${DOTS_TEST_GIF_LOG:?}"
-        exit 1
-    fi
-    printf 'ANIMATED_GIF_FRAMES_%s_LOOP_1|' "$frame_count" >> "${DOTS_TEST_GIF_LOG:?}"
-fi
-printf '%s ' "$@" >> "${DOTS_TEST_KITTY_LOG:?}"
-printf '\n' >> "${DOTS_TEST_KITTY_LOG:?}"
-FAKE_KITTY
-cat > "$FAKE_BIN/magick" <<'FAKE_MAGICK'
-#!/usr/bin/env bash
-set -euo pipefail
-frames=()
-output=''
-for arg in "$@"; do
-    case "$arg" in
-        *.svg) frames+=("$arg") ;;
-        GIF:*) output="${arg#GIF:}" ;;
-    esac
-done
-[[ "${#frames[@]}" -eq 25 && -n "$output" ]] || exit 1
-if cmp -s "${frames[0]}" "${frames[24]}"; then
-    exit 1
-fi
-printf 'MAGICK_INPUT_FRAMES_%s|' "${#frames[@]}" >> "${DOTS_TEST_ANIMATION_LOG:?}"
-printf 'GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff' > "$output"
-printf '\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' >> "$output"
-for _ in 1 2; do
-    printf '\x21\xf9\x04\x00\x08\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00' >> "$output"
-done
-printf '\x3b' >> "$output"
-FAKE_MAGICK
-cat > "$FAKE_BIN/fc-match" <<'FAKE_FONT'
-#!/usr/bin/env sh
-printf 'JetBrainsMono Nerd Font\n'
-FAKE_FONT
-chmod +x "$FAKE_BIN/kitty" "$FAKE_BIN/magick" "$FAKE_BIN/fc-match"
+# zpty joins its command arguments without preserving shell quoting, so put
+# the terminal-size setup in a small executable wrapper instead of nesting
+# `sh -c` here.
+cat > "$START_FILE" <<EOF
+#!/bin/sh
+stty rows $ROWS columns $COLS
+exec zsh -f -i
+EOF
+chmod +x "$START_FILE"
 
-trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE_BIN"' EXIT
+zpty -b "$PTY_NAME" env \
+    TERM=xterm-256color \
+    DOTS_TEST_STATE_FILE="$STATE_FILE" \
+    DOTS_TEST_PALETTE_DIR="$PALETTE_DIR" \
+    DOTS_TEST_ZSH_DIR="$ZSH_DIR" \
+    "$START_FILE" ||
+    fail "could not start the interactive test shell"
 
-zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-    PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" DOTS_TEST_GIF_LOG="$GIF_LOG" \
-    DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
-    DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
-    DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
-    "ZSH_DIR=$ZSH_DIR" NO_COLOR=1 zsh -f -i
-
-read_until() {
-    local needle="$1"
-    local -i tries=0
-    local output='' data=''
-    while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        [[ "$output" == *"$needle"* ]] && break
-        command sleep 0.05
-        (( tries += 1 ))
+pump() {
+    local chunk=''
+    while zpty -r -t "$PTY_NAME" chunk 2>/dev/null; do
+        RAW+="$chunk"
+        print -rn -- "$chunk" >> "$RAW_FILE"
     done
-    REPLY="$output"
-}
-# Match visible text while preserving raw ANSI output for colour assertions.
-read_until_visible() {
-    local needle="$1"
-    local -i tries=0
-    local output='' data='' visible=''
-    while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;]*m", "", sys.stdin.read()))')"
-        [[ "$visible" == *"$needle"* ]] && break
-        command sleep 0.05
-        (( tries += 1 ))
-    done
-    _DOTS_TEST_LAST_RAW_OUTPUT="$output"
-    REPLY="$visible"
 }
 
-drain_for() {
-    local -i rounds="$1"
-    local output='' data=''
-    while (( rounds > 0 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+wait_raw() {
+    local needle="$1"
+    local -i attempts=0
+    while (( attempts < 750 )); do
+        pump
+        [[ "$RAW" == *"$needle"* ]] && return 0
         command sleep 0.02
-        rounds=$(( rounds - 1 ))
+        attempts=$(( attempts + 1 ))
     done
-    REPLY="$output"
+    fail "timed out waiting for output: $needle"
 }
 
-# Wait for the clean shell, then load the modules as the real .zshrc does.
-local_startup=''
-typeset chunk=''
-typeset -i attempt=0
-while (( attempt < 40 )); do
-    if zpty -r -t "$PTY_NAME" chunk; then local_startup+="$chunk"; fi
-    [[ -n "$local_startup" ]] && break
-    command sleep 0.05
-    (( attempt += 1 ))
+send_line() {
+    zpty -w "$PTY_NAME" "$1"
+}
+
+send_keys() {
+    zpty -w -n "$PTY_NAME" "$1"
+}
+
+vt_snapshot() {
+    pump
+    cp "$RAW_FILE" "$SNAP_RAW" || fail "could not snapshot the terminal stream"
+}
+
+vt_query() {
+    local query="$1"
+    shift
+    python3 "$VT_HELPER" --input "$SNAP_RAW" --cols "$COLS" --rows "$ROWS" \
+        --query "$query" "$@"
+}
+
+wait_visual() {
+    local needle="$1"
+    local -i attempts=0
+    local screen=''
+    while (( attempts < 750 )); do
+        vt_snapshot
+        screen="$(vt_query screen)"
+        [[ "$screen" == *"$needle"* ]] && return 0
+        command sleep 0.02
+        attempts=$(( attempts + 1 ))
+    done
+    fail "timed out waiting for screen text: $needle"
+}
+
+count_state_lines() {
+    local prefix="$1"
+    awk -v p="$prefix" 'index($0, p) == 1 { n++ } END { print n + 0 }' \
+        "$STATE_FILE" 2>/dev/null
+}
+
+last_state_line() {
+    local prefix="$1"
+    awk -v p="$prefix" 'index($0, p) == 1 { last = $0 } END { print last }' \
+        "$STATE_FILE" 2>/dev/null
+}
+
+snap() {
+    local -i before
+    before=$(count_state_lines 'SNAP|')
+    local -i attempts=0
+    local line=''
+    while (( attempts < 500 )); do
+        # Ctrl+C can flush input that was already queued, so resend the
+        # snapshot key when no widget has run after a short wait.
+        if (( attempts % 20 == 0 )); then
+            send_keys $'\x14'
+        fi
+        pump
+        if (( $(count_state_lines 'SNAP|') > before )); then
+            line=$(last_state_line 'SNAP|')
+            local pid_value=''
+            if snap_value pid "$line"; then
+                pid_value="$REPLY"
+            fi
+            if [[ "$pid_value" == <-> ]] && (( pid_value > 0 )); then
+                LAST_PID="$pid_value"
+            else
+                LAST_PID=''
+            fi
+            REPLY="$line"
+            return 0
+        fi
+        command sleep 0.01
+        attempts=$(( attempts + 1 ))
+    done
+    fail "the ZLE snapshot widget did not respond"
+}
+
+wait_animation_complete() {
+    local -i attempts=0
+    local line=''
+    while (( attempts < 500 )); do
+        snap
+        line="$REPLY"
+        if [[ "$line" == *'|active=0|'* &&
+            "$line" == *'|lastgf=25|'* &&
+            "$line" == *'|phase=96|'* &&
+            "$line" == *'|last=stream-complete|'* ]]; then
+            REPLY="$line"
+            return 0
+        fi
+        command sleep 0.01
+        attempts=$(( attempts + 1 ))
+    done
+    fail "the gradient animation did not complete all 25 frames; last snapshot: $line"
+}
+
+wait_clean_prompt() {
+    local -i attempts=0
+    local line=''
+    while (( attempts < 500 )); do
+        snap
+        line="$REPLY"
+        if [[ "$line" == *'|active=0|'* && "$line" == *'|mode=emoji|'* ]]; then
+            REPLY="$line"
+            return 0
+        fi
+        command sleep 0.01
+        attempts=$(( attempts + 1 ))
+    done
+    fail "the prompt did not return to its idle state; last snapshot: $line"
+}
+
+marker_counts() {
+    local marker="$1"
+    vt_snapshot
+    vt_query find --text "$marker"
+}
+
+count_marker_on_screen() {
+    local counts="$1"
+    local value="${counts#*screen=}"
+    print -r -- "${value%% *}"
+}
+
+count_marker_in_scrollback() {
+    local counts="$1"
+    local value="${counts#*scrollback=}"
+    print -r -- "${value%% *}"
+}
+
+assert_marker_once() {
+    local label="$1" marker="$2"
+    local counts screen_count scrollback_count
+    counts=$(marker_counts "$marker")
+    screen_count=$(count_marker_on_screen "$counts")
+    scrollback_count=$(count_marker_in_scrollback "$counts")
+    (( screen_count + scrollback_count == 1 )) ||
+        fail "$label (marker appears $screen_count time(s) on screen and $scrollback_count in scrollback)"
+    print -- "ok - $label"
+}
+
+vt_scrollback_rows() {
+    vt_snapshot
+    vt_query json |
+        python3 -c 'import json, sys; print(len(json.load(sys.stdin)["scrollback"]))'
+}
+
+palette_colors() {
+    python3 -c '
+import re, sys
+data = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+colors = { ",".join(match) for match in re.findall(r"38;2;(\d+);(\d+);(\d+)m", data) }
+print(" ".join(sorted(colors)))
+' "$1"
+}
+
+# Expected pools are part of the public behaviour: ordinary styles share a
+# pool, while anime, ecchi, and rainbow keep their own identities.
+common_pool=(👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠)
+anime_pool=(😭 🥰 🥺 💖 💗 💓 💕)
+ecchi_pool=(😏 ❤️ 🩷 💘)
+rainbow_pool=(🧡 💛 💚 💙 🤍)
+
+assert_pool() {
+    local style="$1" expected_count="$2" expected_values="$3"
+    local line
+    line=$(last_state_line "POOL|$style|")
+    [[ -n "$line" ]] || fail "pool $style was not recorded"
+    local recorded_count="${line#POOL|$style|}"
+    recorded_count="${recorded_count%%|*}"
+    local recorded_values="${line#*|$expected_count|}"
+    [[ "$recorded_count" == "$expected_count" ]] ||
+        fail "$style pool size (expected $expected_count, got $recorded_count; line: $line)"
+    [[ "$recorded_values" == "$expected_values" ]] ||
+        fail "$style pool contents (expected '$expected_values', got '$recorded_values')"
+    print -- "ok - $style uses its documented emoji pool"
+}
+
+# Screen/line helpers.
+input_line_from_screen() {
+    local screen="$1"
+    local line="${${(f)screen}[(R)*BASE_OUTPUT*]}"
+    [[ -n "$line" ]] || fail "the input prompt line is missing from the screen"
+    REPLY="$line"
+}
+
+assert_input_emoji() {
+    local label="$1" style="$2" screen="$3"
+    local line emoji found=0 entry
+    input_line_from_screen "$screen"
+    line="$REPLY"
+    emoji="${line#*BASE_OUTPUT }"
+    emoji="${emoji%% ❯*}"
+    emoji="${emoji## }"
+    emoji="${emoji%% }"
+    emoji="${emoji//$'\uFE0F'/}"
+    local -a pool
+    case "$style" in
+        anime) pool=( "${anime_pool[@]}" ) ;;
+        ecchi) pool=( "${ecchi_pool[@]}" ) ;;
+        rainbow) pool=( "${rainbow_pool[@]}" ) ;;
+        *) pool=( "${common_pool[@]}" ) ;;
+    esac
+    for entry in "${pool[@]}"; do
+        entry="${entry//$'\uFE0F'/}"
+        [[ "$emoji" == "$entry" ]] && found=1
+    done
+    (( found )) ||
+        fail "$label (prompt emoji '$emoji' is not in the $style pool)"
+    print -- "ok - $label"
+}
+
+assert_style_palette() {
+    local style="$1" marker="$2"
+    vt_snapshot
+    local actual
+    actual="$(vt_query colors --text "$marker")"
+    [[ -n "$actual" ]] || fail "$style gradient produced no truecolour cells"
+    local -a actual_colors
+    actual_colors=( ${(s: :)actual} )
+    (( ${#actual_colors} >= 6 )) ||
+        fail "$style gradient used only ${#actual_colors} distinct colours"
+    local expected=" ${PALETTE_COLORS[$style]} "
+    local color
+    for color in "${actual_colors[@]}"; do
+        [[ "$expected" == *" $color "* ]] ||
+            fail "$style gradient used unexpected colour $color (palette: $expected)"
+    done
+    print -- "ok - $style gradient uses its documented 24-bit palette"
+}
+
+clear_screen() {
+    send_line 'command clear; print -r -- SCREEN_CLEARED'
+    wait_raw SCREEN_CLEARED
+    wait_clean_prompt
+}
+
+queue_gradient() {
+    local style="$1" suffix="${2:-}"
+    local marker="GRADIENT_BANNER_MARKER_${style:u}"
+    if [[ -n "$suffix" ]]; then
+        marker+="_${suffix:u}"
+    fi
+    send_line "_dots_test_queue $style${suffix:+ $suffix}"
+    wait_raw "QUEUED:${style}:${suffix}"
+    REPLY="$marker"
+}
+
+# Let the initial interactive prompt appear before sourcing the modules.
+command sleep 0.2
+pump
+
+send_line "source '$INIT_FILE'"
+wait_raw BASE_OUTPUT
+sleep 0.05
+
+env_line=$(last_state_line 'ENV|')
+assert_field "the PTY is $COLS columns wide" columns "$COLS" "$env_line"
+assert_field "the PTY is $ROWS rows tall" lines "$ROWS" "$env_line"
+
+# Startup animation: the ordinary emoji prompt animation still completes on
+# its own and leaves RPROMPT untouched.
+startup_line=''
+typeset -i startup_attempts=0
+while (( startup_attempts < 500 )); do
+    snap
+    startup_line="$REPLY"
+    if [[ "$startup_line" == *'|lastframes=12|'* &&
+        "$startup_line" == *'|active=0|'* ]]; then
+        break
+    fi
+    command sleep 0.01
+    startup_attempts=$(( startup_attempts + 1 ))
 done
-if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach its prompt"; fi
-print -- "ok - clean interactive child shell reached its prompt"
+assert_field "startup emoji animation completes all 12 frames" lastframes 12 "$startup_line"
+assert_field "startup animation leaves no active worker" active 0 "$startup_line"
+assert_field "startup worker ended by closing its stream" last stream-complete "$startup_line"
+assert_field "startup animation uses the ordinary style" style normal "$startup_line"
+assert_field "right prompt is unchanged by the startup animation" rprompt BASE_RPROMPT "$startup_line"
 
-zpty -w "$PTY_NAME" "source '$INIT_FILE'"
-read_until "❯"
-assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
-assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
-[[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
-print -- "ok - initial animation leaves the path line untouched"
-
-# Let the shorter initial one-shot animation finish before submitting another command.
-drain_for 100
-zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
-read_until STATE_SNAPSHOT
-assert_contains "startup animation finishes all 12 frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_12 LAST_STATE_stream-complete" "$REPLY"
-assert_contains "startup uses the shared style" "STYLE_normal" "$REPLY"
-assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
-
-# Deterministically render a frame and verify it is directly before the input marker.
-zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
-read_until "BASE_OUTPUT 😭 ❯"
-assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
-assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
-
-# A prompt that already contains duplicate markers (including one after the
-# status code) must still render a single final marker after the emoji.
-zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\n'
-read_until "PROMPT_DUPLICATE_RENDERED:"
-assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
-assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
-
-# Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
-zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
-read_until "POOL_normal_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
-read_until "POOL_sarcastic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
-assert_contains "sarcastic pool includes melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
-read_until "POOL_dramatic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
-assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
-read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
-assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
-read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
-assert_contains "ecchi has its dedicated four-emoji pool" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
-assert_absent "Ecchi pool no longer contains melting face" "🫠" "$REPLY"
-zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
-read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
-assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
-
-# The standalone phase producer must emit exactly 24 ordered phases.
-zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'$'\n'
-read_until GRADIENT_STREAM_PROBE_OK
-assert_contains "gradient worker emits 24 ordered phase values" "GRADIENT_STREAM_PROBE_OK:24:4:96" "$REPLY"
-
-# Both historic environment-variable names remain compatible aliases.
-zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
-read_until INFINITE_ALIASES_OK
-assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
-
-# Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
-zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
-read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
-drain_for 5
-
-# The failure banner is emitted through ZLE's independent message area.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
-read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
-assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
-
-read_until_visible "BASE_OUTPUT"
-assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
-assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
-read_until_visible "normal ANIMATED FAILURE BANNER"
-assert_contains "normal gradient message becomes visible in ZLE" "normal ANIMATED FAILURE BANNER" "$REPLY"
-assert_contains "normal gradient uses 24-bit colour" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
-
-# Type a command without sending Enter. It must stay editable while the worker
-# runs through all 25 frames.
-zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
-read_until_visible "INPUT_DURING_GRADIENT"
-assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
-drain_for 120
-
-# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
-zpty -w -n "$PTY_NAME" $'\x14'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-assert_contains "the complete input buffer survives all gradient frames" \
-    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
-assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
-assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
-assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
-
-# Only now send Enter; the unchanged command must execute.
-zpty -w -n "$PTY_NAME" $'\n'
-read_until "INPUT_DURING_GRADIENT"
-assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
-assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
-
-# Every message style uses the same independent ZLE message channel.
-for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
-    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
-    read_until_visible "${style} ANIMATED FAILURE BANNER"
-    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
-    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
-    drain_for 120
-
-    # Inspect animation state inside ZLE before line-finish resets its counters.
-    zpty -w -n "$PTY_NAME" $'\x14'
-    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+vt_snapshot
+startup_screen="$(vt_query screen)"
+assert_contains "the path line is rendered above the input line" BASE_PATH "$startup_screen"
+assert_contains "the right prompt is still displayed" BASE_RPROMPT "$startup_screen"
+assert_input_emoji "startup animation places an ordinary emoji before the marker" normal "$startup_screen"
+path_line="${${(f)startup_screen}[(r)BASE_PATH*]}"
+for entry in "${common_pool[@]}"; do
+    assert_absent "the path line never receives animated emoji" "$entry" "$path_line"
 done
-print -- "ok - all eight styles animate without blocking or replacing input"
 
-# Clear operations must cancel an active message and its worker.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
-zpty -w "$PTY_NAME" $'\x0c'
-drain_for 5
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Re-sourcing must not wrap PROMPT twice or register duplicate hooks.
+send_line 'source "$DOTS_TEST_ZSH_DIR/failure-animation.zsh"; print -r -- RESOURCED'
+wait_raw RESOURCED
+send_line '_dots_test_hooks'
+wait_raw HOOKS_READY
+hooks_line=$(last_state_line 'HOOKS|')
+assert_field "re-sourcing keeps exactly one precmd hook" precmd 1 "$hooks_line"
+assert_field "re-sourcing keeps exactly one preexec hook" preexec 1 "$hooks_line"
+assert_field "re-sourcing keeps exactly one line-finish hook" linefinish 1 "$hooks_line"
+assert_field "re-sourcing leaves the prompt wrapper in place" prompt '$(_dots_failure_animation_render_prompt)' "$hooks_line"
 
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
-zpty -w "$PTY_NAME" 'clear'$'\n'
-read_until CLEAR_EXECUTED
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-# Infinite emoji mode loops while idle; accepting a command stops it.
-zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
-read_until INFINITE_ENABLED
-assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
-read_until INFINITE_DISABLED
-assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
-typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
-infinite_frames="${infinite_frames%%[^0-9]*}"
-[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
-(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
-print -- "ok - infinite emoji animation loops beyond one frame sequence"
+# Emoji pools are preserved exactly.
+for pool_style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    send_line "_dots_test_pool $pool_style"
+    wait_raw "POOL_READY:$pool_style"
+done
+assert_pool normal 13 "👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_pool sarcastic 13 "👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_pool dramatic 13 "👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_pool anime 7 "😭 🥰 🥺 💖 💗 💓 💕"
+assert_pool ecchi 4 "😏 ❤️ 🩷 💘"
+assert_pool rainbow 5 "🧡 💛 💚 💙 🤍"
+assert_pool legendary 13 "👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_pool mythic 13 "👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+ecchi_line=$(last_state_line 'POOL|ecchi|')
+assert_absent "Ecchi pool does not contain the melting face" 🫠 "$ecchi_line"
 
-print -- "All style-aware and rare-event prompt animation integration tests passed."
+# The phase-0 banner already counts as the first frame; the producer supplies
+# the remaining 24 phases through the pipe.
+send_line '_dots_test_phase_zero'
+wait_raw PHASE_ZERO_READY
+phase_zero_line=$(last_state_line 'PHASE0|')
+assert_field "phase 0 is accepted as the first gradient frame" gf 1 "$phase_zero_line"
+assert_field "phase 0 starts at the beginning of the palette" phase 0 "$phase_zero_line"
+assert_field "phase 0 selects gradient mode" mode gradient "$phase_zero_line"
+wait_clean_prompt
+
+# Advancing the phase must actually move the colour sweep; a static banner
+# would still satisfy the frame counters above.
+send_line '_dots_test_gradient_motion'
+wait_raw GRADIENT_MOTION_READY
+motion_line=$(last_state_line 'GRADIENT_MOTION|')
+assert_field "a new phase changes the rendered gradient" same 0 "$motion_line"
+assert_field "phase 0 starts on the first metallic-gold stop" first '74;50;12' "$motion_line"
+assert_field "phase 20 advances the first character through the palette" second '190;145;55' "$motion_line"
+
+# Prompts that already contain several markers must keep exactly one final
+# marker and leave the status text before the animated emoji.
+send_line '_dots_test_duplicate_prompt'
+wait_raw DUPLICATE_PROMPT_READY
+duplicate_line=$(last_state_line 'DUPLICATE_PROMPT|')
+assert_contains "the exit status stays before the animated emoji" 'BASE_OUTPUT CODE=1 😭 ❯' "$duplicate_line"
+assert_absent "the rendered prompt keeps only one final marker" '❯ ❯' "$duplicate_line"
+
+# Render the full palette of every style once so the screen assertions can
+# verify that animation only uses documented colours.
+send_line '_dots_test_palettes'
+wait_raw PALETTES_READY
+typeset -A PALETTE_COLORS
+for palette_style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    PALETTE_COLORS[$palette_style]=$(palette_colors "$PALETTE_DIR/$palette_style.raw")
+    [[ -n "${PALETTE_COLORS[$palette_style]}" ]] ||
+        fail "could not extract the $palette_style palette"
+done
+
+# A real failed command must produce the real failure pipeline: the banner,
+# exit status detail, style palette, and a completed asynchronous animation.
+send_line '_dots_test_set_style legendary'
+wait_raw STYLE_SET:legendary
+send_line 'false'
+wait_visual 'exit status 1'
+wait_animation_complete
+failure_line="$REPLY"
+assert_field "a real failure uses the selected legendary style" style legendary "$failure_line"
+assert_field "a real failure renders a gradient block" mode gradient "$failure_line"
+assert_field "a real failure completes all 25 gradient frames" gf 25 "$failure_line"
+assert_field "a real failure records all 25 banner frames" lastgf 25 "$failure_line"
+assert_field "a real failure reaches the final gradient phase" phase 96 "$failure_line"
+assert_field "a real failure releases the producer" active 0 "$failure_line"
+assert_field "a real failure closes the producer stream cleanly" last stream-complete "$failure_line"
+assert_field "a real failure closes the producer pipe" fd -1 "$failure_line"
+assert_field "a real failure clears the producer pid" pid 0 "$failure_line"
+
+vt_snapshot
+failure_screen="$(vt_query screen)"
+assert_contains "the selected legendary banner is visible" legendary "$failure_screen"
+assert_contains "the failure detail reports the exit status" 'exit status 1' "$failure_screen"
+assert_contains "the right prompt survives a real failure" BASE_RPROMPT "$failure_screen"
+assert_style_palette legendary 'exit status 1'
+
+# Real messages contain emoji. Verify that their prompt block still sits above
+# the editable input line instead of wrapping onto it.
+row_text=$(vt_query rows --text 'exit status 1')
+typeset -a real_detail_rows
+real_detail_rows=( ${(s: :)row_text} )
+row_text=$(vt_query rows --text 'BASE_OUTPUT')
+typeset -a real_input_rows
+real_input_rows=( ${(s: :)row_text} )
+(( ${#real_detail_rows} > 0 && ${#real_input_rows} > 0 )) ||
+    fail "the real failure detail or input line is missing from the screen"
+(( real_detail_rows[-1] < real_input_rows[-1] )) ||
+    fail "the real failure banner overlaps or follows the input line"
+print -- "ok - a real emoji-bearing failure block stays above the editable input line"
+
+send_keys $'\n'
+wait_clean_prompt
+clean_line="$REPLY"
+assert_field "the next prompt drops the gradient block" mode emoji "$clean_line"
+assert_field "the next prompt resets the gradient counter" gf 0 "$clean_line"
+assert_field "the next prompt has no producer" active 0 "$clean_line"
+
+# Every style must animate through the same prompt block, use its palette, and
+# commit the final message exactly once to ordinary output.
+for style in normal sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    clear_screen
+    queue_gradient "$style"
+    marker="$REPLY"
+    wait_visual "$marker"
+
+    # Snapshot immediately: the worker should still be alive at this point.
+    if [[ "$style" == normal ]]; then
+        snap
+        mid_line="$REPLY"
+        assert_field "normal animation is active while the banner is visible" active 1 "$mid_line"
+        assert_int_field "normal animation reports a live producer pid" pid 1 "$mid_line"
+        snap_value fd "$mid_line"
+        (( REPLY >= 0 )) || fail "normal animation did not register its pipe"
+        print -- "ok - normal animation registers a real file descriptor"
+
+        # Type without submitting. The producer must not consume the keys or
+        # disturb BUFFER/CURSOR while frames continue.
+        typed_command='print -r -- TYPED_DURING_ANIMATION'
+        typed_length=${#typed_command}
+        send_keys "$typed_command"
+        snap
+        typed_line="$REPLY"
+        assert_field "typing during animation keeps the complete buffer" buf "$typed_command" "$typed_line"
+        snap_value cursor "$typed_line"
+        (( REPLY == typed_length )) ||
+            fail "typing during animation moved the cursor (expected $typed_length, got $REPLY)"
+        print -- "ok - typing during animation leaves the cursor at the end of the buffer"
+
+        send_keys $'\x01'
+        snap
+        assert_field "Ctrl+A moves the cursor during animation" cursor 0 "$REPLY"
+        send_keys $'\x05'
+        snap
+        post_ctrl_e="$REPLY"
+        assert_field "Ctrl+E restores the cursor during animation" cursor "$typed_length" "$post_ctrl_e"
+        assert_field "cursor movement never changes the animation buffer" buf "$typed_command" "$post_ctrl_e"
+
+        wait_animation_complete
+        animated_line="$REPLY"
+        assert_field "normal animation completes all 25 frames with typed input" gf 25 "$animated_line"
+        assert_field "normal animation keeps the typed buffer after completion" buf "$typed_command" "$animated_line"
+
+        # Only an explicit Enter executes the command.
+        send_keys $'\n'
+        wait_visual $'\nTYPED_DURING_ANIMATION'
+        wait_clean_prompt
+        assert_field "Enter executes the unmodified typed command" mode emoji "$REPLY"
+        vt_snapshot
+        executed_screen="$(vt_query screen)"
+        assert_contains "the typed command output is ordinary terminal text" $'\nTYPED_DURING_ANIMATION' "$executed_screen"
+    else
+        wait_animation_complete
+        animated_line="$REPLY"
+        assert_field "$style animation completes all 25 frames" gf 25 "$animated_line"
+        assert_field "$style animation records all 25 banner frames" lastgf 25 "$animated_line"
+        assert_field "$style animation reaches phase 96" phase 96 "$animated_line"
+        assert_field "$style animation releases its producer" active 0 "$animated_line"
+        assert_field "$style animation ends by closing its stream" last stream-complete "$animated_line"
+        assert_field "$style animation leaves no producer pid" pid 0 "$animated_line"
+        assert_field "$style animation leaves no producer pipe" fd -1 "$animated_line"
+        assert_field "$style animation keeps the selected style" style "$style" "$animated_line"
+
+        vt_snapshot
+        style_screen="$(vt_query screen)"
+        assert_contains "$style banner is above the input line" "$marker" "$style_screen"
+        assert_contains "$style detail line is visible" "GRADIENT_DETAIL_MARKER_${style:u}" "$style_screen"
+        assert_contains "$style animation preserves the right prompt" BASE_RPROMPT "$style_screen"
+        assert_input_emoji "$style animation keeps its own prompt emoji" "$style" "$style_screen"
+        assert_style_palette "$style" "$marker"
+
+        # The gradient is a prompt block, so it must sit between the status
+        # line and the editable input line, never on top of either.
+        row_text=$(vt_query rows --text "$marker")
+        local -a banner_rows
+        banner_rows=( ${(s: :)row_text} )
+        (( ${#banner_rows} == 1 )) ||
+            fail "$style banner appears on ${#banner_rows} rows; expected exactly one"
+        row_text=$(vt_query rows --text 'BASE_STATUS')
+        local -a status_rows
+        status_rows=( ${(s: :)row_text} )
+        row_text=$(vt_query rows --text 'BASE_OUTPUT')
+        local -a input_rows
+        input_rows=( ${(s: :)row_text} )
+        (( ${#status_rows} > 0 && ${#input_rows} > 0 )) ||
+            fail "$style original prompt lines are missing"
+        (( banner_rows[1] > status_rows[-1] )) ||
+            fail "$style gradient block overlaps the status/path lines"
+        (( banner_rows[1] < input_rows[-1] )) ||
+            fail "$style gradient block overlaps or follows the input line"
+        print -- "ok - $style gradient block sits above the editable input line"
+
+        send_keys $'\n'
+        wait_clean_prompt
+        assert_marker_once "$style banner is preserved exactly once after submission" "$marker"
+    fi
+
+    # Submission must stop the worker even if it was still running.
+    snap
+    post_submit="$REPLY"
+    assert_field "$style submission leaves no active animation" active 0 "$post_submit"
+    assert_field "$style submission leaves no producer pid" pid 0 "$post_submit"
+    assert_field "$style submission closes the producer pipe" fd -1 "$post_submit"
+done
+
+# Full-screen independence: with the prompt already at the bottom of the
+# terminal, successive frames must not scroll or drag the gradient block.
+clear_screen
+send_line 'for i in {1..26}; do print -r -- "FILLER_LINE_$i"; done'
+wait_raw FILLER_LINE_26
+wait_clean_prompt
+queue_gradient rainbow scroll
+scroll_marker="$REPLY"
+wait_visual "$scroll_marker"
+command sleep 0.08
+scroll_before=$(vt_scrollback_rows)
+row_text=$(vt_query rows --text "$scroll_marker")
+scroll_row_before="$row_text"
+command sleep 0.25
+scroll_after=$(vt_scrollback_rows)
+row_text=$(vt_query rows --text "$scroll_marker")
+scroll_row_after="$row_text"
+[[ "$scroll_after" == "$scroll_before" ]] ||
+    fail "animation added scrollback lines ($scroll_before -> $scroll_after)"
+print -- "ok - animation frames redraw in place without adding scrollback lines"
+[[ "$scroll_row_after" == "$scroll_row_before" ]] ||
+    fail "animation dragged its block between rows ($scroll_row_before -> $scroll_row_after)"
+print -- "ok - animation does not drag the gradient block while the screen is full"
+wait_animation_complete
+send_keys $'\n'
+wait_clean_prompt
+assert_marker_once "the scrolled animation commits its final frame once" "$scroll_marker"
+send_line 'for i in {1..35}; do print -r -- "PUSH_LINE_$i"; done'
+wait_raw PUSH_LINE_35
+wait_clean_prompt
+counts=$(marker_counts "$scroll_marker")
+scrollback_count=$(count_marker_in_scrollback "$counts")
+screen_count=$(count_marker_on_screen "$counts")
+(( scrollback_count == 1 && screen_count == 0 )) ||
+    fail "committed banner should be ordinary scrollback text (screen=$screen_count scrollback=$scrollback_count)"
+print -- "ok - the committed banner survives scrolling as exactly one scrollback row"
+
+# Ctrl+L must stop the animation and leave a usable prompt.
+clear_screen
+queue_gradient anime ctrll
+ctrll_marker="$REPLY"
+wait_visual "$ctrll_marker"
+send_keys $'\x0c'
+wait_clean_prompt
+ctrll_line="$REPLY"
+assert_field "Ctrl+L stops the gradient worker" active 0 "$ctrll_line"
+assert_field "Ctrl+L closes the producer pipe" fd -1 "$ctrll_line"
+assert_field "Ctrl+L clears the producer pid" pid 0 "$ctrll_line"
+vt_snapshot
+ctrll_screen="$(vt_query screen)"
+assert_absent "Ctrl+L removes the unfinished gradient block" "$ctrll_marker" "$ctrll_screen"
+assert_contains "Ctrl+L leaves the ordinary prompt intact" BASE_OUTPUT "$ctrll_screen"
+
+# The actual clear command must do the same and still clear the screen.
+clear_screen
+queue_gradient ecchi clear
+clear_marker="$REPLY"
+wait_visual "$clear_marker"
+send_line 'command clear; print -r -- CLEAR_RAN'
+wait_raw CLEAR_RAN
+wait_clean_prompt
+clear_line="$REPLY"
+assert_field "clear stops the gradient worker" active 0 "$clear_line"
+assert_field "clear closes the producer pipe" fd -1 "$clear_line"
+assert_field "clear clears the producer pid" pid 0 "$clear_line"
+vt_snapshot
+clear_screen_text="$(vt_query screen)"
+assert_absent "clear removes the unfinished gradient block" "$clear_marker" "$clear_screen_text"
+assert_contains "clear leaves an ordinary prompt" BASE_OUTPUT "$clear_screen_text"
+
+# Ctrl+C is a send-break: it must abandon the line and stop the producer
+# without executing the typed command.
+clear_screen
+queue_gradient rainbow ctrlc
+ctrlc_marker="$REPLY"
+wait_visual "$ctrlc_marker"
+snap
+ctrlc_mid="$REPLY"
+assert_field "Ctrl+C test starts with an active producer" active 1 "$ctrlc_mid"
+snap_value pid "$ctrlc_mid"
+ctrlc_pid="$REPLY"
+[[ "$ctrlc_pid" == <-> ]] && (( ctrlc_pid > 0 )) ||
+    fail "Ctrl+C test could not observe the producer pid"
+send_keys 'echo ABORTED_COMMAND'
+snap
+assert_field "the aborted line is present before Ctrl+C" buf 'echo ABORTED_COMMAND' "$REPLY"
+send_keys $'\x03'
+wait_clean_prompt
+ctrlc_line="$REPLY"
+assert_field "Ctrl+C stops the gradient worker" active 0 "$ctrlc_line"
+assert_field "Ctrl+C closes the producer pipe" fd -1 "$ctrlc_line"
+assert_field "Ctrl+C clears the producer pid" pid 0 "$ctrlc_line"
+assert_field "Ctrl+C restores an empty edit buffer" buf '' "$ctrlc_line"
+typeset -i orphan_wait=0
+while (( orphan_wait < 100 )) && kill -0 "$ctrlc_pid" 2>/dev/null; do
+    command sleep 0.02
+    orphan_wait=$(( orphan_wait + 1 ))
+done
+kill -0 "$ctrlc_pid" 2>/dev/null &&
+    fail "Ctrl+C left an orphan producer (pid $ctrlc_pid)"
+print -- "ok - Ctrl+C terminates and reaps the producer"
+vt_snapshot
+ctrlc_screen="$(vt_query screen)"
+assert_absent "Ctrl+C does not execute the abandoned command" $'\nABORTED_COMMAND' "$ctrlc_screen"
+assert_contains "Ctrl+C leaves a fresh ordinary prompt" BASE_OUTPUT "$ctrlc_screen"
+
+# Incremental history search must remain usable while frames are arriving.
+clear_screen
+send_line 'echo HISTORY_ALPHA'
+wait_visual HISTORY_ALPHA
+wait_clean_prompt
+send_line 'echo HISTORY_BETA'
+wait_visual HISTORY_BETA
+wait_clean_prompt
+queue_gradient dramatic hist
+hist_marker="$REPLY"
+wait_visual "$hist_marker"
+send_keys $'\x12'
+send_keys 'HISTORY_'
+wait_visual 'bck-i-search'
+sleep 0.1
+vt_snapshot
+hist_screen="$(vt_query screen)"
+assert_contains "history search stays visible during animation" 'bck-i-search' "$hist_screen"
+assert_contains "history search finds the most recent command during animation" HISTORY_BETA "$hist_screen"
+command sleep 0.5
+vt_snapshot
+hist_screen="$(vt_query screen)"
+assert_contains "history search survives all animation frames" 'bck-i-search' "$hist_screen"
+assert_contains "history search keeps its match after animation completes" HISTORY_BETA "$hist_screen"
+send_keys $'\x07'
+command sleep 0.15
+vt_snapshot
+hist_screen="$(vt_query screen)"
+if [[ "$hist_screen" == *'bck-i-search'* ]]; then
+    send_keys $'\x07'
+    command sleep 0.15
+fi
+send_keys $'\x03'
+wait_clean_prompt
+assert_field "history search leaves a clean prompt" mode emoji "$REPLY"
+print -- "ok - incremental history search works through the animation"
+
+# Completion menus must also remain visible and usable during animation.
+clear_screen
+queue_gradient ecchi comp
+comp_marker="$REPLY"
+wait_visual "$comp_marker"
+send_keys 'dots-test-command '
+send_keys $'\t'
+wait_visual alpha
+vt_snapshot
+comp_screen="$(vt_query screen)"
+assert_contains "completion menu shows the first candidate" alpha "$comp_screen"
+assert_contains "completion menu shows the second candidate" beta "$comp_screen"
+assert_contains "completion menu shows the third candidate" gamma "$comp_screen"
+assert_contains "completion menu shows the fourth candidate" delta "$comp_screen"
+command sleep 0.4
+vt_snapshot
+comp_screen="$(vt_query screen)"
+assert_contains "completion menu survives animation frames" alpha "$comp_screen"
+assert_contains "completion menu keeps its candidates after animation" delta "$comp_screen"
+send_keys $'\x03'
+command sleep 0.05
+send_keys $'\x03'
+wait_clean_prompt
+assert_field "completion cancellation leaves a clean prompt" mode emoji "$REPLY"
+print -- "ok - completion remains usable while animation frames are redrawn"
+
+# Infinite emoji mode loops independently of failure messages, then stops when
+# the next command is accepted.
+clear_screen
+send_line '_dots_test_enable_infinite'
+wait_raw INFINITE_ENABLED
+command sleep 0.6
+snap
+infinite_line="$REPLY"
+assert_field "infinite emoji mode keeps an active worker" active 1 "$infinite_line"
+snap_value frames "$infinite_line"
+infinite_frames="$REPLY"
+[[ "$infinite_frames" == <-> ]] && (( infinite_frames > 12 )) ||
+    fail "infinite animation did not loop beyond one 12-frame cycle (frames=$infinite_frames)"
+print -- "ok - infinite emoji animation loops beyond one cycle"
+send_line '_dots_test_disable_infinite'
+wait_raw INFINITE_DISABLED
+infinite_line=$(last_state_line 'INFINITE_DISABLED|')
+assert_field "infinite mode stops when a command is submitted" active 0 "$infinite_line"
+assert_int_field "infinite mode records its completed frame count" lastframes 13 "$infinite_line"
+send_line '_dots_test_infinite_aliases'
+wait_raw INFINITE_ALIASES_READY
+alias_line=$(last_state_line 'INFINITE_ALIASES|')
+assert_field "both historical infinite aliases remain accepted" ok 2 "$alias_line"
+wait_clean_prompt
+
+# The animation is terminal-native; reject a raster-image or external graphics
+# rendering path even if a future change adds one without touching the tests.
+if grep -qE '(^|[^[:alnum:]_])(magick|icat)([^[:alnum:]_]|$)' \
+    "$ZSH_DIR/failure-animation.zsh"; then
+    fail "the animation module references an external image renderer"
+fi
+print -- "ok - the animation module has no external image-rendering dependency"
+
+# Final resource check.
+snap
+final_line="$REPLY"
+assert_field "the shell ends with no active animation" active 0 "$final_line"
+assert_field "the shell ends with no producer pipe" fd -1 "$final_line"
+assert_field "the shell ends with no producer pid" pid 0 "$final_line"
+assert_field "the shell ends with the ordinary prompt mode" mode emoji "$final_line"
+assert_field "the shell ends with RPROMPT unchanged" rprompt BASE_RPROMPT "$final_line"
+[[ "$RAW" != *$'\e_G'* ]] || fail "the animation used a Kitty graphics escape"
+[[ "$RAW" != *'--place'* ]] || fail "the animation attempted Kitty image placement"
+print -- "ok - no graphics placement or external image protocol was used"
+
+print -- "All asynchronous prompt animation PTY tests passed."
