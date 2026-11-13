@@ -353,7 +353,12 @@ read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
 # The standalone phase producer must emit exactly 24 ordered phases.
-zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'
+zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'$'\n'
+read_until GRADIENT_STREAM_PROBE_OK
+assert_contains "gradient worker emits 24 ordered phase values" "GRADIENT_STREAM_PROBE_OK:24:4:96" "$REPLY"
+
+# Both historic environment-variable names remain compatible aliases.
+zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
 read_until INFINITE_ALIASES_OK
 assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
 
@@ -367,6 +372,7 @@ drain_for 5
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_0_PENDING_1"
 assert_contains "normal gradient is queued before ZLE starts" "SPECIAL_QUEUED_normal_START_0_PENDING_1" "$REPLY"
+assert_contains "normal gradient reuses the active shared FD watcher" "SPECIAL_QUEUED_normal_START_0_PENDING_1_ACTIVE_1" "$REPLY"
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
