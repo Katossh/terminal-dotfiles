@@ -15,6 +15,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
 typeset -gi _DOTS_FAILURE_GRADIENT_FD=-1
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
+typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
 typeset -ga _DOTS_FAILURE_GRADIENT_LINES=()
@@ -397,6 +398,29 @@ _dots_failure_animation_start_gradient() {
     return 1
 }
 
+# This hook runs after the prompt is about to enter ZLE, unlike precmd where
+# failure messages are selected. Register the timer pipe only inside ZLE.
+_dots_failure_animation_gradient_line_init() {
+    emulate -L zsh
+    setopt localoptions no_ignore_braces
+
+    (( _DOTS_FAILURE_GRADIENT_PENDING )) || return 0
+    _DOTS_FAILURE_GRADIENT_PENDING=0
+
+    if _dots_failure_animation_start_gradient; then
+        return 0
+    fi
+
+    # If async registration is unavailable, retain a static gradient message.
+    _DOTS_FAILURE_GRADIENT_PHASE=0
+    if _dots_failure_animation_render_gradient_message; then
+        zle -R
+        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
+    fi
+    _DOTS_FAILURE_ANIMATION_STATE='gradient-static-fallback'
+    return 0
+}
+
 
 _dots_failure_animation_render_prompt() {
     emulate -L zsh
@@ -496,8 +520,11 @@ _dots_failure_animation_start() {
     _DOTS_FAILURE_ANIMATION_STYLE="$style"
     if [[ -n "$banner" ]]; then
         _DOTS_FAILURE_ANIMATION_MODE='gradient'
-        if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail" &&
-            _dots_failure_animation_start_gradient; then
+        if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail"; then
+            # precmd runs before ZLE is active. Defer FD registration until
+            # the line-init widget enters the editor.
+            _DOTS_FAILURE_GRADIENT_PENDING=1
+            _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_MODE='emoji'
@@ -571,6 +598,7 @@ _dots_failure_animation_reset() {
 
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
+    _DOTS_FAILURE_GRADIENT_PENDING=0
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
@@ -604,6 +632,7 @@ _dots_failure_animation_line_finish() {
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
+    _DOTS_FAILURE_GRADIENT_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
     _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
@@ -616,6 +645,7 @@ if [[ -o interactive ]]; then
     autoload -Uz add-zsh-hook add-zle-hook-widget
     add-zsh-hook precmd _dots_failure_animation_precmd
     add-zsh-hook preexec _dots_failure_animation_preexec
+    add-zle-hook-widget zle-line-init _dots_failure_animation_gradient_line_init
     add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
     # FD frame updates use a ZLE widget; the banner itself is a ZLE message,
     # never part of PROMPT or a direct terminal overlay.
