@@ -39,7 +39,7 @@ _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
 _DOTS_FAILURE_GRADIENT_INTERVAL=0.2
 
 _dots_test_buffer_snapshot() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:ACCEPT_PENDING_${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:ACCEPT_PENDING_${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}:STEP_${_DOTS_FAILURE_ANIMATION_STEP}:FRAME_COUNT_${_DOTS_FAILURE_ANIMATION_FRAMES}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}:LAST_STATE_${_DOTS_FAILURE_ANIMATION_LAST_STATE}:FD_${_DOTS_FAILURE_ANIMATION_FD}"
 }
 zle -N _dots_test_buffer_snapshot
 bindkey '^T' _dots_test_buffer_snapshot
@@ -153,9 +153,22 @@ assert_absent "the command has not started before the gradient finishes" "SUBMIT
 
 # The FD watcher completes every phase, then replays Enter automatically.
 read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
-assert_contains "command submission waits for all 25 gradient frames" \
-    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$REPLY"
 submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" 
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+
+print -- "All single-gradient failure animation integration tests passed."
+\\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
 if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
     read_until "GRADIENT_COMMAND_EXECUTED"
     submitted_output+="${REPLY}"
