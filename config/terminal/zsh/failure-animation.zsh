@@ -486,10 +486,10 @@ _dots_failure_animation_fd_handler() {
             _dots_failure_animation_cleanup
 
             # The accept-line widget defers Enter until this stream ends.
-            # zle -U processes the queued key after this FD widget returns.
+            # Re-queue LF: PTY line discipline maps terminal CR to LF.
             if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
                 _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
-                zle .accept-line
+                zle -U $'\n'
             fi
             return 0
         fi
