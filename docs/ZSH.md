@@ -53,7 +53,7 @@ An optional diagnostic detail is displayed on the next line. The failure categor
 
 On an interactive colour-capable terminal, this exact message is animated with one moving 24-bit gradient for 25 frames. The banner occupies its own prompt row above the normal prompt. Each colour sequence is wrapped in Zsh's prompt-aware \`%{...%}\` markers, so ZLE treats it as zero-width instead of printing escape notation or shifting the input cursor. The background worker only sends frame numbers through a private pipe; ZLE alone redraws the prompt and the worker never reads keyboard input.
 
-When the command is submitted, the final banner remains in scrollback as part of the submitted prompt. It does not modify the editable command buffer or cursor. The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
+Typing remains fully responsive while the gradient runs. If Enter is pressed before the 25 frames finish, ZLE queues that submission and replays Enter after the final frame; the command therefore starts only after the animation completes (about 1.9 seconds at the default 0.08-second interval). The buffer and cursor are preserved while submission is queued. The final banner remains in scrollback as part of the submitted prompt. The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
 
 \`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
 
