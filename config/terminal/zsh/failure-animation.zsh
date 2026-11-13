@@ -14,6 +14,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
+typeset -gi _DOTS_FAILURE_GRADIENT_SUBMITTED=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
@@ -483,6 +484,20 @@ _dots_failure_animation_fd_handler() {
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
             _dots_failure_animation_cleanup
+
+            # The submitted prompt is already in scrollback. Remove its banner
+            # from the new live prompt only after the buffered animation ends.
+            if (( _DOTS_FAILURE_GRADIENT_SUBMITTED )); then
+                _DOTS_FAILURE_GRADIENT_SUBMITTED=0
+                _DOTS_FAILURE_ANIMATION_BANNER=''
+                _DOTS_FAILURE_GRADIENT_LINES=()
+                _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+                _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
+                _DOTS_FAILURE_ANIMATION_MODE='emoji'
+                _DOTS_FAILURE_ANIMATION_STYLE='normal'
+                zle .reset-prompt
+                zle -R
+            fi
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
@@ -593,6 +608,18 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
+    # If the animation already finished while a foreground command ran, its
+    # submitted banner only needs to be removed from the next prompt.
+    if (( _DOTS_FAILURE_GRADIENT_SUBMITTED && !_DOTS_FAILURE_ANIMATION_ACTIVE )); then
+        _DOTS_FAILURE_GRADIENT_SUBMITTED=0
+        _DOTS_FAILURE_ANIMATION_BANNER=''
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+        _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_STYLE='normal'
+    fi
+
     if _dots_failure_animation_infinite_enabled; then
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
@@ -613,6 +640,7 @@ _dots_failure_animation_reset() {
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
     _DOTS_FAILURE_GRADIENT_PENDING=0
+    _DOTS_FAILURE_GRADIENT_SUBMITTED=0
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
@@ -628,6 +656,8 @@ _dots_failure_animation_preexec() {
     # Do not cancel the failure gradient when a command is submitted. The
     # worker keeps writing frame numbers while the foreground command runs;
     # ZLE consumes the buffered frames when the next prompt becomes active.
+    [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]] && _DOTS_FAILURE_GRADIENT_SUBMITTED=1
+
     local -a command_words
     command_words=( "${(@z)1}" )
     case "${command_words[1]:-}" in
