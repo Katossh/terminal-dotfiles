@@ -142,7 +142,32 @@ read_until_visible 'GRADIENT_COMMAND_EXECUTED'
 assert_contains "input is accepted while the gradient animates" "GRADIENT_COMMAND_EXECUTED" "$REPLY"
 
 # Enter is queued by the ZLE widget instead of cancelling the active worker.
-zpty -w -n "$PTY_NAME" $'\\r'
+zpty -w -n "$PTY_NAME" 
+zpty -w -n "$PTY_NAME" 
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
+
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" $'\\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\r'
 zpty -w -n "$PTY_NAME" $'\\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 assert_contains "the complete command remains editable while Enter is queued" \
@@ -156,6 +181,128 @@ read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
     zpty -w -n "$PTY_NAME" $'\\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
+
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" 
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\r'
+zpty -w -n "$PTY_NAME" $'\\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
+
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" $'\\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\r'
+zpty -w -n "$PTY_NAME" 
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
+
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" $'\\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
+
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
+    zpty -w -n "$PTY_NAME" 
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
+fi
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$submitted_output"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
     read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
 fi
