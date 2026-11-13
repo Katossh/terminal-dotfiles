@@ -438,7 +438,6 @@ _dots_failure_animation_gradient_line_init() {
         zle -R
         zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
-    _DOTS_FAILURE_ANIMATION_STATE='gradient-static-fallback'
     return 0
 }
 
