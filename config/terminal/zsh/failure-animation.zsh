@@ -13,7 +13,6 @@ typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
-typeset -gi _DOTS_FAILURE_GRADIENT_FD=-1
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
@@ -356,25 +355,6 @@ _dots_failure_animation_gradient_render_widget() {
         zle -R
         zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
-}
-
-_dots_failure_animation_gradient_fd_handler() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    local fd="${1:-}"
-    local phase=''
-    if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" phase; then
-        _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
-        _dots_failure_animation_gradient_cleanup
-        return 0
-    fi
-
-    [[ "$phase" == <-> ]] || return 0
-    _DOTS_FAILURE_GRADIENT_PHASE=$(( phase % 100 ))
-    (( _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES += 1 ))
-    _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
-    zle _dots_failure_animation_gradient_render_widget
 }
 
 # Start the timer and register its reader before ZLE starts. This mirrors
