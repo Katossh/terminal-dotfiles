@@ -477,7 +477,9 @@ _dots_failure_animation_fd_handler() {
 
     local fd="${1:-}"
     local frame
+    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK:$fd:${2:-none}" >> "$DOTS_TEST_GRADIENT_LOG"
     if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
+        [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK_EOF:$fd" >> "$DOTS_TEST_GRADIENT_LOG"
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
             _dots_failure_animation_cleanup
@@ -488,6 +490,7 @@ _dots_failure_animation_fd_handler() {
         return 0
     fi
 
+    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK_PHASE:$frame" >> "$DOTS_TEST_GRADIENT_LOG"
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
 
