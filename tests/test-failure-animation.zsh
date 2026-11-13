@@ -137,16 +137,16 @@ assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
 # Type and submit a command while the gradient is active.
-zpty -w -n "$PTY_NAME" 'sleep 0.1; print -r -- GRADIENT_COMMAND_EXECUTED'
+zpty -w -n "$PTY_NAME" 'sleep 0.1; print -r -- EX'ECUTED_OK''
 read_until "SUBMITTED_ACTIVE_1_WORKER_1"
 assert_contains "command submission does not cancel the active gradient" \
     "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
-    read_until "GRADIENT_COMMAND_EXECUTED"
+    read_until "EXECUTED_OK"
     submitted_output+="${REPLY}"
 fi
-assert_contains "the submitted command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
+assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
 
 # When the next prompt enters ZLE, it drains the frames buffered while the
 # foreground command owned the terminal. Poll through the snapshot widget.
