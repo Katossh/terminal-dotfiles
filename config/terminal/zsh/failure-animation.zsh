@@ -630,7 +630,9 @@ _dots_failure_animation_precmd() {
 }
 
 _dots_failure_animation_replay_accept_widget() {
-    zle -U $'\n'
+    # Invoke the built-in widget directly. Injecting LF with zle -U is not
+    # equivalent to pressing Enter on every keymap (LF may self-insert).
+    zle .accept-line
 }
 
 _dots_failure_animation_accept_line_widget() {
