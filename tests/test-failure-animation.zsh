@@ -32,7 +32,7 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _dots_test_report_buffer_widget() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}"
 }
 zle -N _dots_test_report_buffer_widget
 bindkey '^T' _dots_test_report_buffer_widget
@@ -401,7 +401,8 @@ drain_for 120
 zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 assert_contains "the complete input buffer survives all gradient frames" \
-    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
 assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
 assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
 
