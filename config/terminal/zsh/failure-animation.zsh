@@ -483,14 +483,17 @@ _dots_failure_animation_fd_handler() {
     if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
-            _dots_failure_animation_cleanup
 
-            # The accept-line widget defers Enter until this stream ends.
-            # Re-queue LF: PTY line discipline maps terminal CR to LF.
+            # Let the submitted line enter preexec before cleanup unregisters
+            # this FD widget. The normal preexec hook then closes the stream.
             if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
                 _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
-                zle -U $'\n'
+                _DOTS_FAILURE_GRADIENT_ACTIVE=0
+                zle .accept-line
+                return 0
             fi
+
+            _dots_failure_animation_cleanup
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
