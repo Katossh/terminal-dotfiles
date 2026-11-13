@@ -56,9 +56,9 @@ _dots_test_start_failure() {
 precmd_functions=( _dots_test_start_failure ${precmd_functions:#_dots_test_start_failure} )
 
 _dots_test_report_preexec() {
-    print -r -- "SUBMIT_AFTER_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_\${_DOTS_FAILURE_GRADIENT_ACTIVE}_PENDING_\${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}"
+    print -r -- "SUBMIT_AFTER_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_PENDING_${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}"
 }
-preexec_functions=( \${preexec_functions:#_dots_test_report_preexec} _dots_test_report_preexec )
+preexec_functions=( ${preexec_functions:#_dots_test_report_preexec} _dots_test_report_preexec )
 ZSH_INIT
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
@@ -141,19 +141,13 @@ zpty -w -n "$PTY_NAME" 'print -r -- GRADIENT_COMMAND_EXECUTED'
 read_until_visible 'GRADIENT_COMMAND_EXECUTED'
 assert_contains "input is accepted while the gradient animates" "GRADIENT_COMMAND_EXECUTED" "$REPLY"
 
-# Enter must be queued by the ZLE widget rather than cancelling the worker.
-zpty -w -n "$PTY_NAME" 
-
-print -- "All single-gradient failure animation integration tests passed."
-\n'
-zpty -w -n "$PTY_NAME" 
-
-print -- "All single-gradient failure animation integration tests passed."
-\x14'
+# Enter is queued by the ZLE widget instead of cancelling the active worker.
+zpty -w -n "$PTY_NAME" $'\n'
+zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 assert_contains "the complete command remains editable while Enter is queued" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
-assert_contains "the gradient is still active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the gradient remains active after Enter" "ACTIVE_1" "$REPLY"
 assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
 assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
 
