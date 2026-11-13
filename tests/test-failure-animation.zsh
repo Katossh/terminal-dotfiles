@@ -31,6 +31,12 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 
+_dots_test_report_buffer_widget() {
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END"
+}
+zle -N _dots_test_report_buffer_widget
+bindkey '^T' _dots_test_report_buffer_widget
+
 # Deterministic visible-screen coordinates for PTY integration tests.
 _dots_failure_animation_query_cursor() {
     local -a banner_lines
@@ -263,7 +269,7 @@ read_until() {
     done
     REPLY="$output"
 }
-# Wait for visible prompt text while preserving raw ANSI output for colour checks.
+# Match readable prompt contents while retaining the raw ANSI stream for colour checks.
 read_until_visible() {
     local needle="$1"
     local -i tries=0
@@ -381,6 +387,13 @@ zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
 read_until_visible "INPUT_DURING_GRADIENT"
 assert_contains "keystrokes are echoed while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
 drain_for 120
+
+# Inspect the actual ZLE buffer after the last frame without submitting it.
+zpty -w "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the command remains in ZLE BUFFER after animation" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
+
 zpty -w "$PTY_NAME" $'\n'
 read_until "INPUT_DURING_GRADIENT"
 assert_contains "the exact command typed during animation is executed" "INPUT_DURING_GRADIENT" "$REPLY"
