@@ -369,6 +369,8 @@ _dots_failure_animation_gradient_fd_widget() {
     _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
     if _dots_failure_animation_render_gradient_message; then
         zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
+        # FD callbacks run at a low level; force ZLE to paint the message.
+        zle -R
     fi
 }
 
