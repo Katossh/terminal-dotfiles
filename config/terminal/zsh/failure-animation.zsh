@@ -308,24 +308,14 @@ _dots_failure_animation_prepare_banner() {
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
-    local trace="${DOTS_TEST_GRADIENT_LOG:-}"
-    local -i frame=1 phase=0
-
-    [[ -z "$trace" ]] || print -r -- "START:$:$interval:frame=$frame" >> "$trace"
+    local -i frame=1
 
     # Phase zero is rendered by zle-line-init so the message is visible
     # immediately; the worker supplies the remaining 24 animated phases.
     for (( frame = 1; frame < 25; frame++ )); do
-        [[ -z "$trace" ]] || print -r -- "LOOP:$frame" >> "$trace"
-        command sleep "$interval" 2>/dev/null
-        local sleep_status=$?
-        [[ -z "$trace" ]] || print -r -- "SLEEP:$frame:$sleep_status" >> "$trace"
-        (( sleep_status == 0 )) || return 0
-        phase=$(( frame * 4 ))
-        [[ -z "$trace" ]] || print -r -- "PHASE:$phase" >> "$trace"
-        print -r -- "$phase" || return 0
+        command sleep "$interval" 2>/dev/null || return 0
+        print -r -- "$(( frame * 4 ))" || return 0
     done
-    [[ -z "$trace" ]] || print -r -- "DONE:$:$frame" >> "$trace"
 }
 
 _dots_failure_animation_gradient_cleanup() {
@@ -454,7 +444,6 @@ _dots_failure_animation_cleanup() {
     setopt localoptions no_ignore_braces
 
     local redraw="${1:-0}"
-    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CLEANUP:active=$_DOTS_FAILURE_ANIMATION_ACTIVE:gradient=$_DOTS_FAILURE_GRADIENT_ACTIVE:fd=$_DOTS_FAILURE_ANIMATION_FD:redraw=$redraw" >> "$DOTS_TEST_GRADIENT_LOG"
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
         _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
         _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
@@ -482,9 +471,7 @@ _dots_failure_animation_fd_handler() {
 
     local fd="${1:-}"
     local frame
-    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK:$fd:${2:-none}" >> "$DOTS_TEST_GRADIENT_LOG"
     if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
-        [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK_EOF:$fd" >> "$DOTS_TEST_GRADIENT_LOG"
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
             _dots_failure_animation_cleanup
@@ -495,7 +482,6 @@ _dots_failure_animation_fd_handler() {
         return 0
     fi
 
-    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "CALLBACK_PHASE:$frame" >> "$DOTS_TEST_GRADIENT_LOG"
     (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
     (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
 
@@ -614,7 +600,6 @@ _dots_failure_animation_precmd() {
 
 _dots_failure_animation_reset() {
     emulate -L zsh
-    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "RESET:active=$_DOTS_FAILURE_ANIMATION_ACTIVE" >> "$DOTS_TEST_GRADIENT_LOG"
 
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
