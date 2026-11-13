@@ -14,6 +14,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
+typeset -gi _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
@@ -379,7 +380,7 @@ _dots_failure_animation_start_gradient() {
 
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
     _DOTS_FAILURE_GRADIENT_ACTIVE=1
-    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
+    if zle -F -w "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
         return 0
     fi
@@ -483,6 +484,13 @@ _dots_failure_animation_fd_handler() {
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
             _dots_failure_animation_cleanup
+
+            # The accept-line widget defers Enter until this stream ends.
+            # zle -U processes the queued key after this FD widget returns.
+            if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
+                _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
+                zle -U $'\r'
+            fi
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
@@ -498,13 +506,17 @@ _dots_failure_animation_fd_handler() {
         _DOTS_FAILURE_GRADIENT_PHASE=$(( frame % 100 ))
         (( _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES += 1 ))
         _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
-        zle _dots_failure_animation_gradient_render_widget
+        if _dots_failure_animation_render_gradient_message; then
+            zle .reset-prompt
+            zle -R
+        fi
         return 0
     fi
 
     _DOTS_FAILURE_ANIMATION_FRAME="$frame"
     _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
-    zle && zle .reset-prompt
+    zle .reset-prompt
+    zle -R
 }
 
 # Failure-message hooks render complete messages before the next prompt.
@@ -607,12 +619,26 @@ _dots_failure_animation_precmd() {
     fi
 }
 
+_dots_failure_animation_accept_line_widget() {
+    emulate -L zsh
+
+    # Keep Enter in ZLE's input stack until the failure gradient is complete.
+    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=1
+        return 0
+    fi
+
+    _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
+    zle .accept-line
+}
+
 _dots_failure_animation_reset() {
     emulate -L zsh
 
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
     _DOTS_FAILURE_GRADIENT_PENDING=0
+    _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
@@ -682,6 +708,8 @@ if [[ -o interactive ]]; then
     # FD frame updates use a ZLE widget; the banner uses prompt-safe colour
     # spans, never a raw ANSI message or terminal graphics overlay.
     zle -N _dots_failure_animation_gradient_render_widget
+    zle -N _dots_failure_animation_fd_handler
+    zle -N accept-line _dots_failure_animation_accept_line_widget
     # Wrap the built-in widget so Ctrl+L clears the banner too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
