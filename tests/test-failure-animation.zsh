@@ -32,7 +32,10 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _dots_test_report_buffer_widget() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}_START_STATUS_${_DOTS_TEST_GRADIENT_START_STATUS}_WORKER_STATE_${_DOTS_FAILURE_ANIMATION_STATE}"
+    local trace_lines="$(command wc -l < "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
+    local callback_phases="$(command grep -c CALLBACK_PHASE "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
+    local callback_eof="$(command grep -c CALLBACK_EOF "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}_START_STATUS_${_DOTS_TEST_GRADIENT_START_STATUS}_WORKER_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_TRACE_LINES_${trace_lines}_CALLBACK_PHASES_${callback_phases}_CALLBACK_EOF_${callback_eof}"
 }
 zle -N _dots_test_report_buffer_widget
 bindkey '^T' _dots_test_report_buffer_widget
@@ -191,9 +194,11 @@ FAKE_BIN="$(mktemp -d)"
 KITTY_LOG="$FAKE_BIN/kitty.log"
 ANIMATION_LOG="$FAKE_BIN/animation.log"
 GIF_LOG="$FAKE_BIN/gif.log"
+GRADIENT_LOG="$FAKE_BIN/gradient.log"
 : > "$KITTY_LOG"
 : > "$ANIMATION_LOG"
 : > "$GIF_LOG"
+: > "$GRADIENT_LOG"
 cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
 #!/usr/bin/env bash
 if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
@@ -258,6 +263,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" DOTS_TEST_GIF_LOG="$GIF_LOG" \
+    DOTS_TEST_GRADIENT_LOG="$GRADIENT_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
@@ -382,6 +388,7 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 drain_for 5
 
 # The failure banner is emitted through ZLE's independent message area.
+: > "$GRADIENT_LOG"
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
