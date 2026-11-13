@@ -393,6 +393,7 @@ drain_for 5
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
+read_until "GRADIENT_PRECMD_STATUS_"
 assert_contains "failure hook starts before the animation precmd watcher" "GRADIENT_PRECMD_STATUS_0_ACTIVE_1_FD_" "$REPLY"
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
