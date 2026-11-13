@@ -167,5 +167,7 @@ done
 assert_contains "all 25 gradient frames finish after command submission" "FRAMES_25" "$snapshot"
 assert_contains "the gradient worker terminates after the final prompt redraw" "WORKER_0" "$snapshot"
 assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
+assert_contains "the submitted banner is removed from the next prompt" "BANNER_0" "$snapshot"
+assert_contains "submitted state is cleared after completion" "SUBMITTED_0" "$snapshot"
 
 print -- "All single-gradient failure animation integration tests passed."
