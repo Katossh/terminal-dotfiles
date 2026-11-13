@@ -3,7 +3,7 @@
 # Failure gradients are rendered in ZLE's message area, independently of the
 # editable prompt. A background timer sends phase numbers only; ZLE renders
 # each frame without re-expanding PROMPT or touching the command buffer.
-# The separate prompt emoji animation keeps its own ZLE watcher.
+# Prompt emoji and failure-gradient frames share one ZLE file-descriptor watcher.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
@@ -344,9 +344,8 @@ _dots_failure_animation_render_gradient_message() {
     _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE="$message"
 }
 
-# The regular FD callback follows the same lifecycle as the working prompt
-# animation watcher. It delegates display work to a ZLE widget so message
-# updates remain isolated from the shell's command buffer and cursor.
+# The shared FD callback delegates gradient display to a ZLE widget, keeping
+# updates isolated from the shell's command buffer and cursor.
 _dots_failure_animation_gradient_render_widget() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
