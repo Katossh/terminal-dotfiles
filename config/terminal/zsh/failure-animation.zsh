@@ -318,6 +318,10 @@ _dots_failure_animation_gradient_stream() {
         command sleep "$interval" 2>/dev/null || return 0
         print -r -- "$(( frame * 4 ))" || return 0
     done
+
+    # An explicit terminator is more reliable than waiting for pipe EOF:
+    # ZLE can react to this final readable record even when EOF is delayed.
+    print -r -- DONE
 }
 
 _dots_failure_animation_gradient_cleanup() {
@@ -495,6 +499,16 @@ _dots_failure_animation_fd_handler() {
         fi
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
         _dots_failure_animation_cleanup 1
+        return 0
+    fi
+
+    if [[ "$frame" == DONE ]] && (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
+        _dots_failure_animation_cleanup
+        if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
+            _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
+            zle _dots_failure_animation_replay_accept_widget
+        fi
         return 0
     fi
 
