@@ -274,10 +274,191 @@ read_until_visible() {
     local needle="$1"
     local -i tries=0
     local output='' data='' visible=''
-    local esc=$'\e'
     while (( tries < 120 )); do
         if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        visible="$(print -rn -- "$output" | command sed -E "s/${esc}\[[0-9;]*m//g")"
+        visible="$(print -rn -- "$output" | command sed -E 
+        [[ "$visible" == *"$needle"* ]] && break
+        command sleep 0.05
+        (( tries += 1 ))
+    done
+    _DOTS_TEST_LAST_RAW_OUTPUT="$output"
+    REPLY="$visible"
+}
+
+drain_for() {
+    local -i rounds="$1"
+    local output='' data=''
+    while (( rounds > 0 )); do
+        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        command sleep 0.02
+        rounds=$(( rounds - 1 ))
+    done
+    REPLY="$output"
+}
+
+# Wait for the clean shell, then load the modules as the real .zshrc does.
+local_startup=''
+typeset chunk=''
+typeset -i attempt=0
+while (( attempt < 40 )); do
+    if zpty -r -t "$PTY_NAME" chunk; then local_startup+="$chunk"; fi
+    [[ -n "$local_startup" ]] && break
+    command sleep 0.05
+    (( attempt += 1 ))
+done
+if [[ -z "$local_startup" ]]; then fail "interactive child shell did not reach its prompt"; fi
+print -- "ok - clean interactive child shell reached its prompt"
+
+zpty -w "$PTY_NAME" "source '$INIT_FILE'"
+read_until "❯"
+assert_contains "first interactive prompt renders the path line" "BASE_PATH" "$REPLY"
+assert_contains "first interactive prompt renders the input marker" "❯" "$REPLY"
+[[ "$REPLY" != *'BASE_PATH 💀'* && "$REPLY" != *'BASE_PATH 😭'* ]] || fail "animation was inserted on the path line"
+print -- "ok - initial animation leaves the path line untouched"
+
+# Let the shorter initial one-shot animation finish before submitting another command.
+drain_for 100
+zpty -w "$PTY_NAME" '_dots_test_snapshot'$'\n'
+read_until STATE_SNAPSHOT
+assert_contains "startup animation finishes all 12 frames" "STATE_SNAPSHOT ACTIVE_0 LAST_FRAMES_12 LAST_STATE_stream-complete" "$REPLY"
+assert_contains "startup uses the shared style" "STYLE_normal" "$REPLY"
+assert_contains "right prompt remains unchanged" "RPROMPT_BASE_RPROMPT" "$REPLY"
+
+# Deterministically render a frame and verify it is directly before the input marker.
+zpty -w "$PTY_NAME" '_dots_test_render_prompt'$'\n'
+read_until "BASE_OUTPUT 😭 ❯"
+assert_contains "emoji appears immediately before the input marker" "BASE_OUTPUT 😭 ❯" "$REPLY"
+assert_absent "path line stays free of the emoji" "BASE_PATH 😭" "$REPLY"
+
+# A prompt that already contains duplicate markers (including one after the
+# status code) must still render a single final marker after the emoji.
+zpty -w "$PTY_NAME" '_dots_test_render_duplicate_prompt'$'\n'
+read_until "PROMPT_DUPLICATE_RENDERED:"
+assert_contains "exit code stays before the animated emoji" "BASE_OUTPUT CODE=1 😭 ❯" "$REPLY"
+assert_absent "prompt contains only one final marker" "❯ ❯" "$REPLY"
+
+# Normal, sarcastic and dramatic styles share one pool, including the melting-face reaction.
+zpty -w "$PTY_NAME" '_dots_test_assert_pool normal'$'\n'
+read_until "POOL_normal_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "ordinary styles use the common 13-emoji pool" "POOL_normal_13_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool sarcastic'$'\n'
+read_until "POOL_sarcastic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "sarcastic uses the common pool" "POOL_sarcastic_13_" "$REPLY"
+assert_contains "sarcastic pool includes melting face" "🫠" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool dramatic'$'\n'
+read_until "POOL_dramatic_13_👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🖤 🤎 💜 🫠"
+assert_contains "dramatic uses the common pool" "POOL_dramatic_13_" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool anime'$'\n'
+read_until "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕"
+assert_contains "anime has its dedicated seven-emoji pool" "POOL_anime_7_😭 🥰 🥺 💖 💗 💓 💕" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool ecchi'$'\n'
+read_until "POOL_ecchi_4_😏 ❤️ 🩷 💘"
+assert_contains "ecchi has its dedicated four-emoji pool" "POOL_ecchi_4_😏 ❤️ 🩷 💘" "$REPLY"
+assert_absent "Ecchi pool no longer contains melting face" "🫠" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_assert_pool rainbow'$'\n'
+read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
+assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
+
+# Both historic environment-variable names remain compatible aliases.
+zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
+read_until INFINITE_ALIASES_OK
+assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
+
+# Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
+zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
+read_until GRADIENTS_OK
+assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
+drain_for 5
+
+# Failure gradients are shown in ZLE's message area beneath the editable prompt.
+# Typing must remain responsive and the full edit buffer must survive all frames.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
+read_until "SPECIAL_QUEUED_normal"
+assert_contains "normal gradient request is queued" "SPECIAL_QUEUED_normal" "$REPLY"
+read_until_visible "BASE_OUTPUT"
+assert_contains "the original path and input prompt remain intact" "BASE_PATH" "$REPLY"
+assert_contains "the input marker remains available during animation" "BASE_OUTPUT" "$REPLY"
+read_until_visible "normal ANIMATED FAILURE BANNER"
+assert_contains "normal message is rendered in ZLE's message area" "normal ANIMATED FAILURE BANNER" "$REPLY"
+assert_contains "normal gradient uses 24-bit colour" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+zpty -w "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are echoed while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Inspect the actual ZLE buffer after the final frame without submitting it.
+zpty -w "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete command remains in ZLE BUFFER after animation" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
+
+zpty -w "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the exact command typed during animation is executed" "INPUT_DURING_GRADIENT" "$REPLY"
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "the input test completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+assert_contains "the input test leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+assert_absent "the gradient never places a Kitty image" "--place" "$REPLY"
+
+# All other styles use the same independent ZLE message renderer and palettes.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}"
+    assert_contains "${style} gradient request is queued" "SPECIAL_QUEUED_${style}" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message appears in ZLE's message area" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} uses truecolour output" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+    read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+    assert_contains "${style} completes all 25 frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+    assert_contains "${style} never invokes Kitty graphics" "KITTY_CALLS_0" "$REPLY"
+    assert_contains "${style} never invokes ImageMagick" "RENDERED_25_0" "$REPLY"
+    assert_contains "${style} never creates an animated GIF" "ANIMATED_GIFS_0" "$REPLY"
+done
+print -- "ok - all eight message styles animate without intercepting user input"
+
+# Clear operations must cancel an active animation and its message.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_legendary"
+read_until_visible "legendary ANIMATED FAILURE BANNER"
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_legendary"
+read_until_visible "legendary ANIMATED FAILURE BANNER"
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+
+s/\033\\[[0-9;]*m//g')"
         [[ "$visible" == *"$needle"* ]] && break
         command sleep 0.05
         (( tries += 1 ))
