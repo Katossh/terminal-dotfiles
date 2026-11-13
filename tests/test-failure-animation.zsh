@@ -364,7 +364,7 @@ assert_contains "the original path remains above the editable command line" "BAS
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
 read_until_visible "normal ANIMATED FAILURE BANNER"
 assert_contains "normal gradient message becomes visible in ZLE" "normal ANIMATED FAILURE BANNER" "$REPLY"
-assert_contains "normal gradient uses 24-bit colour" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_contains "normal gradient uses 24-bit colour" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
 # Send a real command while frames are still arriving. The input must remain
 # editable, and the buffer must still contain the exact command after frame 25.
@@ -394,7 +394,7 @@ for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     assert_contains "${style} gradient is queued before ZLE starts" "SPECIAL_QUEUED_${style}_START_0_PENDING_1" "$REPLY"
     read_until_visible "${style} ANIMATED FAILURE BANNER"
     assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
-    assert_contains "${style} gradient uses truecolour output" $'\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
     drain_for 120
 
     zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
