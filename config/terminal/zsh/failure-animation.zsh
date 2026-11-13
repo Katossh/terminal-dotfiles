@@ -1,8 +1,8 @@
 # Style-aware prompt and failure-message animations for interactive Zsh.
 #
-# Failure gradients are rendered in ZLE's message area, independently of the
-# editable prompt. A background timer sends phase numbers only; ZLE renders
-# each frame without re-expanding PROMPT or touching the command buffer.
+# Failure gradients are rendered as prompt-safe rows above the input line.
+# A background timer sends phase numbers only; ZLE renders each frame without
+# reading input or modifying the editable command buffer.
 # Prompt emoji and failure-gradient frames share one ZLE file-descriptor watcher.
 
 typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
@@ -537,6 +537,7 @@ _dots_failure_animation_start() {
             else
                 local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
                 _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
+                return 1
             fi
             return 0
         fi
@@ -681,6 +682,6 @@ if [[ -o interactive ]]; then
     # FD frame updates use a ZLE widget; the banner uses prompt-safe colour
     # spans, never a raw ANSI message or terminal graphics overlay.
     zle -N _dots_failure_animation_gradient_render_widget
-    # Wrap the built-in widget so Ctrl+L clears the message too.
+    # Wrap the built-in widget so Ctrl+L clears the banner too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
