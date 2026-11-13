@@ -309,11 +309,13 @@ _dots_failure_animation_prepare_banner() {
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
-    local -i frame=0
+    local -i frame=1
 
-    for (( frame = 0; frame < 25; frame++ )); do
+    # Phase zero is rendered by zle-line-init so the message is visible
+    # immediately; the worker supplies the remaining 24 animated phases.
+    for (( frame = 1; frame < 25; frame++ )); do
+        command sleep "$interval" 2>/dev/null || return 0
         print -r -- "$(( frame * 4 ))" || return 0
-        (( frame == 24 )) || command sleep "$interval" 2>/dev/null || return 0
     done
 }
 
@@ -388,6 +390,15 @@ _dots_failure_animation_start_gradient() {
     if ! zle; then
         _DOTS_FAILURE_ANIMATION_STATE='gradient-fallback-zle-inactive'
         return 1
+    fi
+
+    # Paint phase zero immediately; the private pipe advances through the
+    # remaining 24 phases without touching PROMPT or BUFFER.
+    _DOTS_FAILURE_GRADIENT_PHASE=0
+    if _dots_failure_animation_render_gradient_message; then
+        _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=1
+        zle -R
+        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
 
     exec {_DOTS_FAILURE_GRADIENT_FD}< <(_dots_failure_animation_gradient_stream "$_DOTS_FAILURE_GRADIENT_INTERVAL") || {
