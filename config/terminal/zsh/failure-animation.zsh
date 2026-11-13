@@ -489,7 +489,7 @@ _dots_failure_animation_fd_handler() {
             # zle -U processes the queued key after this FD widget returns.
             if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
                 _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
-                zle -U $'\r'
+                zle .accept-line
             fi
             return 0
         fi
