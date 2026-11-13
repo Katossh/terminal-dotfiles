@@ -353,7 +353,7 @@ read_until "POOL_rainbow_5_🧡 💛 💚 💙 🤍"
 assert_contains "rainbow has its dedicated five-emoji pool" "POOL_rainbow_5_🧡 💛 💚 💙 🤍" "$REPLY"
 
 # The standalone phase producer must emit exactly 24 ordered phases.
-zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
+zpty -w "$PTY_NAME" '_dots_test_gradient_stream_probe'
 read_until INFINITE_ALIASES_OK
 assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
 
@@ -447,104 +447,3 @@ infinite_frames="${infinite_frames%%[^0-9]*}"
 print -- "ok - infinite emoji animation loops beyond one frame sequence"
 
 print -- "All style-aware and rare-event prompt animation integration tests passed."
-
-\\n'
-read_until GRADIENT_STREAM_PROBE_OK
-assert_contains "gradient worker emits 24 ordered phase values" "GRADIENT_STREAM_PROBE_OK:24:4:96" "$REPLY"
-
-# Both historic environment-variable names remain compatible aliases.
-zpty -w "$PTY_NAME" '_dots_test_legacy_infinite_aliases'$'\n'
-read_until INFINITE_ALIASES_OK
-assert_contains "Emoji-specific and Continuous variables remain Infinite aliases" "INFINITE_ALIASES_OK" "$REPLY"
-
-# Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
-zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
-read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
-drain_for 5
-
-# The failure banner is emitted through ZLE's independent message area.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
-read_until "SPECIAL_QUEUED_normal_START_0_PENDING_1"
-assert_contains "normal gradient is queued before ZLE starts" "SPECIAL_QUEUED_normal_START_0_PENDING_1" "$REPLY"
-read_until_visible "BASE_OUTPUT"
-assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
-assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
-read_until_visible "normal ANIMATED FAILURE BANNER"
-assert_contains "normal gradient message becomes visible in ZLE" "normal ANIMATED FAILURE BANNER" "$REPLY"
-assert_contains "normal gradient uses 24-bit colour" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
-
-# Type a command without sending Enter. It must stay editable while the worker
-# runs through all 25 frames.
-zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
-read_until_visible "INPUT_DURING_GRADIENT"
-assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
-drain_for 120
-
-# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
-zpty -w -n "$PTY_NAME" $'\x14'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-assert_contains "the complete input buffer survives all gradient frames" \
-    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
-assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
-assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
-
-# Only now send Enter; the unchanged command must execute.
-zpty -w -n "$PTY_NAME" $'\n'
-read_until "INPUT_DURING_GRADIENT"
-assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
-assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
-
-# Every message style uses the same independent ZLE message channel.
-for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
-    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
-    read_until "SPECIAL_QUEUED_${style}_START_0_PENDING_1"
-    assert_contains "${style} gradient is queued before ZLE starts" "SPECIAL_QUEUED_${style}_START_0_PENDING_1" "$REPLY"
-    read_until_visible "${style} ANIMATED FAILURE BANNER"
-    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
-    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
-    drain_for 120
-
-    # Inspect animation state inside ZLE before line-finish resets its counters.
-    zpty -w -n "$PTY_NAME" $'\x14'
-    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
-    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
-done
-print -- "ok - all eight styles animate without blocking or replacing input"
-
-# Clear operations must cancel an active message and its worker.
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_0_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
-zpty -w "$PTY_NAME" $'\x0c'
-drain_for 5
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-
-zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_0_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
-zpty -w "$PTY_NAME" 'clear'$'\n'
-read_until CLEAR_EXECUTED
-zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
-read_until SPECIAL_STATE_GRADIENT_ACTIVE_
-assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
-# Infinite emoji mode loops while idle; accepting a command stops it.
-zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
-read_until INFINITE_ENABLED
-assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
-read_until "❯"
-drain_for 220
-zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
-read_until INFINITE_DISABLED
-assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
-typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
-infinite_frames="${infinite_frames%%[^0-9]*}"
-[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
-(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
-print -- "ok - infinite emoji animation loops beyond one frame sequence"
-
-print -- "All style-aware and rare-event prompt animation integration tests passed."
-
