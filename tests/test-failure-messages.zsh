@@ -92,7 +92,8 @@ assert_absent "command newline is replaced, not rendered as a new message" $'\n 
 unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
 capture_message network curl "$unsafe_detail"
 assert_control_free "detail fallback contains no control bytes" "$DOTS_TEST_OUTPUT"
-assert_eq "detail is kept on one additional row" 2 "$(printf '%s' "$DOTS_TEST_OUTPUT" | command wc -l | command tr -d ' ')"
+detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+assert_eq "detail is kept on one additional row" 2 "${#detail_lines}"
 
 # A zero chance remains a supported opt-out and never invokes the animator.
 export DOTS_FAILURE_MESSAGE_CHANCE=0
