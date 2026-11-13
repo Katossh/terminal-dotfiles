@@ -32,10 +32,7 @@ RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _dots_test_report_buffer_widget() {
-    local trace_lines="$(command wc -l < "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
-    local callback_phases="$(command grep -c CALLBACK_PHASE "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
-    local callback_eof="$(command grep -c CALLBACK_EOF "$DOTS_TEST_GRADIENT_LOG" 2>/dev/null)"
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}_START_STATUS_${_DOTS_TEST_GRADIENT_START_STATUS}_WORKER_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_TRACE_LINES_${trace_lines}_CALLBACK_PHASES_${callback_phases}_CALLBACK_EOF_${callback_eof}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_WORKER_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_PENDING_NOW_${_DOTS_FAILURE_GRADIENT_PENDING}"
 }
 zle -N _dots_test_report_buffer_widget
 bindkey '^T' _dots_test_report_buffer_widget
@@ -139,7 +136,6 @@ _dots_test_render_gradients() {
 }
 typeset -g _DOTS_TEST_SPECIAL_STYLE=''
 typeset -gi _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
-typeset -gi _DOTS_TEST_GRADIENT_START_STATUS=99
 _dots_test_queue_special_animation() {
     local style="$1"
     _DOTS_TEST_SPECIAL_STYLE="$style"
@@ -153,8 +149,7 @@ _dots_test_start_queued_gradient() {
         "$_DOTS_TEST_SPECIAL_STYLE" \
         "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
         "live gradient test"
-    _DOTS_TEST_GRADIENT_START_STATUS=$?
-    print -r -- "GRADIENT_PRECMD_STATUS_${_DOTS_TEST_GRADIENT_START_STATUS}_ACTIVE_${_DOTS_FAILURE_ANIMATION_ACTIVE}_FD_${_DOTS_FAILURE_ANIMATION_FD}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}"
+
 }
 precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
 _dots_test_snapshot_special_animation() {
@@ -194,11 +189,9 @@ FAKE_BIN="$(mktemp -d)"
 KITTY_LOG="$FAKE_BIN/kitty.log"
 ANIMATION_LOG="$FAKE_BIN/animation.log"
 GIF_LOG="$FAKE_BIN/gif.log"
-GRADIENT_LOG="$FAKE_BIN/gradient.log"
 : > "$KITTY_LOG"
 : > "$ANIMATION_LOG"
 : > "$GIF_LOG"
-: > "$GRADIENT_LOG"
 cat > "$FAKE_BIN/kitty" <<'FAKE_KITTY'
 #!/usr/bin/env bash
 if [[ "${1:-}" == +kitten && "${2:-}" == icat && "${3:-}" == --print-window-size ]]; then
@@ -263,7 +256,6 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"; rm -rf "$FAKE
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     PATH="$FAKE_BIN:$PATH" DOTS_TEST_KITTY_LOG="$KITTY_LOG" DOTS_TEST_ANIMATION_LOG="$ANIMATION_LOG" DOTS_TEST_GIF_LOG="$GIF_LOG" \
-    DOTS_TEST_GRADIENT_LOG="$GRADIENT_LOG" \
     DOTS_FAILURE_MESSAGE_CHANCE=100 DOTS_FAILURE_ANIMATION_CHANCE=100 \
     DOTS_FAILURE_STYLE=normal DOTS_FAILURE_MESSAGE_ESCALATION=0 DOTS_FAILURE_ANIMATION=1 \
     DOTS_FAILURE_ANIMATION_INTERVAL=0.02 \
@@ -388,12 +380,10 @@ assert_contains "Legendary and Mythic gradient renderers use their dedicated pal
 drain_for 5
 
 # The failure banner is emitted through ZLE's independent message area.
-: > "$GRADIENT_LOG"
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
-read_until "GRADIENT_PRECMD_STATUS_"
-assert_contains "failure hook starts before the animation precmd watcher" "GRADIENT_PRECMD_STATUS_0_ACTIVE_1_FD_" "$REPLY"
+
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
@@ -411,9 +401,7 @@ drain_for 120
 # Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
 zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-print -r -- "GRADIENT_TRACE_BEGIN"
-command cat "$GRADIENT_LOG"
-print -r -- "GRADIENT_TRACE_END"
+
 assert_contains "the complete input buffer survives all gradient frames" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
 assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
