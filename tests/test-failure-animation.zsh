@@ -383,7 +383,6 @@ drain_for 5
 # The failure banner is emitted through ZLE's independent message area.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
-assert_contains "normal gradient is queued before ZLE starts" "SPECIAL_QUEUED_normal_START_0_PENDING_1" "$REPLY"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
@@ -417,7 +416,7 @@ assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
 for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
     zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
     read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
-    assert_contains "${style} gradient is queued before ZLE starts" "SPECIAL_QUEUED_${style}_START_0_PENDING_1" "$REPLY"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
     read_until_visible "${style} ANIMATED FAILURE BANNER"
     assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
     assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
@@ -442,7 +441,7 @@ read_until SPECIAL_STATE_GRADIENT_ACTIVE_
 assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_0_PENDING_1"
+read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
 read_until_visible "legendary ANIMATED FAILURE BANNER"
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
