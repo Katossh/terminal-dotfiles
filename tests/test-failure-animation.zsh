@@ -121,7 +121,7 @@ assert_contains "normal prompt renders after sourcing the modules" "BASE_PATH" "
 # The real public failure-message function is called from precmd.
 zpty -w "$PTY_NAME" '_dots_test_queue_failure'$'\n'
 read_until FAILURE_QUEUED
-read_until_visible '✖ Command "missing-command" failed.'
+read_until_visible 'command not found'
 assert_contains "one deterministic error message appears" '✖ Command "missing-command" failed.' "$REPLY"
 assert_contains "diagnostic detail appears below the same message" 'command not found' "$REPLY"
 assert_contains "failure banner remains above the input prompt" "BASE_OUTPUT ❯" "$REPLY"
