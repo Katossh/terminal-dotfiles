@@ -308,14 +308,20 @@ _dots_failure_animation_prepare_banner() {
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
-    local -i frame=1
+    local trace="${DOTS_TEST_GRADIENT_LOG:-}"
+    local -i frame=1 phase=0
+
+    [[ -z "$trace" ]] || print -r -- "START:$:$interval" >> "$trace"
 
     # Phase zero is rendered by zle-line-init so the message is visible
     # immediately; the worker supplies the remaining 24 animated phases.
     for (( frame = 1; frame < 25; frame++ )); do
         command sleep "$interval" 2>/dev/null || return 0
-        print -r -- "$(( frame * 4 ))" || return 0
+        phase=$(( frame * 4 ))
+        [[ -z "$trace" ]] || print -r -- "$phase" >> "$trace"
+        print -r -- "$phase" || return 0
     done
+    [[ -z "$trace" ]] || print -r -- "DONE:$" >> "$trace"
 }
 
 _dots_failure_animation_gradient_cleanup() {
