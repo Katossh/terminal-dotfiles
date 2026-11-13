@@ -335,9 +335,10 @@ _dots_failure_animation_gradient_fd_widget() {
     local fd="${1:-}"
     local phase=''
     if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" phase; then
+        # The final phase already repainted the prompt. Closing the pipe must
+        # not trigger another prompt expansion while a user is editing input.
         _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
         _dots_failure_animation_gradient_cleanup
-        zle && zle .reset-prompt
         return 0
     fi
 
