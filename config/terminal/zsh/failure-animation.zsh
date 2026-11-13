@@ -526,15 +526,11 @@ _dots_failure_animation_start() {
     if [[ -n "$banner" ]]; then
         _DOTS_FAILURE_ANIMATION_MODE='gradient'
         if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail"; then
-            # precmd is outside ZLE: start the timer and register its FD now.
-            # The line-init hook only paints phase zero on the next prompt.
+            # Queue the banner. The precmd hook owns worker startup and FD
+            # registration, whether the request came from a failure hook or
+            # from a shell function used by the PTY integration test.
             _DOTS_FAILURE_GRADIENT_PENDING=1
-            if _dots_failure_animation_start_gradient; then
-                _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
-            else
-                local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
-                _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
-            fi
+            _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_MODE='emoji'
@@ -588,6 +584,17 @@ _dots_failure_animation_precmd() {
     emulate -L zsh
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
+
+    # Start queued failure gradients here, before ZLE enters its editing
+    # widget. This is the same lifecycle used by the prompt emoji watcher.
+    if (( _DOTS_FAILURE_GRADIENT_PENDING && !_DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        if _dots_failure_animation_start_gradient; then
+            _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+        else
+            local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+            _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
+        fi
+    fi
 
     if _dots_failure_animation_infinite_enabled; then
         _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
