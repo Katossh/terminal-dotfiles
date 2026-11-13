@@ -14,6 +14,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
+typeset -gi _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
@@ -483,6 +484,13 @@ _dots_failure_animation_fd_handler() {
         if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
             _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
             _dots_failure_animation_cleanup
+
+            # Enter was swallowed while the gradient ran. Replay carriage
+            # return after EOF, when every frame has been rendered.
+            if (( _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING )); then
+                _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
+                zle _dots_failure_animation_replay_accept_widget
+            fi
             return 0
         fi
         _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
@@ -607,12 +615,31 @@ _dots_failure_animation_precmd() {
     fi
 }
 
+_dots_failure_animation_replay_accept_widget() {
+    # The terminal's Enter key is carriage return. Re-inject that key so the
+    # current keymap runs the wrapped accept-line widget.
+    zle -U $'\r'
+}
+
+_dots_failure_animation_accept_line_widget() {
+    emulate -L zsh
+
+    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=1
+        return 0
+    fi
+
+    _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
+    zle .accept-line
+}
+
 _dots_failure_animation_reset() {
     emulate -L zsh
 
     _dots_failure_animation_cleanup
     _dots_failure_animation_gradient_cleanup
     _DOTS_FAILURE_GRADIENT_PENDING=0
+    _DOTS_FAILURE_GRADIENT_ACCEPT_PENDING=0
     _DOTS_FAILURE_ANIMATION_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
@@ -682,6 +709,8 @@ if [[ -o interactive ]]; then
     # FD frame updates use a ZLE widget; the banner uses prompt-safe colour
     # spans, never a raw ANSI message or terminal graphics overlay.
     zle -N _dots_failure_animation_gradient_render_widget
+    zle -N _dots_failure_animation_replay_accept_widget
+    zle -N accept-line _dots_failure_animation_accept_line_widget
     # Wrap the built-in widget so Ctrl+L clears the banner too.
     zle -N clear-screen _dots_failure_animation_clear_screen_widget
 fi
