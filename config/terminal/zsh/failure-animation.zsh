@@ -311,17 +311,21 @@ _dots_failure_animation_gradient_stream() {
     local trace="${DOTS_TEST_GRADIENT_LOG:-}"
     local -i frame=1 phase=0
 
-    [[ -z "$trace" ]] || print -r -- "START:$:$interval" >> "$trace"
+    [[ -z "$trace" ]] || print -r -- "START:$:$interval:frame=$frame" >> "$trace"
 
     # Phase zero is rendered by zle-line-init so the message is visible
     # immediately; the worker supplies the remaining 24 animated phases.
     for (( frame = 1; frame < 25; frame++ )); do
-        command sleep "$interval" 2>/dev/null || return 0
+        [[ -z "$trace" ]] || print -r -- "LOOP:$frame" >> "$trace"
+        command sleep "$interval" 2>/dev/null
+        local sleep_status=$?
+        [[ -z "$trace" ]] || print -r -- "SLEEP:$frame:$sleep_status" >> "$trace"
+        (( sleep_status == 0 )) || return 0
         phase=$(( frame * 4 ))
-        [[ -z "$trace" ]] || print -r -- "$phase" >> "$trace"
+        [[ -z "$trace" ]] || print -r -- "PHASE:$phase" >> "$trace"
         print -r -- "$phase" || return 0
     done
-    [[ -z "$trace" ]] || print -r -- "DONE:$" >> "$trace"
+    [[ -z "$trace" ]] || print -r -- "DONE:$:$frame" >> "$trace"
 }
 
 _dots_failure_animation_gradient_cleanup() {
