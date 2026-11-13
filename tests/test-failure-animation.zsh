@@ -155,15 +155,7 @@ assert_absent "the command has not started before the gradient finishes" "SUBMIT
 read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"* ]]; then
-    zpty -w -n "$PTY_NAME" 
-if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
-    read_until "GRADIENT_COMMAND_EXECUTED"
-    submitted_output+="${REPLY}"
-fi
-assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
-
-print -- "All single-gradient failure animation integration tests passed."
-\\x14'
+    zpty -w -n "$PTY_NAME" $'\x14'
     read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     fail "gradient completion hand-off did not run; final ZLE snapshot: $REPLY"
 fi
