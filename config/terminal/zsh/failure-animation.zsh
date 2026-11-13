@@ -19,6 +19,7 @@ typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
 typeset -ga _DOTS_FAILURE_GRADIENT_LINES=()
 typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -g _DOTS_FAILURE_ANIMATION_FRAME='💀'
@@ -337,11 +338,12 @@ _dots_failure_animation_render_gradient_message() {
             "${_DOTS_FAILURE_GRADIENT_LINES[line]}" \
             "$_DOTS_FAILURE_ANIMATION_STYLE" \
             "$_DOTS_FAILURE_GRADIENT_PHASE"
-        message+="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW}"
+        message+="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE}"
         (( line < line_count )) && message+=$'\n'
     done
 
     _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE="$message"
+    _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT="$message"
 }
 
 # The shared FD callback delegates gradient display to a ZLE widget, keeping
@@ -351,8 +353,10 @@ _dots_failure_animation_gradient_render_widget() {
     setopt localoptions no_ignore_braces
 
     if _dots_failure_animation_render_gradient_message; then
+        # zle -M prints escape bytes literally. Prompt spans %{...%} are
+        # understood by ZLE and contribute zero columns to cursor layout.
+        zle .reset-prompt
         zle -R
-        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
 }
 
@@ -397,8 +401,8 @@ _dots_failure_animation_gradient_line_init() {
 
     if _dots_failure_animation_render_gradient_message; then
         _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=1
+        zle .reset-prompt
         zle -R
-        zle -M "$_DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE"
     fi
     return 0
 }
@@ -416,8 +420,272 @@ _dots_failure_animation_render_prompt() {
         rendered="${_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT}"
     fi
 
-    # Prompt emoji animation is independent from the in-place failure-message
-    # renderer; message frames never become part of the editable prompt.
+    # Keep the single failure banner on its own prompt row. Its prompt-safe
+    # colour spans are rendered by ZLE, not printed as message text.
+    if [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
+        rendered="${_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}"
+    local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
+    if [[ -n "$marker" ]]; then
+        local marker_pattern="${(b)marker}"
+        if [[ "$rendered" == *"$marker"* ]]; then
+            # Strip earlier copies as well: Starship modules can leave a marker
+            # before the final input marker (for example after the exit code).
+            local suffix="${rendered##*${marker_pattern}}"
+            local prefix="${rendered%${marker_pattern}*}"
+            prefix="${prefix//${marker_pattern}/}"
+            while [[ "$prefix" == *' ' ]]; do
+                prefix="${prefix% }"
+            done
+            rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
+        else
+            rendered="${rendered% }"
+            rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
+        fi
+    fi
+    _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT="$rendered"
+    print -rn -- "$rendered"
+}
+_dots_failure_animation_cleanup() {
+    emulate -L zsh
+    setopt localoptions no_ignore_braces
+
+    local redraw="${1:-0}"
+    if (( _DOTS_FAILURE_ANIMATION_ACTIVE )); then
+        _DOTS_FAILURE_ANIMATION_LAST_STATE="${_DOTS_FAILURE_ANIMATION_STATE}"
+        _DOTS_FAILURE_ANIMATION_LAST_FRAMES=$_DOTS_FAILURE_ANIMATION_FRAMES
+
+        local fd="${_DOTS_FAILURE_ANIMATION_FD}"
+        zle -F "$fd" 2>/dev/null || true
+        { exec {fd}<&- } 2>/dev/null || true
+
+        _DOTS_FAILURE_ANIMATION_FD=-1
+        _DOTS_FAILURE_ANIMATION_ACTIVE=0
+        _DOTS_FAILURE_ANIMATION_STATE='finished'
+    fi
+
+    _DOTS_FAILURE_GRADIENT_ACTIVE=0
+    _DOTS_FAILURE_GRADIENT_FD=-1
+
+    if (( redraw )) && zle; then
+        zle .reset-prompt
+    fi
+}
+
+_dots_failure_animation_fd_handler() {
+    emulate -L zsh
+    setopt localoptions no_ignore_braces
+
+    local fd="${1:-}"
+    local frame
+    if [[ -z "$fd" ]] || ! IFS= builtin read -r -u "$fd" frame; then
+        if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+            _DOTS_FAILURE_ANIMATION_STATE='gradient-finished'
+            _dots_failure_animation_cleanup
+            return 0
+        fi
+        _DOTS_FAILURE_ANIMATION_STATE='stream-complete'
+        _dots_failure_animation_cleanup 1
+        return 0
+    fi
+
+    (( _DOTS_FAILURE_ANIMATION_STEP += 1 ))
+    (( _DOTS_FAILURE_ANIMATION_FRAMES += 1 ))
+
+    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        [[ "$frame" == <-> ]] || return 0
+        _DOTS_FAILURE_GRADIENT_PHASE=$(( frame % 100 ))
+        (( _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES += 1 ))
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-frame-rendered'
+        zle _dots_failure_animation_gradient_render_widget
+        return 0
+    fi
+
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
+    _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
+    zle && zle .reset-prompt
+}
+
+# Failure-message hooks render complete messages before the next prompt.
+_dots_failure_animation_start() {
+    emulate -L zsh
+
+    [[ -o interactive && -t 0 && -t 1 &&
+        "${TERM:-dumb}" != dumb &&
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
+        -z "${NO_COLOR:-}" ]] || return 1
+
+    local style="${1:-normal}"
+    local banner="${2-}"
+    local detail="${3-}"
+    case "$style" in
+        anime|ecchi|rainbow|normal|sarcastic|dramatic|legendary|mythic) ;;
+        *) style=normal ;;
+    esac
+
+    _DOTS_FAILURE_ANIMATION_STYLE="$style"
+    if [[ -n "$banner" ]]; then
+        _DOTS_FAILURE_ANIMATION_MODE='gradient'
+        if _dots_failure_animation_prepare_banner "$style" "$banner" "$detail"; then
+            # This function runs before ZLE: start and register the timer now,
+            # then let zle-line-init paint the first frame. This also works when
+            # the failure notice is queued by a later precmd hook.
+            _DOTS_FAILURE_GRADIENT_PENDING=1
+            if _dots_failure_animation_start_gradient; then
+                _DOTS_FAILURE_ANIMATION_STATE='gradient-pending'
+            else
+                local fallback_reason="$_DOTS_FAILURE_ANIMATION_STATE"
+                _DOTS_FAILURE_ANIMATION_STATE="gradient-static-fallback-${fallback_reason}"
+            fi
+            return 0
+        fi
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_BANNER=''
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        return 1
+    fi
+
+    _DOTS_FAILURE_ANIMATION_MODE='emoji'
+    _DOTS_FAILURE_ANIMATION_BANNER=''
+    _DOTS_FAILURE_ANIMATION_PENDING=1
+    return 0
+}
+
+_dots_failure_animation_begin() {
+    emulate -L zsh
+    setopt localoptions no_ignore_braces
+
+    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
+    [[ -o interactive && -t 0 && -t 1 &&
+        "${TERM:-dumb}" != dumb &&
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
+
+    _DOTS_FAILURE_ANIMATION_STEP=0
+    _DOTS_FAILURE_ANIMATION_FRAMES=0
+    _DOTS_FAILURE_ANIMATION_STATE='starting'
+
+    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
+    local infinite=0
+    local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
+    if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
+        interval=0.08
+    elif (( interval < 0.01 || interval > 2.0 )); then
+        interval=0.08
+    fi
+    _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
+
+    _dots_failure_animation_infinite_enabled && infinite=1
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite")
+    _DOTS_FAILURE_ANIMATION_ACTIVE=1
+
+    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
+        _DOTS_FAILURE_ANIMATION_STATE='registered'
+    else
+        _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
+        _dots_failure_animation_cleanup
+    fi
+}
+
+_dots_failure_animation_precmd() {
+    emulate -L zsh
+
+    [[ -o interactive && -t 0 && -t 1 ]] || return 0
+
+    if _dots_failure_animation_infinite_enabled; then
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
+        _DOTS_FAILURE_ANIMATION_PENDING=1
+    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
+        _DOTS_FAILURE_ANIMATION_PENDING=1
+    fi
+
+    if (( _DOTS_FAILURE_ANIMATION_PENDING )); then
+        _DOTS_FAILURE_ANIMATION_PENDING=0
+        _dots_failure_animation_begin
+    fi
+}
+
+_dots_failure_animation_reset() {
+    emulate -L zsh
+
+    _dots_failure_animation_cleanup
+    _dots_failure_animation_gradient_cleanup
+    _DOTS_FAILURE_GRADIENT_PENDING=0
+    _DOTS_FAILURE_ANIMATION_PENDING=0
+    _DOTS_FAILURE_ANIMATION_BANNER=''
+    _DOTS_FAILURE_GRADIENT_LINES=()
+    _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+    _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
+    _DOTS_FAILURE_ANIMATION_MODE='emoji'
+    _DOTS_FAILURE_ANIMATION_STYLE='normal'
+}
+
+_dots_failure_animation_preexec() {
+    emulate -L zsh
+
+    # zle-line-finish can run during editor transitions while the buffer is
+    # still editable. Keep the gradient alive there; stop it only once Zsh
+    # enters preexec, which means the user actually submitted a command.
+    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )) || [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
+        _dots_failure_animation_cleanup
+        _DOTS_FAILURE_GRADIENT_PENDING=0
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+        _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_STYLE='normal'
+    fi
+
+    local -a command_words
+    command_words=( "${(@z)1}" )
+    case "${command_words[1]:-}" in
+        clear)
+            _dots_failure_animation_reset
+            ;;
+        command|builtin)
+            [[ "${command_words[2]:-}" == clear ]] && _dots_failure_animation_reset
+            ;;
+    esac
+}
+
+_dots_failure_animation_clear_screen_widget() {
+    _dots_failure_animation_reset
+    zle .clear-screen
+}
+
+_dots_failure_animation_line_finish() {
+    _DOTS_FAILURE_ANIMATION_PENDING=0
+
+    # Ordinary prompt emoji animation is still tied to line submission. A
+    # failure gradient has its own lifecycle and is cancelled in preexec.
+    if (( !_DOTS_FAILURE_GRADIENT_ACTIVE )) && [[ -z "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
+        _dots_failure_animation_cleanup
+        _DOTS_FAILURE_GRADIENT_PENDING=0
+        _DOTS_FAILURE_ANIMATION_BANNER=''
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+        _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_STYLE='normal'
+        _DOTS_FAILURE_ANIMATION_PHASE=0
+    fi
+}
+
+if [[ -o interactive ]]; then
+    autoload -Uz add-zsh-hook add-zle-hook-widget
+    add-zsh-hook precmd _dots_failure_animation_precmd
+    add-zsh-hook preexec _dots_failure_animation_preexec
+    add-zle-hook-widget zle-line-init _dots_failure_animation_gradient_line_init
+    add-zle-hook-widget zle-line-finish _dots_failure_animation_line_finish
+    # FD frame updates use a ZLE widget; the banner itself is a ZLE message,
+    # never part of PROMPT or a direct terminal overlay.
+    zle -N _dots_failure_animation_gradient_render_widget
+    # Wrap the built-in widget so Ctrl+L clears the message too.
+    zle -N clear-screen _dots_failure_animation_clear_screen_widget
+fi
+\n'"$rendered"
+    fi
+
+    # Prompt emoji animation remains independent of the failure banner.
     local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
     if [[ -n "$marker" ]]; then
         local marker_pattern="${(b)marker}"
