@@ -17,6 +17,9 @@ typeset -gi _DOTS_FAILURE_GRADIENT_FD=-1
 typeset -gi _DOTS_FAILURE_GRADIENT_ACTIVE=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PENDING=0
 typeset -gi _DOTS_FAILURE_GRADIENT_PHASE=0
+typeset -gi _DOTS_FAILURE_GRADIENT_PRECMD_HITS=0
+ typeset -gi _DOTS_FAILURE_GRADIENT_PRECMD_TTY=0
+ typeset -gi _DOTS_FAILURE_GRADIENT_PRECMD_PENDING=0
 typeset -g _DOTS_FAILURE_GRADIENT_INTERVAL='0.08'
 typeset -ga _DOTS_FAILURE_GRADIENT_LINES=()
 typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
@@ -582,6 +585,11 @@ _dots_failure_animation_begin() {
 
 _dots_failure_animation_precmd() {
     emulate -L zsh
+
+    (( _DOTS_FAILURE_GRADIENT_PRECMD_HITS += 1 ))
+    _DOTS_FAILURE_GRADIENT_PRECMD_TTY=0
+    [[ -t 0 && -t 1 ]] && _DOTS_FAILURE_GRADIENT_PRECMD_TTY=1
+    _DOTS_FAILURE_GRADIENT_PRECMD_PENDING=$_DOTS_FAILURE_GRADIENT_PENDING
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
