@@ -149,7 +149,6 @@ _dots_test_start_queued_gradient() {
         "$_DOTS_TEST_SPECIAL_STYLE" \
         "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
         "live gradient test"
-
 }
 precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
 _dots_test_snapshot_special_animation() {
@@ -401,7 +400,6 @@ drain_for 120
 # Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
 zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-
 assert_contains "the complete input buffer survives all gradient frames" \
     "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:BUFFER_SNAPSHOT_END" "$REPLY"
 assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
