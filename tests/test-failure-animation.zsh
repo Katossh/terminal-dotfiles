@@ -36,10 +36,10 @@ PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-_DOTS_FAILURE_GRADIENT_INTERVAL=0.02
+_DOTS_FAILURE_GRADIENT_INTERVAL=0.08
 
 _dots_test_buffer_snapshot() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}:BANNER_${#_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}:SUBMITTED_${_DOTS_FAILURE_GRADIENT_SUBMITTED}"
 }
 zle -N _dots_test_buffer_snapshot
 bindkey '^T' _dots_test_buffer_snapshot
@@ -54,6 +54,11 @@ _dots_test_start_failure() {
     dots_failure_message not_found 'missing-command' 'command not found'
 }
 precmd_functions=( _dots_test_start_failure ${precmd_functions:#_dots_test_start_failure} )
+
+_dots_test_report_preexec() {
+    print -r -- "SUBMITTED_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}"
+}
+preexec_functions=( ${preexec_functions:#_dots_test_report_preexec} _dots_test_report_preexec )
 ZSH_INIT
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
@@ -131,22 +136,38 @@ assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 [[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
 assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
-# Type a command without Enter. The background worker must animate independently.
-zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
-read_until_visible 'INPUT_DURING_GRADIENT'
-assert_contains "input is accepted while the gradient animates" "INPUT_DURING_GRADIENT" "$REPLY"
-drain_for 80
+# Type a command while the gradient is active, then submit it immediately.
+zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
+read_until_visible "EX'ECUTED_OK'"
+assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
 
-# Ctrl+T reports the live ZLE buffer without changing it.
-zpty -w -n "$PTY_NAME" $'\x14'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-assert_contains "the full input buffer remains intact" "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33" "$REPLY"
-assert_contains "the gradient completes all 25 frames" "FRAMES_25" "$REPLY"
-assert_contains "the gradient worker terminates cleanly" "WORKER_0" "$REPLY"
+zpty -w -n "$PTY_NAME" $'\r'
+read_until "SUBMITTED_ACTIVE_1_WORKER_1"
+assert_contains "command submission does not cancel the active gradient" \
+    "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
+    read_until "EXECUTED_OK"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
 
-# Only now submit the command; it must execute unchanged.
-zpty -w -n "$PTY_NAME" $'\n'
-read_until "INPUT_DURING_GRADIENT"
-assert_contains "the original buffered command executes" "INPUT_DURING_GRADIENT" "$REPLY"
+# Once the command exits and ZLE is active again, buffered frames are rendered.
+read_until "BASE_OUTPUT"
+local snapshot=''
+local -i frame_attempt=0
+while (( frame_attempt < 120 )); do
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    snapshot="$REPLY"
+    [[ "$snapshot" == *"FRAMES_25"* && "$snapshot" == *"WORKER_0"* ]] && break
+    command sleep 0.05
+    (( frame_attempt += 1 ))
+done
+assert_contains "all 25 gradient frames finish after command submission" "FRAMES_25" "$snapshot"
+assert_contains "the gradient worker terminates after the final prompt redraw" "WORKER_0" "$snapshot"
+assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
+assert_contains "the submitted banner is removed from the next prompt" "BANNER_0" "$snapshot"
+assert_contains "submitted state is cleared after completion" "SUBMITTED_0" "$snapshot"
 
 print -- "All single-gradient failure animation integration tests passed."
