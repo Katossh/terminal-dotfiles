@@ -83,55 +83,22 @@ _dots_test_assert_pool() {
     print -r -- "POOL_${style}_${#_DOTS_FAILURE_ANIMATION_POOL}_${(j: :)_DOTS_FAILURE_ANIMATION_POOL}"
 }
 _dots_test_render_gradients() {
-    local rendered=''
+    local first_frame='' prompt_output=''
 
-    _dots_failure_animation_gradient_line 'LEGENDARY BANNER' legendary 0
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'L'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'Y'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'B'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'R'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *$'\e[38;2;74;50;12m'* ]] || return 1
-
-    _dots_failure_animation_gradient_line '🌠 MYTHIC STARFALL 🌠' mythic 0
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'M'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'C'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'S'* &&
-       "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *'R'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" == *$'\e[38;2;15;17;21m'* ]] || return 1
-    [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" != *$'\e[38;2;255;0;0m'* ]] || return 1
-    local first_frame=''
-    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 0
+    _dots_failure_animation_gradient_line '✖ Command "gradient-test-command" failed.' normal 0
     first_frame="$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE"
-    local first_color_zero="${first_frame#*38;2;}"
-    first_color_zero="${first_color_zero%%m*}"
-    _dots_failure_animation_gradient_line 'LEGENDARY ANIMATED FAILURE BANNER' legendary 20
+    [[ "$first_frame" == *'Command'* && "$first_frame" == *'failed.'* ]] || return 1
+    [[ "$first_frame" == *$'%{\e[38;2;36;123;160m%}'* ]] || return 1
+
+    _dots_failure_animation_gradient_line '✖ Command "gradient-test-command" failed.' normal 20
     [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE" != "$first_frame" ]] || return 1
-    local first_color_twenty="${_DOTS_FAILURE_ANIMATION_GRADIENT_LINE#*38;2;}"
-    first_color_twenty="${first_color_twenty%%m*}"
-    # At phase 20 the leftmost character has advanced into the later part
-    # of the palette; adding the phase would move the highlight the other way.
-    [[ "$first_color_zero" == '74;50;12' &&
-       "$first_color_twenty" == '190;145;55' ]] || return 1
 
-    _DOTS_FAILURE_ANIMATION_MODE='mythic'
-    _DOTS_FAILURE_ANIMATION_BANNER='🌠 MYTHIC STARFALL 🌠'
-    rendered="$(_dots_failure_animation_render_prompt)"
-    [[ "$rendered" != *'MYTHIC STARFALL'* ]] || return 1
+    _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT="$first_frame"
+    prompt_output="$(_dots_failure_animation_render_prompt)"
+    [[ "$prompt_output" == *'Command "gradient-test-command" failed.'* ]] || return 1
+    [[ "$prompt_output" == *$'%{\e[38;2;36;123;160m%}'* ]] || return 1
 
-    local palette_style expected_color
-    for palette_style in normal anime ecchi rainbow; do
-        _dots_failure_animation_gradient_line 'PALETTE CHECK' "$palette_style" 0
-        case "$palette_style" in
-            normal) expected_color='36;123;160' ;;
-            anime) expected_color='255;190;220' ;;
-            ecchi) expected_color='120;24;70' ;;
-            rainbow) expected_color='255;82;82' ;;
-        esac
-        [[ "$_DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW" == *$'\e[38;2;'$expected_color'm'* ]] || return 1
-    done
-
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_BANNER=''
+    _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
     print -- GRADIENTS_OK
 }
 typeset -g _DOTS_TEST_SPECIAL_STYLE=''
@@ -145,10 +112,7 @@ _dots_test_queue_special_animation() {
 _dots_test_start_queued_gradient() {
     (( _DOTS_TEST_GRADIENT_REQUEST_PENDING )) || return 0
     _DOTS_TEST_GRADIENT_REQUEST_PENDING=0
-    _dots_failure_animation_start \
-        "$_DOTS_TEST_SPECIAL_STYLE" \
-        "$_DOTS_TEST_SPECIAL_STYLE ANIMATED FAILURE BANNER" \
-        "live gradient test"
+    _dots_failure_animation_start normal '✖ Command "normal-banner-test" failed.' 'live gradient test'
 }
 precmd_functions=( _dots_test_start_queued_gradient ${precmd_functions:#_dots_test_start_queued_gradient} )
 _dots_test_snapshot_special_animation() {
@@ -375,10 +339,10 @@ assert_contains "Emoji-specific and Continuous variables remain Infinite aliases
 # Both rare gradients render in their own palettes: metallic gold and monochrome Mythic.
 zpty -w "$PTY_NAME" '_dots_test_render_gradients'$'\n'
 read_until GRADIENTS_OK
-assert_contains "Legendary and Mythic gradient renderers use their dedicated palettes" "GRADIENTS_OK" "$REPLY"
+assert_contains "one prompt-safe gradient changes phase without corrupting prompt layout" "GRADIENTS_OK" "$REPLY"
 drain_for 5
 
-# The failure banner is emitted through ZLE's independent message area.
+# The one failure banner is rendered as a prompt-safe row above the input.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"$'\n'
 read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
 assert_contains "normal gradient request is queued for the real precmd path" "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1" "$REPLY"
@@ -386,9 +350,71 @@ assert_contains "normal gradient request is queued for the real precmd path" "SP
 read_until_visible "BASE_OUTPUT"
 assert_contains "the original path remains above the editable command line" "BASE_PATH" "$REPLY"
 assert_contains "the original input prompt remains unchanged" "BASE_OUTPUT" "$REPLY"
-read_until_visible "normal ANIMATED FAILURE BANNER"
-assert_contains "normal gradient message becomes visible in ZLE" "normal ANIMATED FAILURE BANNER" "$REPLY"
-assert_contains "normal gradient uses 24-bit colour" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+read_until_visible "Command failed: "normal-banner-test"."
+assert_contains "normal gradient message becomes visible in ZLE" "Command failed: "normal-banner-test"." "$REPLY"
+assert_contains "normal gradient emits real 24-bit colour controls" 
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# The single failure message completes all frames without touching the input buffer.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
 # Type a command without sending Enter. It must stay editable while the worker
 # runs through all 25 frames.
@@ -432,8 +458,8 @@ print -- "ok - all eight styles animate without blocking or replacing input"
 
 # Clear operations must cancel an active message and its worker.
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
 zpty -w "$PTY_NAME" $'\x0c'
 drain_for 5
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
@@ -441,8 +467,2464 @@ read_until SPECIAL_STATE_GRADIENT_ACTIVE_
 assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
 
 zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
-read_until "SPECIAL_QUEUED_legendary_START_QUEUED_PENDING_1"
-read_until_visible "legendary ANIMATED FAILURE BANNER"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+assert_contains "one message stays visible while typing" '✖ Command "normal-banner-test" failed.' "$REPLY"
+drain_for 120
+zpty -w -n "$PTY_NAME" 
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+assert_contains "one message stays visible while typing" '✖ Command "normal-banner-test" failed.' "$REPLY"
+drain_for 120
+zpty -w -n "$PTY_NAME" 
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+assert_contains "one message stays visible while typing" '✖ Command "normal-banner-test" failed.' "$REPLY"
+drain_for 120
+zpty -w -n "$PTY_NAME" 
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+assert_contains "one message stays visible while typing" '✖ Command "normal-banner-test" failed.' "$REPLY"
+drain_for 120
+zpty -w -n "$PTY_NAME" 
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+assert_contains "one message stays visible while typing" '✖ Command "normal-banner-test" failed.' "$REPLY"
+drain_for 120
+zpty -w -n "$PTY_NAME" 
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "single gradient completes all 25 frames" "FRAMES_25" "$REPLY"
+assert_contains "single gradient leaves no asynchronous worker" "ACTIVE_0" "$REPLY"
+assert_contains "single gradient preserves the empty input buffer" "BUFFER_SNAPSHOT_BEGIN::" "$REPLY"
+print -- "ok - the single gradient banner animates without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\e[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+assert_absent "normal gradient never prints caret-escaped ANSI as text" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+
+# Type a command without sending Enter. It must stay editable while the worker
+# runs through all 25 frames.
+zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
+read_until_visible "INPUT_DURING_GRADIENT"
+assert_contains "keystrokes are accepted while the gradient is running" "INPUT_DURING_GRADIENT" "$REPLY"
+drain_for 120
+
+# Ctrl+T reports the actual ZLE BUFFER but does not submit or modify it.
+zpty -w -n "$PTY_NAME" $'\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+assert_contains "the complete input buffer survives all gradient frames" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33:BUFFER_SNAPSHOT_END" "$REPLY"
+assert_contains "the input cursor remains at its original offset" "CURSOR_33" "$REPLY"
+assert_contains "normal gradient completes all 25 frames before submission" "FRAMES_25" "$REPLY"
+assert_contains "normal gradient worker exits before submission" "ACTIVE_0" "$REPLY"
+
+# Only now send Enter; the unchanged command must execute.
+zpty -w -n "$PTY_NAME" $'\n'
+read_until "INPUT_DURING_GRADIENT"
+assert_contains "the buffered command executes unchanged" "INPUT_DURING_GRADIENT" "$REPLY"
+assert_absent "animation never invokes Kitty image placement" "--place" "$REPLY"
+
+# Every message style uses the same independent ZLE message channel.
+for style in sarcastic dramatic anime ecchi rainbow legendary mythic; do
+    zpty -w "$PTY_NAME" "_dots_test_queue_special_animation '$style'"$'\n'
+    read_until "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1"
+    assert_contains "${style} gradient is queued for precmd" "SPECIAL_QUEUED_${style}_START_QUEUED_PENDING_1" "$REPLY"
+    read_until_visible "${style} ANIMATED FAILURE BANNER"
+    assert_contains "${style} message is displayed independently of PROMPT" "${style} ANIMATED FAILURE BANNER" "$REPLY"
+    assert_contains "${style} gradient uses truecolour output" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+    drain_for 120
+
+    # Inspect animation state inside ZLE before line-finish resets its counters.
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    assert_contains "${style} completes all 25 gradient frames" "FRAMES_25" "$REPLY"
+    assert_contains "${style} leaves no asynchronous gradient worker" "ACTIVE_0" "$REPLY"
+done
+print -- "ok - all eight styles animate without blocking or replacing input"
+
+# Clear operations must cancel an active message and its worker.
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation legendary"$'\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" $'\x0c'
+drain_for 5
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "Ctrl+L stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+
+zpty -w "$PTY_NAME" "_dots_test_queue_special_animation normal"
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
+zpty -w "$PTY_NAME" 'clear'$'\n'
+read_until CLEAR_EXECUTED
+zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
+read_until SPECIAL_STATE_GRADIENT_ACTIVE_
+assert_contains "clear stops the active gradient worker" "GRADIENT_ACTIVE_0" "$REPLY"
+# Infinite emoji mode loops while idle; accepting a command stops it.
+zpty -w "$PTY_NAME" '_dots_test_enable_infinite'$'\n'
+read_until INFINITE_ENABLED
+assert_contains "infinite emoji mode can be enabled with the environment variable" "INFINITE_ENABLED" "$REPLY"
+read_until "❯"
+drain_for 220
+zpty -w "$PTY_NAME" '_dots_test_disable_infinite'$'\n'
+read_until INFINITE_DISABLED
+assert_contains "infinite mode stops cleanly when a command is submitted" "INFINITE_DISABLED ACTIVE_0" "$REPLY"
+typeset infinite_frames="${REPLY##*LAST_FRAMES_}"
+infinite_frames="${infinite_frames%%[^0-9]*}"
+[[ "$infinite_frames" == <-> ]] || fail "infinite animation frame count was not reported"
+(( infinite_frames > 36 )) || fail "infinite emoji animation did not loop beyond one 12-frame cycle"
+print -- "ok - infinite emoji animation loops beyond one frame sequence"
+
+print -- "All style-aware and rare-event prompt animation integration tests passed."
+\n'
+read_until "SPECIAL_QUEUED_normal_START_QUEUED_PENDING_1"
+read_until_visible '✖ Command "normal-banner-test" failed.'
 zpty -w "$PTY_NAME" 'clear'$'\n'
 read_until CLEAR_EXECUTED
 zpty -w "$PTY_NAME" '_dots_test_snapshot_special_animation'$'\n'
