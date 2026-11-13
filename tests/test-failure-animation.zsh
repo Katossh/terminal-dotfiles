@@ -155,7 +155,11 @@ assert_absent "the command has not started before the gradient finishes" "SUBMIT
 read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
 assert_contains "command submission waits for all 25 gradient frames" \
     "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$REPLY"
-read_until "GRADIENT_COMMAND_EXECUTED"
-assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$REPLY"
+submitted_output="$REPLY"
+if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+    read_until "GRADIENT_COMMAND_EXECUTED"
+    submitted_output+="${REPLY}"
+fi
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$submitted_output"
 
 print -- "All single-gradient failure animation integration tests passed."
