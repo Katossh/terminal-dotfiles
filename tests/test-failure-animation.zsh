@@ -261,7 +261,7 @@ read_until_visible() {
     local output='' data='' visible=''
     while (( tries < 120 )); do
         if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        visible="$(print -rn -- "$output" | command perl -pe 's/\e\[[0-9;]*m//g')"
+        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;]*m", "", sys.stdin.read()))')"
         [[ "$visible" == *"$needle"* ]] && break
         command sleep 0.05
         (( tries += 1 ))
