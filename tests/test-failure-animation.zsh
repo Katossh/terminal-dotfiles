@@ -36,10 +36,10 @@ PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-_DOTS_FAILURE_GRADIENT_INTERVAL=0.02
+_DOTS_FAILURE_GRADIENT_INTERVAL=0.2
 
 _dots_test_buffer_snapshot() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:ACCEPT_PENDING_${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}"
 }
 zle -N _dots_test_buffer_snapshot
 bindkey '^T' _dots_test_buffer_snapshot
@@ -54,13 +54,18 @@ _dots_test_start_failure() {
     dots_failure_message not_found 'missing-command' 'command not found'
 }
 precmd_functions=( _dots_test_start_failure ${precmd_functions:#_dots_test_start_failure} )
+
+_dots_test_report_preexec() {
+    print -r -- "SUBMIT_AFTER_FRAMES_\${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_\${_DOTS_FAILURE_GRADIENT_ACTIVE}_PENDING_\${_DOTS_FAILURE_GRADIENT_ACCEPT_PENDING}"
+}
+preexec_functions=( \${preexec_functions:#_dots_test_report_preexec} _dots_test_report_preexec )
 ZSH_INIT
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 
 zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
     "ZSH_DIR=$ZSH_DIR" DOTS_FAILURE_MESSAGE_CHANCE=100 \
-    DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_GRADIENT_INTERVAL=0.02 \
+    DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_GRADIENT_INTERVAL=0.2 \
     zsh -f -i
 
 read_until() {
@@ -131,22 +136,32 @@ assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 [[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
 assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
-# Type a command without Enter. The background worker must animate independently.
-zpty -w -n "$PTY_NAME" 'print -r -- INPUT_DURING_GRADIENT'
-read_until_visible 'INPUT_DURING_GRADIENT'
-assert_contains "input is accepted while the gradient animates" "INPUT_DURING_GRADIENT" "$REPLY"
-drain_for 80
+# Type and submit a command while the gradient is still active.
+zpty -w -n "$PTY_NAME" 'print -r -- GRADIENT_COMMAND_EXECUTED'
+read_until_visible 'GRADIENT_COMMAND_EXECUTED'
+assert_contains "input is accepted while the gradient animates" "GRADIENT_COMMAND_EXECUTED" "$REPLY"
 
-# Ctrl+T reports the live ZLE buffer without changing it.
-zpty -w -n "$PTY_NAME" $'\x14'
+# Enter must be queued by the ZLE widget rather than cancelling the worker.
+zpty -w -n "$PTY_NAME" 
+
+print -- "All single-gradient failure animation integration tests passed."
+\n'
+zpty -w -n "$PTY_NAME" 
+
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-assert_contains "the full input buffer remains intact" "BUFFER_SNAPSHOT_BEGIN:print -r -- INPUT_DURING_GRADIENT:CURSOR_33" "$REPLY"
-assert_contains "the gradient completes all 25 frames" "FRAMES_25" "$REPLY"
-assert_contains "the gradient worker terminates cleanly" "WORKER_0" "$REPLY"
+assert_contains "the complete command remains editable while Enter is queued" \
+    "BUFFER_SNAPSHOT_BEGIN:print -r -- GRADIENT_COMMAND_EXECUTED:CURSOR_37" "$REPLY"
+assert_contains "the gradient is still active after Enter" "ACTIVE_1" "$REPLY"
+assert_contains "the pending Enter is recorded" "ACCEPT_PENDING_1" "$REPLY"
+assert_absent "the command has not started before the gradient finishes" "SUBMIT_AFTER_FRAMES_" "$REPLY"
 
-# Only now submit the command; it must execute unchanged.
-zpty -w -n "$PTY_NAME" $'\n'
-read_until "INPUT_DURING_GRADIENT"
-assert_contains "the original buffered command executes" "INPUT_DURING_GRADIENT" "$REPLY"
+# The FD watcher completes every phase, then replays Enter automatically.
+read_until "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0"
+assert_contains "command submission waits for all 25 gradient frames" \
+    "SUBMIT_AFTER_FRAMES_25_ACTIVE_0_PENDING_0" "$REPLY"
+read_until "GRADIENT_COMMAND_EXECUTED"
+assert_contains "the queued command executes unchanged" "GRADIENT_COMMAND_EXECUTED" "$REPLY"
 
 print -- "All single-gradient failure animation integration tests passed."
