@@ -136,20 +136,24 @@ assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 [[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
 assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
-# Type and submit a command while the gradient is active.
-zpty -w -n "$PTY_NAME" 'sleep 0.1; print -r -- EX'ECUTED_OK''
+# Type a command while the gradient is active, then submit it immediately.
+zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
+read_until_visible "EX'ECUTED_OK'"
+assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
+
+zpty -w -n "$PTY_NAME" $'\r'
 read_until "SUBMITTED_ACTIVE_1_WORKER_1"
 assert_contains "command submission does not cancel the active gradient" \
     "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
 submitted_output="$REPLY"
-if [[ "$submitted_output" != *"GRADIENT_COMMAND_EXECUTED"* ]]; then
+if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
     read_until "EXECUTED_OK"
     submitted_output+="${REPLY}"
 fi
 assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
 
-# When the next prompt enters ZLE, it drains the frames buffered while the
-# foreground command owned the terminal. Poll through the snapshot widget.
+# Once the command exits and ZLE is active again, buffered frames are rendered.
+read_until "BASE_OUTPUT"
 local snapshot=''
 local -i frame_attempt=0
 while (( frame_attempt < 120 )); do
@@ -163,4 +167,5 @@ done
 assert_contains "all 25 gradient frames finish after command submission" "FRAMES_25" "$snapshot"
 assert_contains "the gradient worker terminates after the final prompt redraw" "WORKER_0" "$snapshot"
 assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
+
 print -- "All single-gradient failure animation integration tests passed."
