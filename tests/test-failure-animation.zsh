@@ -25,13 +25,14 @@ zmodload zsh/zpty 2>/dev/null || {
 
 cat > "$INIT_FILE" <<'ZSH_INIT'
 setopt promptsubst
+unset NO_COLOR
 STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT ❯ '
 PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 RPROMPT='BASE_RPROMPT'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _dots_test_report_buffer_widget() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}_REGSTATUS_${_DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS}_LASTFD_${_DOTS_FAILURE_GRADIENT_LAST_FD}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:BUFFER_SNAPSHOT_END_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_MODE_${_DOTS_FAILURE_ANIMATION_MODE}_STATE_${_DOTS_FAILURE_ANIMATION_STATE}_PHASE_${_DOTS_FAILURE_GRADIENT_PHASE}"
 }
 zle -N _dots_test_report_buffer_widget
 bindkey '^T' _dots_test_report_buffer_widget
@@ -126,11 +127,8 @@ _dots_test_render_gradients() {
 typeset -g _DOTS_TEST_SPECIAL_STYLE=''
 _dots_test_queue_special_animation() {
     local style="$1"
-    local saved_no_color="${NO_COLOR-}"
-    unset NO_COLOR
     local -i start_status=0
     _dots_failure_animation_start "$style" "$style ANIMATED FAILURE BANNER" "live gradient test" || start_status=$?
-    if [[ -n "$saved_no_color" ]]; then export NO_COLOR="$saved_no_color"; fi
     print -r -- "SPECIAL_QUEUED_${style}_START_${start_status}_PENDING_${_DOTS_FAILURE_GRADIENT_PENDING}"
 }
 _dots_test_snapshot_special_animation() {
