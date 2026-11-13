@@ -630,6 +630,18 @@ _dots_failure_animation_reset() {
 _dots_failure_animation_preexec() {
     emulate -L zsh
 
+    # zle-line-finish can run during editor transitions while the buffer is
+    # still editable. Keep the gradient alive there; stop it only once Zsh
+    # enters preexec, which means the user actually submitted a command.
+    if (( _DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        _dots_failure_animation_cleanup
+        _DOTS_FAILURE_GRADIENT_PENDING=0
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_STYLE='normal'
+    fi
+
     local -a command_words
     command_words=( "${(@z)1}" )
     case "${command_words[1]:-}" in
@@ -649,17 +661,20 @@ _dots_failure_animation_clear_screen_widget() {
 }
 
 _dots_failure_animation_line_finish() {
-    [[ -z "${DOTS_TEST_GRADIENT_LOG:-}" ]] || print -r -- "LINE_FINISH:active=$_DOTS_FAILURE_ANIMATION_ACTIVE:gradient=$_DOTS_FAILURE_GRADIENT_ACTIVE" >> "$DOTS_TEST_GRADIENT_LOG"
     _DOTS_FAILURE_ANIMATION_PENDING=0
-    _dots_failure_animation_cleanup
-    _dots_failure_animation_gradient_cleanup
-    _DOTS_FAILURE_GRADIENT_PENDING=0
-    _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_GRADIENT_LINES=()
-    _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
-    _DOTS_FAILURE_ANIMATION_MODE='emoji'
-    _DOTS_FAILURE_ANIMATION_STYLE='normal'
-    _DOTS_FAILURE_ANIMATION_PHASE=0
+
+    # Ordinary prompt emoji animation is still tied to line submission. A
+    # failure gradient has its own lifecycle and is cancelled in preexec.
+    if (( !_DOTS_FAILURE_GRADIENT_ACTIVE )); then
+        _dots_failure_animation_cleanup
+        _DOTS_FAILURE_GRADIENT_PENDING=0
+        _DOTS_FAILURE_ANIMATION_BANNER=''
+        _DOTS_FAILURE_GRADIENT_LINES=()
+        _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
+        _DOTS_FAILURE_ANIMATION_MODE='emoji'
+        _DOTS_FAILURE_ANIMATION_STYLE='normal'
+        _DOTS_FAILURE_ANIMATION_PHASE=0
+    fi
 }
 
 if [[ -o interactive ]]; then
