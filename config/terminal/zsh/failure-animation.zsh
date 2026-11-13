@@ -399,12 +399,12 @@ _dots_failure_animation_start_gradient() {
         _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=0
         _DOTS_FAILURE_ANIMATION_STATE='gradient-registered'
         return 0
+    else
+        _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=$?
+        _DOTS_FAILURE_ANIMATION_STATE='gradient-registration-failed'
+        _dots_failure_animation_gradient_cleanup
+        return 1
     fi
-
-    _DOTS_FAILURE_GRADIENT_REGISTRATION_STATUS=$?
-    _DOTS_FAILURE_ANIMATION_STATE='gradient-registration-failed'
-    _dots_failure_animation_gradient_cleanup
-    return 1
 }
 
 # This hook runs after the prompt is about to enter ZLE, unlike precmd where
