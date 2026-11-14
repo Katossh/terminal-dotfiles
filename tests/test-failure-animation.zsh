@@ -236,8 +236,7 @@ zpty -w -n "$PTY_NAME" 'sleep 0.24; print -r -- "$_DOTS_TEST_COMMAND_OUTPUT"'
 read_until_visible "sleep 0.24"
 assert_contains "input is accepted while the gradient animates" "sleep 0.24" "$REPLY"
 
-# The worker must still be alive when Enter submits the line.  Check a fresh
-# preexec event, since earlier test commands also invoke the preexec hook.
+# Check a fresh preexec event; earlier test commands also invoke this hook.
 _count_osc4_frames "$_ALL_RAW"
 local -i foreground_frames_before=$REPLY
 zpty -w -n "$PTY_NAME" 
@@ -283,7 +282,7 @@ print -- "ok - second failure uses 256-colour palette-index sequences"
 
 # ── Worker lifecycle: workers self-terminate after their frame cycle ───────────
 
-# Allow time for the second worker's 24 palette updates (24 * 0.04s + headroom).
+# Allow time for the second worker's 25 frames to complete (25 * 0.02s + headroom).
 command sleep 1.2
 
 # Ask the shell to report live worker count via the ZLE snapshot widget.
@@ -301,13 +300,13 @@ assert_contains "gradient workers self-terminate after their frame lifecycle" \
     "WORKER_ALIVE_0" "$final_snap"
 
 print -- "All single-gradient failure animation integration tests passed."
-\r'
+\015'
 read_until_after "PREEXEC_ACTIVE_"
 assert_contains "gradient worker is still alive at command submission" \
     "PREEXEC_ACTIVE_1_WORKERS_1" "$REPLY"
 
 # ZLE is inactive while this foreground sleep runs.  The worker writes OSC 4
-# updates directly to the TTY, so several new frames must arrive before the
+# updates directly to the TTY, so multiple new frames must arrive before the
 # shell returns to its next prompt.
 read_until_after "BASE_OUTPUT"
 local command_output="$REPLY"
@@ -365,7 +364,7 @@ print -- "ok - second failure uses 256-colour palette-index sequences"
 
 # ── Worker lifecycle: workers self-terminate after their frame cycle ───────────
 
-# Allow time for the second worker's 24 palette updates (24 * 0.04s + headroom).
+# Allow time for the second worker's 25 frames to complete (25 * 0.02s + headroom).
 command sleep 1.2
 
 # Ask the shell to report live worker count via the ZLE snapshot widget.
