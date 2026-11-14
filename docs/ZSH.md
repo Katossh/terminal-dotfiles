@@ -11,7 +11,7 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide why / why --verbose without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
-8. failure-animation.zsh — registers after Starship, animates ordinary emoji before the input marker, and renders the single failure-gradient banner on a prompt row above the input.
+8. failure-animation.zsh — registers after Starship, animates ordinary emoji before the input marker, and prints the failure-gradient banner directly into terminal output as an autonomous scrollback message independent of the prompt.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -51,11 +51,13 @@ Every failed command uses one stable message:
 
 An optional diagnostic detail is displayed on the next line. The failure category is still classified internally for diagnostics, but it no longer selects different wording, random jokes, rarity tiers, or colour palettes.
 
-On an interactive colour-capable terminal, this exact message is animated with one moving 24-bit gradient for 25 frames. The banner occupies its own prompt row above the normal prompt. Each colour sequence is wrapped in Zsh's prompt-aware \`%{...%}\` markers, so ZLE treats it as zero-width instead of printing escape notation or shifting the input cursor. The background worker only sends frame numbers through a private pipe; ZLE alone redraws the prompt and the worker never reads keyboard input.
+On an interactive colour-capable terminal, this exact message is animated with a moving gradient for 25 frames. The banner is printed directly into terminal scrollback output — not embedded in the prompt string — so it remains in its original position in terminal history regardless of what the user does next.
 
-Typing remains fully responsive while the gradient runs. Submitting a command does not cancel the background gradient worker or clear its banner. While a foreground command owns the terminal, ZLE cannot redraw the prompt; the worker continues producing frames, and ZLE renders the buffered frames when the next prompt becomes active. The last rendered gradient therefore remains visible during command execution, then the animation resumes at the next prompt. Once the buffered animation finishes, the live banner is cleared so it is not repeated on every subsequent prompt; the already-submitted copy remains in scrollback. The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
+The gradient uses dedicated 256-colour palette slots (OSC 4), one block of twelve slots per concurrent failure. A disowned background worker sends OSC 4 palette-update sequences to the terminal at the configured interval for 25 frames, then exits on its own. Because the colour definitions are updated in-place, the text characters stay exactly where they were printed and animate without any cursor movement or repaint. Up to five gradient messages can coexist simultaneously in scrollback, each using its own palette block.
 
-\`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
+Typing, cursor movement, command submission, and prompt redraws have no effect on the animation. Each worker terminates according to its own frame lifecycle. The same plain message is printed when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
+
+`DOTS_FAILURE_MESSAGE_CHANCE=0` suppresses the notice. `DOTS_FAILURE_GRADIENT_INTERVAL` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
 
 ## Environment variables
 

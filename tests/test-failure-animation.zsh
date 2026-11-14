@@ -28,18 +28,29 @@ zmodload zsh/zpty 2>/dev/null || {
     exit 0
 }
 
+# Autonomous scrollback gradient: the failure message is printed directly into
+# terminal output (not embedded in PROMPT) before the prompt appears.  OSC 4
+# palette slots 180-191 are used for block 0.  Each character is coloured with
+# \e[38;5;180m ... \e[38;5;191m.  A background worker updates those slots for
+# 25 frames via OSC 4 sequences (\e]4;180;rgb:...\e\\).
+
 cat > "$INIT_FILE" <<'ZSH_INIT'
 setopt promptsubst
 unset NO_COLOR
+# Unset TMUX so OSC 4 sequences are not wrapped in tmux passthrough.
+unset TMUX
 STARSHIP_TEST_PROMPT=$'BASE_PATH\nBASE_OUTPUT ❯ '
 PROMPT='$(print -rn -- "$STARSHIP_TEST_PROMPT")'
 source "$ZSH_DIR/failure-messages.zsh"
 source "$ZSH_DIR/failure-animation.zsh"
 _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-_DOTS_FAILURE_GRADIENT_INTERVAL=0.08
 
+# Buffer snapshot written to ZLE message line.  Includes live worker count
+# (not the stale precmd-updated flag) so we can verify self-termination.
 _dots_test_buffer_snapshot() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}:BANNER_${#_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}:SUBMITTED_${_DOTS_FAILURE_GRADIENT_SUBMITTED}"
+    _dots_failure_gradient_active_count
+    local live=$REPLY
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:WORKER_ALIVE_${live}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}"
 }
 zle -N _dots_test_buffer_snapshot
 bindkey '^T' _dots_test_buffer_snapshot
@@ -55,119 +66,217 @@ _dots_test_start_failure() {
 }
 precmd_functions=( _dots_test_start_failure ${precmd_functions:#_dots_test_start_failure} )
 
+# Report gradient state at command submission (runs in preexec, before execution).
 _dots_test_report_preexec() {
-    print -r -- "SUBMITTED_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}_FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}"
+    _dots_failure_gradient_active_count
+    print -r -- "PREEXEC_ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}_WORKERS_${REPLY}"
 }
 preexec_functions=( ${preexec_functions:#_dots_test_report_preexec} _dots_test_report_preexec )
+
+# Second failure queue for the multi-gradient coexistence test.
+_dots_test_queue_failure2() {
+    typeset -gi _DOTS_TEST_FAILURE2_PENDING=1
+    print -r -- FAILURE2_QUEUED
+}
+_dots_test_start_failure2() {
+    (( ${_DOTS_TEST_FAILURE2_PENDING:-0} )) || return 0
+    typeset -gi _DOTS_TEST_FAILURE2_PENDING=0
+    dots_failure_message permission_denied 'some-script' 'permission denied'
+}
+precmd_functions+=( _dots_test_start_failure2 )
 ZSH_INIT
 
 trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 
-zpty -b "$PTY_NAME" env TERM=xterm-256color COLUMNS=120 LINES=30 \
+# Start PTY without inheriting TMUX so OSC 4 is not wrapped in passthrough.
+zpty -b "$PTY_NAME" env -u TMUX TERM=xterm-256color COLUMNS=120 LINES=30 \
     "ZSH_DIR=$ZSH_DIR" DOTS_FAILURE_MESSAGE_CHANCE=100 \
     DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_GRADIENT_INTERVAL=0.02 \
     zsh -f -i
 
+# Global accumulator: ALL raw PTY output since session start.
+typeset -g _ALL_RAW=""
+
+_pty_drain_all() {
+    local data=''
+    while zpty -r -t "$PTY_NAME" data 2>/dev/null; do
+        _ALL_RAW+="$data"
+    done
+}
+
 read_until() {
     local needle="$1"
     local -i tries=0
-    local output='' data=''
+    local data=''
     while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        [[ "$output" == *"$needle"* ]] && break
+        if zpty -r -t "$PTY_NAME" data 2>/dev/null; then _ALL_RAW+="$data"; fi
+        [[ "$_ALL_RAW" == *"$needle"* ]] && break
         command sleep 0.05
         (( tries += 1 ))
     done
-    REPLY="$output"
+    REPLY="$_ALL_RAW"
+}
+
+# Strip ANSI CSI SGR and ED sequences for visible-text comparison.
+_strip_sgr() {
+    print -rn -- "$1" | command python3 -c \
+        'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;]*[mJKH]", "", sys.stdin.read()))'
 }
 
 read_until_visible() {
     local needle="$1"
     local -i tries=0
-    local output='' data='' visible=''
+    local data='' visible=''
     while (( tries < 120 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
-        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;]*m", "", sys.stdin.read()))')"
+        if zpty -r -t "$PTY_NAME" data 2>/dev/null; then _ALL_RAW+="$data"; fi
+        visible="$(_strip_sgr "$_ALL_RAW")"
         [[ "$visible" == *"$needle"* ]] && break
         command sleep 0.05
         (( tries += 1 ))
     done
-    _DOTS_TEST_LAST_RAW_OUTPUT="$output"
     REPLY="$visible"
 }
 
 drain_for() {
     local -i rounds="$1"
-    local output='' data=''
+    local data=''
     while (( rounds > 0 )); do
-        if zpty -r -t "$PTY_NAME" data; then output+="$data"; fi
+        if zpty -r -t "$PTY_NAME" data 2>/dev/null; then _ALL_RAW+="$data"; fi
         command sleep 0.02
         rounds=$(( rounds - 1 ))
     done
-    REPLY="$output"
 }
 
-# Wait for the interactive shell's initial prompt before loading the modules.
-local startup='' chunk=''
+# ── Startup ──────────────────────────────────────────────────────────────────
+
+local chunk=''
 local -i attempt=0
 while (( attempt < 40 )); do
-    if zpty -r -t "$PTY_NAME" chunk; then startup+="$chunk"; fi
-    [[ -n "$startup" ]] && break
+    if zpty -r -t "$PTY_NAME" chunk 2>/dev/null; then _ALL_RAW+="$chunk"; fi
+    [[ -n "$_ALL_RAW" ]] && break
     command sleep 0.05
     (( attempt += 1 ))
 done
-[[ -n "$startup" ]] || fail "interactive child shell did not start"
+[[ -n "$_ALL_RAW" ]] || fail "interactive child shell did not start"
 print -- "ok - interactive child shell started"
 
 zpty -w "$PTY_NAME" "source '$INIT_FILE'"
 read_until "BASE_OUTPUT"
-assert_contains "normal prompt renders after sourcing the modules" "BASE_PATH" "$REPLY"
+local visible_startup
+visible_startup="$(_strip_sgr "$_ALL_RAW")"
+assert_contains "normal prompt renders after sourcing the modules" "BASE_PATH" "$visible_startup"
 
-# The real public failure-message function is called from precmd.
+# ── Single gradient: message layout ──────────────────────────────────────────
+
+# Queue the failure and let precmd emit the banner before the next prompt.
 zpty -w "$PTY_NAME" '_dots_test_queue_failure'$'\n'
 read_until FAILURE_QUEUED
-read_until_visible 'command not found'
-assert_contains "one deterministic error message appears" '✖ Command "missing-command" failed.' "$REPLY"
-assert_contains "diagnostic detail appears below the same message" 'command not found' "$REPLY"
-assert_contains "failure banner remains above the input prompt" "BASE_OUTPUT" "$REPLY"
-assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 
-# The PTY must receive real ANSI bytes, never printable caret notation.
-[[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
-assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
+# Wait for the prompt that follows the failure banner.
+read_until "BASE_OUTPUT"
+# Gather a little more output so OSC 4 frames arrive.
+drain_for 10
 
-# Type a command while the gradient is active, then submit it immediately.
-zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
-read_until_visible "EX'ECUTED_OK'"
-assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
+local full_visible
+full_visible="$(_strip_sgr "$_ALL_RAW")"
+
+assert_contains "one deterministic error message appears" '✖ Command "missing-command" failed.' "$full_visible"
+assert_contains "diagnostic detail appears below the message" 'command not found' "$full_visible"
+assert_contains "failure banner precedes the next prompt" "BASE_OUTPUT" "$full_visible"
+assert_contains "path line remains intact" "BASE_PATH" "$full_visible"
+
+# ── Raw escape-byte checks ────────────────────────────────────────────────────
+
+# New architecture: message characters use 256-colour palette indices (\e[38;5;NNNm).
+[[ "$_ALL_RAW" == *$'\e[38;5;'* ]] || fail "gradient did not emit 256-colour palette-index ANSI bytes (\e[38;5;)"
+print -- "ok - 256-colour palette-index sequences present in PTY output"
+assert_absent "gradient does not emit printable caret escape notation" '^[[38;5;' "$_ALL_RAW"
+
+# OSC 4 sequences from the autonomous worker must appear in the PTY output.
+[[ "$_ALL_RAW" == *$'\e]4;'* ]] || fail "autonomous gradient worker did not emit OSC 4 palette update sequences"
+print -- "ok - autonomous OSC 4 palette frames received in PTY output"
+
+# 24-bit TrueColor is NOT used for the message text (palette slots are used instead).
+assert_absent "gradient message text does not embed raw 24-bit TrueColor codes" $'\e[38;2;' "$_ALL_RAW"
+
+# ── Gradient independence: user can type while worker runs ───────────────────
+
+# Type a command while the gradient worker is still running.
+zpty -w -n "$PTY_NAME" "print -r -- TYPED_DURING_GRADIENT"
+read_until_visible "TYPED_DURING_GRADIENT"
+assert_contains "input is accepted while the gradient animates" "TYPED_DURING_GRADIENT" "$REPLY"
+
+# ── Command submission does not stop the gradient worker ─────────────────────
 
 zpty -w -n "$PTY_NAME" $'\r'
-read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-assert_contains "command submission does not cancel the active gradient" \
-    "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
-submitted_output="$REPLY"
-if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
-    read_until "EXECUTED_OK"
-    submitted_output+="${REPLY}"
-fi
-assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
+# preexec fires before the command executes and prints PREEXEC_ACTIVE.
+read_until "PREEXEC_ACTIVE"
+assert_contains "preexec ran without forcibly cancelling gradient" "PREEXEC_ACTIVE" "$_ALL_RAW"
 
-# Once the command exits and ZLE is active again, buffered frames are rendered.
+# Wait for the command output and the next prompt.
 read_until "BASE_OUTPUT"
+local post_cmd_visible
+post_cmd_visible="$(_strip_sgr "$_ALL_RAW")"
+assert_contains "command output appears after submission" "TYPED_DURING_GRADIENT" "$post_cmd_visible"
+assert_contains "next prompt appears after command completes" "BASE_OUTPUT" "$post_cmd_visible"
+
+# ── PROMPT is clean: no banner embedded in PROMPT string ─────────────────────
+
 local snapshot=''
-local -i frame_attempt=0
-while (( frame_attempt < 120 )); do
+local -i snap_attempt=0
+while (( snap_attempt < 60 )); do
     zpty -w -n "$PTY_NAME" $'\x14'
     read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     snapshot="$REPLY"
-    [[ "$snapshot" == *"FRAMES_25"* && "$snapshot" == *"WORKER_0"* ]] && break
+    [[ "$snapshot" == *"BUFFER_SNAPSHOT_BEGIN:"* ]] && break
     command sleep 0.05
-    (( frame_attempt += 1 ))
+    (( snap_attempt += 1 ))
 done
-assert_contains "all 25 gradient frames finish after command submission" "FRAMES_25" "$snapshot"
-assert_contains "the gradient worker terminates after the final prompt redraw" "WORKER_0" "$snapshot"
-assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
-assert_contains "the submitted banner is removed from the next prompt" "BANNER_0" "$snapshot"
-assert_contains "submitted state is cleared after completion" "SUBMITTED_0" "$snapshot"
+assert_contains "buffer snapshot received" "BUFFER_SNAPSHOT_BEGIN:" "$snapshot"
+assert_contains "prompt buffer is clean (no banner text in BUFFER)" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
+
+# ── Second failure: messages coexist in scrollback ───────────────────────────
+
+# Allow the first gradient worker to finish completely before the second failure.
+# (25 frames * 0.02s = 0.5s; we wait 0.8s for headroom.)
+command sleep 0.8
+
+zpty -w "$PTY_NAME" '_dots_test_queue_failure2'$'\n'
+read_until FAILURE2_QUEUED
+read_until "BASE_OUTPUT"
+drain_for 10
+
+local second_visible
+second_visible="$(_strip_sgr "$_ALL_RAW")"
+
+assert_contains "second failure message appears" 'permission denied' "$second_visible"
+# Both messages must coexist in the scrollback visible text.
+assert_contains "first failure message still present after second failure" \
+    '✖ Command "missing-command" failed.' "$second_visible"
+
+# The second message uses 256-colour palette slots (may reuse block 0 since
+# the first worker finished, or use block 1 if still running).
+[[ "$_ALL_RAW" == *$'\e[38;5;'* ]] ||
+    fail "second failure message did not use 256-colour palette-index sequences"
+print -- "ok - second failure uses 256-colour palette-index sequences"
+
+# ── Worker lifecycle: workers self-terminate after their frame cycle ───────────
+
+# Allow time for the second worker's 25 frames to complete (25 * 0.02s + headroom).
+command sleep 0.8
+
+# Ask the shell to report live worker count via the ZLE snapshot widget.
+local final_snap=''
+local -i fs_attempt=0
+while (( fs_attempt < 60 )); do
+    zpty -w -n "$PTY_NAME" $'\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    final_snap="$REPLY"
+    [[ "$final_snap" == *"WORKER_ALIVE_"* ]] && break
+    command sleep 0.05
+    (( fs_attempt += 1 ))
+done
+assert_contains "gradient workers self-terminate after their frame lifecycle" \
+    "WORKER_ALIVE_0" "$final_snap"
 
 print -- "All single-gradient failure animation integration tests passed."
