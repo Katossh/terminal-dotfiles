@@ -385,13 +385,6 @@ set -g history-limit 10000
 # Scroll up enters copy mode; scroll down returns to live output.
 set -g mouse on
 
-# Forward OSC 4 palette updates used by Zsh's animated failure gradient.
-# DCS passthrough is disabled by default in tmux; allow it only in visible panes.
-# The option was introduced in tmux 3.3.
-%if #{>=:#{version},3.3}
-set -g allow-passthrough on
-%endif
-
 # Allow tmux to set Kitty's clipboard without accepting app-originated OSC 52 buffers.
 set -s set-clipboard external
 

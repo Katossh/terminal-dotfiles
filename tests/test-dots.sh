@@ -56,8 +56,6 @@ grep -Fq 'set -s extended-keys on' "$REPO_DIR/config/terminal/tmux/.tmux.conf.lo
 grep -Fq 'set -s extended-keys-format csi-u' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
 grep -Fq "set -as terminal-features ',xterm-kitty:extkeys'" "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
 grep -Fq 'bind -T copy-mode-vi C-S-c send -X copy-selection-and-cancel' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
-grep -Fq '%if #{>=:#{version},3.3}' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
-grep -Fq 'set -g allow-passthrough on' "$REPO_DIR/config/terminal/tmux/.tmux.conf.local"
 
 # Oh My Zsh and its custom plugins are installed outside the checkout.
 # Provisioning must work even when zsh is absent from PATH (fresh/Nix hosts).
