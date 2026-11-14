@@ -16,65 +16,29 @@ _dots_failure_animation_start() {
 }
 
 fail() {
-    print -u2 -- "not ok - $1"
+    print -u2 -r -- "not ok - $*"
     exit 1
 }
 
-assert_contains() {
-    local label="$1"
-    local needle="$2"
-    local haystack="$3"
-
-    [[ "$haystack" == *"$needle"* ]] || {
-        print -u2 -- "not ok - $label (missing: '$needle')"
-        print -u2 -- "$haystack"
-        exit 1
-    }
-    print -- "ok - $label"
-}
-
 assert_eq() {
-    local label="$1"
-    local expected="$2"
-    local actual="$3"
-
-    [[ "$actual" == "$expected" ]] || {
-        print -u2 -- "not ok - $label (expected '$expected', got '$actual')"
-        exit 1
-    }
+    local label="$1" expected="$2" actual="$3"
+    [[ "$actual" == "$expected" ]] || fail "$label (expected: ${(qqq)expected}; got: ${(qqq)actual})"
     print -- "ok - $label"
 }
 
 assert_absent() {
-    local label="$1"
-    local needle="$2"
-    local haystack="$3"
-
-    [[ "$haystack" != *"$needle"* ]] || {
-        print -u2 -- "not ok - $label (unexpected control character)"
-        print -u2 -r -- "  offending character: ${(qqq)needle}"
-        print -u2 -r -- "  rendered output: ${(qqq)haystack}"
-        exit 1
-    }
+    local label="$1" needle="$2" haystack="$3"
+    [[ "$haystack" != *"$needle"* ]] || fail "$label (unexpected: ${(qqq)needle})"
     print -- "ok - $label"
 }
 
 assert_control_free() {
-    local label="$1"
-    local value="$2"
-    # A single LF between the primary message and optional detail is deliberate.
+    local label="$1" value="$2"
     value="${value//$'\n'/}"
-    [[ "$value" != *[[:cntrl:]]* ]] || {
-        print -u2 -- "not ok - $label (control character remained)"
-        exit 1
-    }
+    [[ "$value" != *[[:cntrl:]]* ]] || fail "$label (control character remained)"
     print -- "ok - $label"
 }
 
-# Capture output while running the message function in this shell. This is
-# necessary because its anti-repeat and escalation state is intentionally
-# persistent between calls.
-typeset -g DOTS_TEST_OUTPUT=''
 capture_message() {
     local capture_file
     capture_file="$(mktemp "${TMPDIR:-/tmp}/dots-failure-message.XXXXXX")" || return 1
@@ -85,254 +49,61 @@ capture_message() {
 
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
-export DOTS_FAILURE_RARE_CHANCE=0
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-export DOTS_FAILURE_RAINBOW_CHANCE=0
-export DOTS_FAILURE_ANIMATION_CHANCE=0
-export DOTS_FAILURE_STYLE=normal
-export DOTS_FAILURE_MESSAGE_ESCALATION=0
-
-capture_message not_found gti
-assert_contains "command-not-found category" "gti" "$DOTS_TEST_OUTPUT"
-capture_message permission chmod
-assert_contains "permission category" "chmod" "$DOTS_TEST_OUTPUT"
-capture_message missing_path /tmp/missing
-assert_contains "missing-path category" "/tmp/missing" "$DOTS_TEST_OUTPUT"
-capture_message git 'git push'
-assert_contains "Git category" "git push" "$DOTS_TEST_OUTPUT"
-capture_message nix 'nix build'
-assert_contains "Nix category" "nix build" "$DOTS_TEST_OUTPUT"
-integer generic_index=0
-typeset generic_output=''
-while (( generic_index < 30 )); do
-    capture_message generic 'cargo test'
-    generic_output+="$DOTS_TEST_OUTPUT"
-    (( generic_index += 1 ))
-done
-assert_contains "generic category retains command context across sampled messages" "cargo test" "$generic_output"
-
-
-# Every style can be forced for previews and deterministic testing.
-export DOTS_FAILURE_STYLE=anime
-integer anime_index=0
-typeset anime_output=''
-while (( anime_index < 30 )); do
-    capture_message not_found anime-style-test
-    anime_output+="$DOTS_TEST_OUTPUT"
-    (( anime_index += 1 ))
-done
-assert_contains "anime style retains command context" "anime-style-test" "$anime_output"
-if [[ "$anime_output" != *"💢"* && "$anime_output" != *"⚡"* &&
-      "$anime_output" != *"🜂"* && "$anime_output" != *"✨"* &&
-      "$anime_output" != *"🐾"* && "$anime_output" != *"🌙"* &&
-      "$anime_output" != *"🔥"* && "$anime_output" != *"🌀"* &&
-      "$anime_output" != *"🎴"* && "$anime_output" != *"💫"* &&
-      "$anime_output" != *"🪽"* && "$anime_output" != *"🔮"* &&
-      "$anime_output" != *"🐉"* && "$anime_output" != *"🎀"* &&
-      "$anime_output" != *"🍡"* && "$anime_output" != *"🌸"* ]]; then
-    fail "anime style should include a themed emoji"
-fi
-print -- "ok - anime style includes themed emoji"
-
+export DOTS_FAILURE_ANIMATION=1
 export DOTS_FAILURE_STYLE=ecchi
-integer ecchi_index=0
-typeset ecchi_output=''
-while (( ecchi_index < 200 )); do
-    capture_message generic ecchi-style-test
-    printf -v ecchi_output '%s\n%s' "$ecchi_output" "$DOTS_TEST_OUTPUT"
-    (( ecchi_index += 1 ))
-done
-assert_contains "ecchi pool includes the Nyaa opening" "Nyaa~" "$ecchi_output"
-assert_contains "ecchi pool varies its openings" "Well, well" "$ecchi_output"
-assert_contains "ecchi pool varies its dialogue style" "Darling" "$ecchi_output"
-typeset -U unique_ecchi_messages
-unique_ecchi_messages=( "${(@f)ecchi_output}" )
-(( ${#unique_ecchi_messages} >= 20 )) || fail "ecchi pool should provide at least twenty distinct messages"
-print -- "ok - ecchi pool has broad message diversity"
+export DOTS_FAILURE_ANIMATION_CHANCE=0
+export DOTS_FAILURE_MESSAGE_ESCALATION=1
 
-export DOTS_FAILURE_STYLE=sarcastic
-capture_message generic sarcasm-style-test
-[[ -n "$DOTS_TEST_OUTPUT" ]] || fail "sarcastic style should produce a notice"
-print -- "ok - sarcastic style produces a notice"
-
-export DOTS_FAILURE_STYLE=dramatic
-capture_message generic dramatic-style-test
-assert_contains "dramatic style retains command context" "dramatic-style-test" "$DOTS_TEST_OUTPUT"
-
-export DOTS_FAILURE_STYLE=rainbow
-capture_message generic rainbow-style-test
-assert_contains "rainbow style retains command context" "rainbow-style-test" "$DOTS_TEST_OUTPUT"
-assert_contains "rainbow style includes rainbow emoji" "🌈" "$DOTS_TEST_OUTPUT"
-assert_control_free "rainbow output stays control-free when redirected" "$DOTS_TEST_OUTPUT"
-
-export DOTS_FAILURE_STYLE=legendary
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic legendary-style-test
-assert_eq "explicit Legendary style selects the banner animation" "legendary" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "Legendary banner retains command context" "legendary-style-test" "$DOTS_TEST_ANIMATION_BANNER"
-
-export DOTS_FAILURE_STYLE=mythic
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic mythic-style-test
-assert_eq "explicit Mythic style selects the banner animation" "mythic" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "Mythic banner retains command context" "mythic-style-test" "$DOTS_TEST_ANIMATION_BANNER"
-assert_contains "Mythic banner includes starfall emoji" "🌠" "$DOTS_TEST_ANIMATION_BANNER"
-
-# The final resolved ordinary style still selects the matching emoji pool.
-export DOTS_FAILURE_ANIMATION_CHANCE=100
-for style in normal sarcastic dramatic anime ecchi rainbow; do
-    export DOTS_FAILURE_STYLE="$style"
+# Every failure category must use the same wording and the same single palette.
+for category in not_found permission missing_path git nix network generic unknown; do
     DOTS_TEST_ANIMATION_STYLE=''
     DOTS_TEST_ANIMATION_BANNER=''
     DOTS_TEST_ANIMATION_DETAIL=''
-    capture_message generic "animation-style-$style"
-    assert_eq "${style} style is passed to animation" "$style" "$DOTS_TEST_ANIMATION_STYLE"
-    assert_eq "${style} sends its selected template to the animator" "$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE" "$DOTS_TEST_ANIMATION_BANNER"
+    capture_message "$category" 'cargo test'
+    assert_eq "$category uses the common gradient style" normal "$DOTS_TEST_ANIMATION_STYLE"
+    assert_eq "$category uses the one message template" '✖ Command "cargo test" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+    assert_eq "$category has no extra message detail" '' "$DOTS_TEST_ANIMATION_DETAIL"
+    assert_eq "$category emits no static duplicate when animation starts" '' "$DOTS_TEST_OUTPUT"
 done
 
-# Basis-point rare rolls are deterministic at 100%; Mythic has priority.
-export DOTS_FAILURE_STYLE=auto
-export DOTS_FAILURE_MYTHIC_CHANCE=10000
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic automatic-mythic-test
-assert_eq "10000 basis points force automatic Mythic" "mythic" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "automatic Mythic retains command context" "automatic-mythic-test" "$DOTS_TEST_ANIMATION_BANNER"
+# Message text remains deterministic across repeated calls and ignores legacy style knobs.
+first="$DOTS_TEST_ANIMATION_BANNER"
+capture_message not_found 'cargo test'
+assert_eq "repeated failures use identical wording" "$first" "$DOTS_TEST_ANIMATION_BANNER"
 
-export DOTS_FAILURE_MYTHIC_CHANCE=0
-export DOTS_FAILURE_LEGENDARY_CHANCE=10000
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic automatic-legendary-test
-assert_eq "10000 basis points force automatic Legendary" "legendary" "$DOTS_TEST_ANIMATION_STYLE"
-assert_contains "automatic Legendary retains command context" "automatic-legendary-test" "$DOTS_TEST_ANIMATION_BANNER"
+# Optional detail is passed separately so the animator can lay it out on the next row.
+capture_message git 'git push' 'remote rejected the update'
+assert_eq "detail does not create another message variant" '✖ Command "git push" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+assert_eq "diagnostic detail is preserved" 'remote rejected the update' "$DOTS_TEST_ANIMATION_DETAIL"
 
-# Explicit style overrides are not replaced by automatic rarity rolls.
-export DOTS_FAILURE_STYLE=normal
-export DOTS_FAILURE_ANIMATION_CHANCE=100
-export DOTS_FAILURE_MYTHIC_CHANCE=10000
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-DOTS_TEST_ANIMATION_STYLE=''
-DOTS_TEST_ANIMATION_BANNER=''
-capture_message generic explicit-normal-style
-assert_eq "explicit Normal bypasses automatic rare-event rolls" "normal" "$DOTS_TEST_ANIMATION_STYLE"
-assert_eq "explicit Normal sends its selected template to the animator" "$_DOTS_FAILURE_MESSAGE_LAST_TEMPLATE" "$DOTS_TEST_ANIMATION_BANNER"
-
-# When the prompt animator is unavailable, rare messages retain their static fallback.
-export DOTS_FAILURE_STYLE=mythic
+# If animation cannot start, the same message falls back to plain output.
 DOTS_TEST_ANIMATION_AVAILABLE=0
-capture_message generic static-mythic-fallback
-assert_contains "static Mythic fallback retains command context" "static-mythic-fallback" "$DOTS_TEST_OUTPUT"
+capture_message generic 'static-fallback' 'inspect stderr'
+assert_eq "plain fallback keeps the one message format" $'✖ Command "static-fallback" failed.\n  ↳ inspect stderr' "$DOTS_TEST_OUTPUT"
 DOTS_TEST_ANIMATION_AVAILABLE=1
 
-# Anime's automatic Ecchi conversion must pass Ecchi, not the pre-conversion
-# Anime style, to the animation. Repeat until the weighted branch is exercised.
-export DOTS_FAILURE_STYLE=auto
-export DOTS_FAILURE_LEGENDARY_CHANCE=0
-export DOTS_FAILURE_MYTHIC_CHANCE=0
-export DOTS_FAILURE_RAINBOW_CHANCE=0
-integer auto_attempt=0
-typeset auto_ecchi_found=0
-while (( auto_attempt < 500 )); do
-    DOTS_TEST_ANIMATION_STYLE=''
-    capture_message generic animation-auto-anime
-    if [[ "$DOTS_TEST_ANIMATION_STYLE" == ecchi ]]; then
-        auto_ecchi_found=1
-        break
-    fi
-    (( auto_attempt += 1 ))
-done
-[[ "$auto_ecchi_found" == 1 ]] || fail "automatic Anime-to-Ecchi selection never reached Ecchi animation pool"
-print -- "ok - automatic Anime-to-Ecchi selection reaches the Ecchi pool"
-
-# Animations are never emitted into redirected output, even at a 100% chance.
-# The start hook is only a state change; no animation bytes enter the message.
-export DOTS_FAILURE_STYLE=normal
-capture_message generic redirected-animation-test
-assert_absent "animation stays off when output is redirected" "Consulting the machine spirits" "$DOTS_TEST_OUTPUT"
-export DOTS_FAILURE_ANIMATION_CHANCE=0
-
-# Network messages must remain distinct from generic fallback messages.
-capture_message network 'curl https://example.invalid'
-assert_contains "network category" "network" "${DOTS_TEST_OUTPUT:l}"
-assert_contains "network command context" "curl https://example.invalid" "$DOTS_TEST_OUTPUT"
-
-integer network_index=1
-while (( network_index < 30 )); do
-    capture_message network 'curl https://example.invalid'
-    assert_contains "network category survives repeat escalation" "network" "${DOTS_TEST_OUTPUT:l}"
-    network_index=$((network_index + 1))
-done
-
-# NUL cannot be held in a shell variable. Test every other C0 control and DEL.
+# Sanitise terminal controls in both the command and diagnostic detail.
+DOTS_TEST_ANIMATION_AVAILABLE=0
 unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
 capture_message network "$unsafe_command"
-# Check the entire output against the POSIX control-character class rather
-# than glob-matching individual control bytes as shell pattern fragments.
-command_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
-(( ${#command_lines[@]} == 1 )) || fail "command controls must not create extra terminal lines"
-assert_control_free "command rendering has no control characters" "$DOTS_TEST_OUTPUT"
+assert_control_free "command fallback contains no control bytes" "$DOTS_TEST_OUTPUT"
+assert_absent "command newline is replaced, not rendered as a new message" $'\n  ↳' "$DOTS_TEST_OUTPUT"
 
 unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
 capture_message network curl "$unsafe_detail"
-# The same complete control-byte check applies to optional detail output.
+assert_control_free "detail fallback contains no control bytes" "$DOTS_TEST_OUTPUT"
 detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
-(( ${#detail_lines[@]} == 2 )) || fail "detail controls must not create extra terminal lines"
-assert_control_free "detail rendering has no control characters" "$DOTS_TEST_OUTPUT"
+assert_eq "detail is kept on one additional row" 2 "${#detail_lines}"
 
-# The same helper sanitises the username before it is interpolated.
-unsafe_user=$'katossh\a\b\t\v\f\r\n\e\x7f'
-_dots_failure_message_sanitize "$unsafe_user"
-assert_contains "username is retained" "katossh" "$REPLY"
-assert_control_free "username is sanitised" "$REPLY"
-
-integer fallback_index=0
-typeset fallback_output=''
-while (( fallback_index < 30 )); do
-    capture_message unexpected fallback-command
-    fallback_output+="$DOTS_TEST_OUTPUT"
-    (( fallback_index += 1 ))
-done
-assert_contains "unknown categories fall back to generic" "fallback-command" "$fallback_output"
-
-# The renderer's state must survive between calls, and adjacent templates
-# must never repeat.
-typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
-typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
-typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
-capture_message generic repeated-command
-first="$DOTS_TEST_OUTPUT"
-capture_message generic repeated-command
-second="$DOTS_TEST_OUTPUT"
-[[ "$first" != "$second" ]] || fail "adjacent messages must not repeat"
-print -- "ok - adjacent messages do not repeat"
-
-# The second and third identical failures advance the escalation counter.
-typeset -g _DOTS_FAILURE_MESSAGE_LAST_KEY=''
-typeset -g _DOTS_FAILURE_MESSAGE_LAST_TEMPLATE=''
-typeset -gi _DOTS_FAILURE_MESSAGE_STREAK=0
-export DOTS_FAILURE_MESSAGE_ESCALATION=1
-capture_message generic escalation-command
-first="$DOTS_TEST_OUTPUT"
-capture_message generic escalation-command
-second="$DOTS_TEST_OUTPUT"
-[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 2 ]] || fail "second failure increments streak"
-capture_message generic escalation-command
-third="$DOTS_TEST_OUTPUT"
-[[ "$_DOTS_FAILURE_MESSAGE_STREAK" == 3 ]] || fail "third failure increments streak"
-[[ "$first" != "$second" && "$second" != "$third" ]] || fail "escalation avoids adjacent repeats"
-print -- "ok - escalation state and anti-repeat"
-
+# A zero chance remains a supported opt-out and never invokes the animator.
 export DOTS_FAILURE_MESSAGE_CHANCE=0
+DOTS_TEST_ANIMATION_STYLE=''
 capture_message generic suppressed
-[[ -z "$DOTS_TEST_OUTPUT" ]] || fail "zero chance suppresses output"
-print -- "ok - zero chance suppresses output"
+assert_eq "zero chance suppresses the message" '' "$DOTS_TEST_OUTPUT"
+assert_eq "zero chance skips the animator" '' "$DOTS_TEST_ANIMATION_STYLE"
 
+# Rendering must not alter the failed command's status.
 dots_failure_message generic status-check >/dev/null
-[[ "$?" == 0 ]] || fail "renderer must return success"
-print -- "ok - renderer returns success"
+assert_eq "renderer returns success" 0 "$?"
 
-print -- "All failure-message tests passed."
+print -- "All single-template failure-message tests passed."
