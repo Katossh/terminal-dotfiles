@@ -55,6 +55,8 @@ On an interactive colour-capable terminal, this exact message is animated with a
 
 The gradient uses dedicated 256-colour palette slots (OSC 4), one block of twelve slots per concurrent failure. A disowned background worker sends OSC 4 palette-update sequences to the terminal at the configured interval for 25 frames, then exits on its own. Because the colour definitions are updated in-place, the text characters stay exactly where they were printed and animate without any cursor movement or repaint. Up to five gradient messages can coexist simultaneously in scrollback, each using its own palette block.
 
+When running inside tmux, the palette updates are wrapped in tmux DCS passthrough. The bundled tmux configuration enables `allow-passthrough` on tmux 3.3 and newer (visible panes only); tmux disables this feature by default. tmux versions older than 3.3 cannot forward these updates to the outer terminal.
+
 Typing, cursor movement, command submission, and prompt redraws have no effect on the animation. Each worker terminates according to its own frame lifecycle. The same plain message is printed when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
 
 `DOTS_FAILURE_MESSAGE_CHANCE=0` suppresses the notice. `DOTS_FAILURE_GRADIENT_INTERVAL` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
