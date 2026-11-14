@@ -64,7 +64,8 @@ jobs:
             tests/test-failure-classifier.zsh \
             tests/test-failure-messages.zsh \
             tests/test-failure-integration.zsh \
-            tests/test-failure-animation.zsh; do
+            tests/test-failure-animation.zsh \
+            tests/test-failure-tmux-passthrough.zsh; do
             zsh -n "$script"
           done
 
@@ -78,7 +79,8 @@ jobs:
             tests/test-failure-classifier.zsh \
             tests/test-failure-messages.zsh \
             tests/test-failure-integration.zsh \
-            tests/test-failure-animation.zsh; do
+            tests/test-failure-animation.zsh \
+            tests/test-failure-tmux-passthrough.zsh; do
             zsh "$test"
           done
 
