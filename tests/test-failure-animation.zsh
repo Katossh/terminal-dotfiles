@@ -91,7 +91,7 @@ trap 'zpty -d "$PTY_NAME" 2>/dev/null || true; rm -f "$INIT_FILE"' EXIT
 # Start PTY without inheriting TMUX so OSC 4 is not wrapped in passthrough.
 zpty -b "$PTY_NAME" env -u TMUX TERM=xterm-256color COLUMNS=120 LINES=30 \
     "ZSH_DIR=$ZSH_DIR" DOTS_FAILURE_MESSAGE_CHANCE=100 \
-    DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_GRADIENT_INTERVAL=0.04 \
+    DOTS_FAILURE_ANIMATION=1 DOTS_FAILURE_GRADIENT_INTERVAL=0.12 \
     zsh -f -i
 
 # Global accumulator: ALL raw PTY output since session start.
@@ -199,7 +199,7 @@ read_until_after "BASE_OUTPUT"
 # must continue emitting OSC 4 palette updates while ZLE is idle.
 _count_osc4_frames "$_ALL_RAW"
 local -i idle_frames_before=$REPLY
-drain_for 8
+drain_for 20
 _count_osc4_frames "$_ALL_RAW"
 local -i idle_frames_after=$REPLY
 (( idle_frames_after - idle_frames_before >= 2 )) ||
@@ -279,8 +279,8 @@ assert_contains "prompt buffer is clean (no banner text in BUFFER)" "BUFFER_SNAP
 # ── Second failure: messages coexist in scrollback ───────────────────────────
 
 # Allow the first gradient worker to finish completely before the second failure.
-# (24 palette updates * 0.04s = 0.96s; wait with scheduling headroom.)
-command sleep 1.2
+# (24 palette updates * 0.12s = 2.88s; wait with scheduling headroom.)
+command sleep 3.2
 
 zpty -w "$PTY_NAME" '_dots_test_queue_failure2'$'\n'
 read_until FAILURE2_QUEUED
@@ -303,8 +303,8 @@ print -- "ok - second failure uses 256-colour palette-index sequences"
 
 # ── Worker lifecycle: workers self-terminate after their frame cycle ───────────
 
-# Allow time for the second worker's 24 palette updates (24 * 0.04s + headroom).
-command sleep 1.2
+# Allow time for the second worker's 24 palette updates (24 * 0.12s + headroom).
+command sleep 3.2
 
 # Ask the shell to report live worker count via the ZLE snapshot widget.
 local final_snap=''
