@@ -53,7 +53,7 @@ The installer does not pull changes automatically. Update the configuration expl
 git -C "${XDG_CONFIG_HOME:-$HOME/.config}/nvim" pull --ff-only
 ~~~
 
-Git authentication for the private repository must already be configured. Override the remote with `DOTS_NVIM_REPO` when needed; `DOTS_SKIP_DOWNLOADS=1` skips this and all other upstream downloads.
+Git authentication for the private repository must already be configured. Interactive `dots install` provisions it normally. Non-interactive runs (including Home Manager/systemd activation) reuse an existing checkout but skip a missing private checkout instead of failing activation. After activation, run `dots install --no-packages` from an authenticated terminal to install it. Credentialed automation can explicitly set `DOTS_NVIM_ALLOW_NONINTERACTIVE=1`. Override the remote with `DOTS_NVIM_REPO` when needed; `DOTS_SKIP_DOWNLOADS=1` skips this and all other upstream downloads.
 
 ## Package installation
 
