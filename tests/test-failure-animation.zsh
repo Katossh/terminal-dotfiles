@@ -136,15 +136,44 @@ assert_contains "path line remains intact" "BASE_PATH" "$REPLY"
 [[ "$_DOTS_TEST_LAST_RAW_OUTPUT" == *$'\e[38;2;'* ]] || fail "gradient did not emit actual 24-bit ANSI control bytes"
 assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;' "$_DOTS_TEST_LAST_RAW_OUTPUT"
 
-# Type a command while the gradient is active, then submit it immediately.
+# Leave the prompt idle beyond the old 25-frame cutoff. The gradient must
+# still be active and the banner must remain available for live redraws.
+local persistent_snapshot='' frame_count=''
+local -i animation_attempt=0
+while (( animation_attempt < 120 )); do
+    zpty -w -n "$PTY_NAME" 
+
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
+    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+    persistent_snapshot="$REPLY"
+    frame_count="${persistent_snapshot##*FRAMES_}"
+    frame_count="${frame_count%%:*}"
+    if (( frame_count > 30 )); then
+        break
+    fi
+    command sleep 0.03
+    (( animation_attempt += 1 ))
+done
+(( frame_count > 30 )) || fail "gradient stopped before exceeding 30 frames"
+assert_contains "gradient remains active beyond the former 25-frame limit" "ACTIVE_1" "$persistent_snapshot"
+assert_contains "gradient worker keeps running while the prompt is idle" "WORKER_1" "$persistent_snapshot"
+print -- "ok - gradient phase stream loops indefinitely while the banner is active"
+
+# Typing remains responsive while the gradient is active.
 zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
 read_until_visible "EX'ECUTED_OK'"
 assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
 
-zpty -w -n "$PTY_NAME" $'\r'
-read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-assert_contains "command submission does not cancel the active gradient" \
-    "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
+# Submitting the command stops the worker; the already-rendered banner remains
+# in scrollback, and the next prompt starts without carrying the old banner.
+zpty -w -n "$PTY_NAME" 
+
+print -- "All single-gradient failure animation integration tests passed."
+\r'
+read_until "SUBMITTED_ACTIVE_0_WORKER_0"
+assert_contains "command submission stops the infinite gradient worker" \
+    "SUBMITTED_ACTIVE_0_WORKER_0" "$REPLY"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
     read_until "EXECUTED_OK"
@@ -152,22 +181,17 @@ if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
 fi
 assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
 
-# Once the command exits and ZLE is active again, buffered frames are rendered.
 read_until "BASE_OUTPUT"
 local snapshot=''
-local -i frame_attempt=0
-while (( frame_attempt < 120 )); do
-    zpty -w -n "$PTY_NAME" $'\x14'
-    read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-    snapshot="$REPLY"
-    [[ "$snapshot" == *"FRAMES_25"* && "$snapshot" == *"WORKER_0"* ]] && break
-    command sleep 0.05
-    (( frame_attempt += 1 ))
-done
-assert_contains "all 25 gradient frames finish after command submission" "FRAMES_25" "$snapshot"
-assert_contains "the gradient worker terminates after the final prompt redraw" "WORKER_0" "$snapshot"
+zpty -w -n "$PTY_NAME" 
+
+print -- "All single-gradient failure animation integration tests passed."
+\x14'
+read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
+snapshot="$REPLY"
 assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
 assert_contains "the submitted banner is removed from the next prompt" "BANNER_0" "$snapshot"
+assert_contains "the worker remains stopped after command completion" "WORKER_0" "$snapshot"
 assert_contains "submitted state is cleared after completion" "SUBMITTED_0" "$snapshot"
 
 print -- "All single-gradient failure animation integration tests passed."
