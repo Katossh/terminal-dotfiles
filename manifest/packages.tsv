@@ -4,6 +4,7 @@
 apt	zsh	required
 apt	git	required
 apt	tmux	required
+apt	zellij	optional
 apt	fzf	required
 apt	ripgrep	required
 apt	neovim	required
@@ -25,6 +26,7 @@ apt	fonts-noto-color-emoji	required
 dnf	zsh	required
 dnf	git	required
 dnf	tmux	required
+dnf	zellij	optional
 dnf	fzf	required
 dnf	ripgrep	required
 dnf	neovim	required
@@ -45,6 +47,7 @@ dnf	google-noto-color-emoji-fonts	required
 pacman	zsh	required
 pacman	git	required
 pacman	tmux	required
+pacman	zellij	optional
 pacman	fzf	required
 pacman	ripgrep	required
 pacman	neovim	required
@@ -65,6 +68,7 @@ pacman	noto-fonts-emoji	required
 zypper	zsh	required
 zypper	git	required
 zypper	tmux	required
+zypper	zellij	optional
 zypper	fzf	required
 zypper	ripgrep	required
 zypper	neovim	required
@@ -85,6 +89,7 @@ zypper	google-noto-coloremoji-fonts	required
 apk	zsh	required
 apk	git	required
 apk	tmux	required
+apk	zellij	optional
 apk	fzf	required
 apk	ripgrep	required
 apk	neovim	required
@@ -105,6 +110,7 @@ apk	font-noto-emoji	required
 xbps	zsh	required
 xbps	git	required
 xbps	tmux	required
+xbps	zellij	optional
 xbps	fzf	required
 xbps	ripgrep	required
 xbps	neovim	required
@@ -125,6 +131,7 @@ xbps	noto-fonts-emoji	required
 pkg	zsh	required
 pkg	git	required
 pkg	tmux	required
+pkg	zellij	optional
 pkg	fzf	required
 pkg	ripgrep	required
 pkg	neovim	required
@@ -144,6 +151,7 @@ pkg	noto-emoji	required
 brew	zsh	required
 brew	git	required
 brew	tmux	required
+brew	zellij	optional
 brew	fzf	required
 brew	ripgrep	required
 brew	neovim	required
@@ -164,6 +172,7 @@ brew-cask	font-noto-color-emoji	required
 nixpkgs	zsh	required
 nixpkgs	git	required
 nixpkgs	tmux	required
+nixpkgs	zellij	optional
 nixpkgs	fzf	required
 nixpkgs	ripgrep	required
 nixpkgs	neovim	required
