@@ -39,21 +39,19 @@ _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
 _DOTS_FAILURE_GRADIENT_INTERVAL=0.08
 
 _dots_test_buffer_snapshot() {
-    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:BANNERS_${#_DOTS_FAILURE_GRADIENT_BANNERS}:PHASE_SLOTS_${#_DOTS_FAILURE_GRADIENT_PHASES}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}:BANNER_${#_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}"
+    zle -M "BUFFER_SNAPSHOT_BEGIN:${BUFFER}:CURSOR_${CURSOR}:FRAMES_${_DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES}:ACTIVE_${_DOTS_FAILURE_GRADIENT_ACTIVE}:WORKER_${_DOTS_FAILURE_ANIMATION_ACTIVE}:STATE_${_DOTS_FAILURE_ANIMATION_STATE}:BANNER_${#_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT}:SUBMITTED_${_DOTS_FAILURE_GRADIENT_SUBMITTED}"
 }
 zle -N _dots_test_buffer_snapshot
 bindkey '^T' _dots_test_buffer_snapshot
 
 _dots_test_queue_failure() {
     typeset -gi _DOTS_TEST_FAILURE_PENDING=1
-    typeset -g _DOTS_TEST_FAILURE_COMMAND="${1:-missing-command}"
-    typeset -g _DOTS_TEST_FAILURE_DETAIL="${2:-command not found}"
     print -r -- FAILURE_QUEUED
 }
 _dots_test_start_failure() {
     (( ${_DOTS_TEST_FAILURE_PENDING:-0} )) || return 0
     typeset -gi _DOTS_TEST_FAILURE_PENDING=0
-    dots_failure_message not_found "$_DOTS_TEST_FAILURE_COMMAND" "$_DOTS_TEST_FAILURE_DETAIL"
+    dots_failure_message not_found 'missing-command' 'command not found'
 }
 precmd_functions=( _dots_test_start_failure ${precmd_functions:#_dots_test_start_failure} )
 
@@ -159,17 +157,21 @@ assert_contains "gradient remains active beyond the former 25-frame limit" "ACTI
 assert_contains "gradient worker keeps running while the prompt is idle" "WORKER_1" "$persistent_snapshot"
 print -- "ok - gradient phase stream loops indefinitely while the banner is active"
 
-# Typing and submitting a successful command must not cancel the first failure.
+# Typing remains responsive while the gradient is active.
 zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
 read_until_visible "EX'ECUTED_OK'"
 assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
+
+# Submitting the command stops the worker; the already-rendered banner remains
+# in scrollback, and the next prompt starts without carrying the old banner.
 zpty -w -n "$PTY_NAME" $'\C-M'
-read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-assert_contains "command submission leaves the first gradient worker active" "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
+read_until "SUBMITTED_ACTIVE_0_WORKER_0"
+assert_contains "command submission stops the infinite gradient worker" \
+    "SUBMITTED_ACTIVE_0_WORKER_0" "$REPLY"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
     read_until "EXECUTED_OK"
-    submitted_output+="$REPLY"
+    submitted_output+="${REPLY}"
 fi
 assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submitted_output"
 
@@ -178,50 +180,9 @@ local snapshot=''
 zpty -w -n "$PTY_NAME" $'\C-T'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 snapshot="$REPLY"
-assert_contains "the first failure remains registered after command submission" "BANNERS_1" "$snapshot"
-assert_contains "the first failure remains animated on the next prompt" "WORKER_1" "$snapshot"
-assert_contains "the first failure text remains visible" 'missing-command' "$snapshot"
+assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
+assert_contains "the submitted banner is removed from the next prompt" "BANNER_0" "$snapshot"
+assert_contains "the worker remains stopped after command completion" "WORKER_0" "$snapshot"
+assert_contains "submitted state is cleared after completion" "SUBMITTED_0" "$snapshot"
 
-# A second failed command must append a separate animation, not replace the first.
-zpty -w -n "$PTY_NAME" "_dots_test_queue_failure second-missing 'second command not found'"
-zpty -w -n "$PTY_NAME" $'\C-M'
-read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-read_until FAILURE_QUEUED
-read_until_visible 'second command not found'
-assert_contains "the second failure is rendered" 'second command not found' "$REPLY"
-
-zpty -w -n "$PTY_NAME" $'\C-T'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-snapshot="$REPLY"
-assert_contains "both failure banners are retained independently" "BANNERS_2" "$snapshot"
-assert_contains "both failure animations share a live scheduler" "WORKER_1" "$snapshot"
-assert_contains "the first failure survives the second failure" 'missing-command' "$snapshot"
-assert_contains "the second failure has its own retained message" 'second-missing' "$snapshot"
-assert_contains "each failure retains a separate phase slot" "PHASE_SLOTS_2" "$snapshot"
-
-# A further successful command also leaves both animations running.
-zpty -w -n "$PTY_NAME" "print -r -- FINAL_EXECUTED"
-read_until_visible "FINAL_EXECUTED"
-zpty -w -n "$PTY_NAME" $'\C-M'
-read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-assert_contains "later command submission does not stop either animation" "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
-read_until "FINAL_EXECUTED"
-read_until "BASE_OUTPUT"
-
-zpty -w -n "$PTY_NAME" $'\C-T'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-snapshot="$REPLY"
-assert_contains "both failures remain after another command" "BANNERS_2" "$snapshot"
-assert_contains "both failure records remain available" 'missing-command' "$snapshot"
-assert_contains "the newer failure remains available" 'second-missing' "$snapshot"
-assert_contains "the scheduler remains active after repeated submissions" "WORKER_1" "$snapshot"
-
-# Explicitly clearing the prompt is still allowed to remove every animation.
-zpty -w -n "$PTY_NAME" $'\C-L'
-zpty -w -n "$PTY_NAME" $'\C-T'
-read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
-snapshot="$REPLY"
-assert_contains "Ctrl+L explicitly clears all failure records" "BANNERS_0" "$snapshot"
-assert_contains "Ctrl+L stops the shared gradient worker" "WORKER_0" "$snapshot"
-
-print -- "All independent failure-gradient integration tests passed."
+print -- "All single-gradient failure animation integration tests passed."
