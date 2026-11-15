@@ -8,7 +8,8 @@ export HOME="$TEST_ROOT/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export DOTS_SKIP_DOWNLOADS=1
-mkdir -p "$XDG_CONFIG_HOME/kitty" "$XDG_CONFIG_HOME/dots/overrides/kitty"
+mkdir -p "$XDG_CONFIG_HOME/kitty" "$XDG_CONFIG_HOME/dots/overrides/kitty" "$XDG_CONFIG_HOME/nvim"
+printf '%s\n' 'user-owned Neovim configuration' > "$XDG_CONFIG_HOME/nvim/init.lua"
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
 # Simulate a pre-existing user file and a file-level personal override.
@@ -94,6 +95,11 @@ case "${1:-}" in
             https://github.com/zsh-users/zsh-completions.git)
                 mkdir -p "$target/src"
                 ;;
+            https://github.com/Katossh/Neovim.git)
+                mkdir -p "$target/lua"
+                : > "$target/init.lua"
+                : > "$target/lua/chadrc.lua"
+                ;;
         esac
         ;;
     -C)
@@ -149,6 +155,12 @@ PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install.log"
 test -f "$XDG_DATA_HOME/oh-my-zsh/oh-my-zsh.sh"
 test -f "$XDG_DATA_HOME/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh"
+nvim_checkout="$XDG_DATA_HOME/dots/upstreams/nvchad-config"
+test -L "$XDG_CONFIG_HOME/nvim"
+test "$(readlink "$XDG_CONFIG_HOME/nvim")" = "$nvim_checkout"
+test -f "$nvim_checkout/init.lua"
+test -f "$nvim_checkout/lua/chadrc.lua"
+test "$(find "$XDG_DATA_HOME/dots/backups/collisions" -path '*/.config/nvim/init.lua' -type f | wc -l)" -eq 1
 test -f "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab/fzf-tab.plugin.zsh"
 test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
 test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
@@ -175,6 +187,24 @@ test ! -e "$XDG_DATA_HOME/oh-my-zsh"
 test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
 test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting"
 test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions"
+test ! -L "$XDG_CONFIG_HOME/nvim"
+test -f "$XDG_CONFIG_HOME/nvim/init.lua"
+grep -Fq 'user-owned Neovim configuration' "$XDG_CONFIG_HOME/nvim/init.lua"
+test ! -e "$XDG_DATA_HOME/dots/upstreams/nvchad-config"
+
+# A pre-existing checkout of the exact same repository is reused in place.
+rm -rf "$XDG_CONFIG_HOME/nvim"
+mkdir -p "$XDG_CONFIG_HOME/nvim/.git" "$XDG_CONFIG_HOME/nvim/lua"
+printf '%s\n' 'https://github.com/Katossh/Neovim.git' > "$XDG_CONFIG_HOME/nvim/.git/test-origin"
+: > "$XDG_CONFIG_HOME/nvim/init.lua"
+: > "$XDG_CONFIG_HOME/nvim/lua/chadrc.lua"
+nvim_clones_before="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/nvim-existing.log"
+nvim_clones_after="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
+test "$nvim_clones_after" -eq "$nvim_clones_before"
+test ! -L "$XDG_CONFIG_HOME/nvim"
+test -f "$XDG_CONFIG_HOME/nvim/lua/chadrc.lua"
 
 # NixOS gets the same user configuration links and installs dependencies into
 # the invoking user's Nix profile. A fake nix executable keeps this test safe.

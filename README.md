@@ -11,7 +11,7 @@ cd "$HOME/terminal-dotfiles"
 # Preview filesystem changes without installing packages or downloading upstream code.
 ./bin/dots install --dry-run --no-packages --yes
 
-# Link configuration and download Oh My Zsh plus its plugins.
+# Link configuration and download Oh My Zsh, its plugins, and your NvChad config.
 ./bin/dots install --no-packages
 
 # Or also install the recommended native packages.
@@ -20,7 +20,7 @@ cd "$HOME/terminal-dotfiles"
 
 Run the installer as your normal user, never through sudo. Existing targets are backed up before managed links replace them. The installer is safe to re-run.
 
-**Important:** --no-packages skips native OS package installation only. It does not skip Oh My Zsh or its plugin downloads. To skip every optional upstream download for an offline/config-only setup, set DOTS_SKIP_DOWNLOADS=1.
+**Important:** --no-packages skips native OS package installation only. It does not skip upstream downloads, including your NvChad configuration. The NvChad repository is private, so Git must already be authenticated for it. To skip every upstream download for an offline/config-only setup, set DOTS_SKIP_DOWNLOADS=1.
 
 ## What dots install does
 
@@ -28,10 +28,11 @@ Run the installer as your normal user, never through sudo. Existing targets are 
 2. Backs up existing target paths rather than silently overwriting them.
 3. Creates shared terminal theme adapters and links helper commands into ~/.local/bin.
 4. Downloads Oh My Zsh and the required custom Zsh repositories into XDG_DATA_HOME (by default ~/.local/share). This happens even when the zsh executable is not installed or not in PATH.
-5. Downloads the Catppuccin tmux plugin when tmux 3.2+ is available; the generated local palette remains a fallback.
-6. Installs native packages only when --packages is selected (or accepted at the interactive prompt).
+5. Clones your NvChad configuration into XDG_DATA_HOME/dots/upstreams/nvchad-config and links it at XDG_CONFIG_HOME/nvim. Existing Neovim configurations are backed up first.
+6. Downloads the Catppuccin tmux plugin when tmux 3.2+ is available; the generated local palette remains a fallback.
+7. Installs native packages only when --packages is selected (or accepted at the interactive prompt).
 
-Git and network access to GitHub are required for framework/plugin downloads. Failed Zsh clones are retried, reported as installation errors, and cause a non-zero exit status. The installer validates the expected entry file/directory of every clone before accepting it.
+Git and network access to GitHub are required. The NvChad repository is private; authenticate Git before installing. Failed required clones are reported as installation errors, and the installer validates the expected entry file/directory before accepting a checkout.
 
 ## Documentation
 
@@ -41,6 +42,18 @@ Git and network access to GitHub are required for framework/plugin downloads. Fa
 - [Yazi setup](docs/YAZI.md) — Neovim opener, Catppuccin theme, config ownership and installation.
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — missing framework, incomplete downloads, PATH and network issues.
 - [Upstream sources](resources/upstream-sources.md) — third-party projects and their runtime locations.
+
+## NvChad configuration
+
+The private [Katossh/Neovim](https://github.com/Katossh/Neovim) repository remains independent of this one. `dots install` clones it into `$XDG_DATA_HOME/dots/upstreams/nvchad-config` and symlinks `$XDG_CONFIG_HOME/nvim` to that checkout. Existing `nvim` directories are moved to the installer's collision-backup area rather than overwritten.
+
+The installer does not pull changes automatically. Update the configuration explicitly with:
+
+~~~sh
+git -C "${XDG_CONFIG_HOME:-$HOME/.config}/nvim" pull --ff-only
+~~~
+
+Git authentication for the private repository must already be configured. Override the remote with `DOTS_NVIM_REPO` when needed; `DOTS_SKIP_DOWNLOADS=1` skips this and all other upstream downloads.
 
 ## Package installation
 

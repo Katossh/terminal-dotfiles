@@ -87,8 +87,9 @@ Options:
 
 Environment:
   DOTS_SKIP_DOWNLOADS=1       Skip upstream Git downloads (offline/config-only mode).
-  DOTS_GIT_CLONE_RETRIES=3     Attempts per required Zsh repository clone.
+  DOTS_GIT_CLONE_RETRIES=3     Attempts per required Git checkout.
   DOTS_GIT_CLONE_RETRY_DELAY=2 Delay between failed clone attempts.
+  DOTS_NVIM_REPO=<url>         Override the NvChad configuration Git repository.
 
 Git operations deliberately remain Git operations:
   git pull, git status, git diff, git log, and so on.
@@ -668,6 +669,41 @@ install_zsh_upstreams() {
     fi
 }
 
+install_nvchad_config() {
+    local repository="${DOTS_NVIM_REPO:-https://github.com/Katossh/Neovim.git}"
+    local checkout="$STATE_DIR/upstreams/nvchad-config" existing_origin
+
+    command -v git >/dev/null 2>&1 || {
+        error "Git is required to install the NvChad configuration."
+        return 1
+    }
+
+    # Reuse an already-installed copy of this exact private repository. This
+    # avoids moving the user's existing ~/.config/nvim checkout into backups.
+    if [[ -d "$CONFIG_DIR/nvim/.git" ]]; then
+        existing_origin="$(git -C "$CONFIG_DIR/nvim" remote get-url origin 2>/dev/null || true)"
+        if [[ "$existing_origin" == "$repository" &&
+              -f "$CONFIG_DIR/nvim/init.lua" &&
+              -f "$CONFIG_DIR/nvim/lua/chadrc.lua" ]]; then
+            info "NvChad configuration already present at $CONFIG_DIR/nvim; leaving the existing checkout in place."
+            return 0
+        fi
+    fi
+
+    install_git_checkout "$checkout" "$repository" "nvchad-config:$repository" \
+        "NvChad configuration" "lua/chadrc.lua" || {
+        error "NvChad configuration is unavailable. Verify GitHub access to $repository, then rerun: dots install --no-packages"
+        return 1
+    }
+
+    if [[ "$DRY_RUN" == 1 ]]; then
+        info "Dry run: would link NvChad configuration to $CONFIG_DIR/nvim"
+        return 0
+    fi
+
+    link_file "nvim" "$checkout" "$CONFIG_DIR/nvim" ""
+}
+
 remove_legacy_zsh_package_links() {
     [[ -f "$STATE_FILE" ]] || return 0
     local tmp="$STATE_FILE.legacy.$$" kind target source actual
@@ -786,6 +822,9 @@ command_install() {
         if ! install_zsh_upstreams; then
             info "Zsh provisioning did not finish; correct the reported issue and rerun: dots install --no-packages"
         fi
+        if ! install_nvchad_config; then
+            info "NvChad provisioning did not finish; correct the reported issue and rerun: dots install --no-packages"
+        fi
         install_tmux_theme
     fi
 
@@ -883,6 +922,8 @@ command_health() {
         info "fast-syntax-highlighting: present" || warn "fast-syntax-highlighting is missing."
     [[ -d "$DATA_DIR/zsh/custom/plugins/zsh-completions/src" ]] && info "zsh-completions: present" || \
         warn "zsh-completions is missing."
+    [[ -f "$CONFIG_DIR/nvim/lua/chadrc.lua" ]] && info "NvChad configuration: present" || \
+        warn "NvChad configuration is missing: run 'dots install --no-packages'."
 
     [[ -e "$CONFIG_DIR/kitty/themes/dots-palette.conf" ]] && info "Generated Kitty palette: present" || warn "Generated Kitty palette is missing."
     [[ -e "$HOME_DIR/.tmux/dots-theme.conf" ]] && info "Generated tmux palette: present" || warn "Generated tmux palette is missing."
@@ -1021,6 +1062,11 @@ remove_download() {
             remove_managed_git_checkout "$path" "$DATA_DIR/zsh/custom/plugins/zsh-completions" \
                 "https://github.com/zsh-users/zsh-completions.git" "zsh-completions"
             ;;
+        nvchad-config:*)
+            origin="${kind#nvchad-config:}"
+            remove_managed_git_checkout "$path" "$STATE_DIR/upstreams/nvchad-config" \
+                "$origin" "NvChad configuration"
+            ;;
         *) warn "Unknown downloaded resource type '$kind'; leaving it untouched."; return 1 ;;
     esac
 }
@@ -1045,7 +1091,7 @@ remove_package() {
 prune_empty_dirs() {
     local dir="$1"
     [[ "$DRY_RUN" == 1 ]] && return 0
-    while [[ "$dir" == "$CONFIG_DIR"/* || "$dir" == "$LOCAL_BIN"/* || "$dir" == "$HOME_DIR/.tmux"/* || "$dir" == "$DATA_DIR/zsh"/* ]]; do
+    while [[ "$dir" == "$CONFIG_DIR"/* || "$dir" == "$LOCAL_BIN"/* || "$dir" == "$HOME_DIR/.tmux"/* || "$dir" == "$DATA_DIR/zsh"/* || "$dir" == "$STATE_DIR/upstreams" || "$dir" == "$STATE_DIR/upstreams/"* ]]; do
         rmdir "$dir" 2>/dev/null || break
         dir="$(dirname "$dir")"
     done

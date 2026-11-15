@@ -55,6 +55,19 @@ zsh-autosuggestions is included in the Oh My Zsh checkout and activated by the Z
 
 The default XDG data directory is ~/.local/share. If XDG_DATA_HOME is set when the installer runs, repositories are installed under that path. Zsh reads the same variable through dots/zshenv.
 
+## NvChad configuration
+
+The installer also clones the private [Katossh/Neovim](https://github.com/Katossh/Neovim) repository. It is a standalone NvChad configuration (NvChad is loaded as a plugin); its source remains in that repository rather than being copied into terminal-dotfiles.
+
+- Checkout: `$XDG_DATA_HOME/dots/upstreams/nvchad-config`
+- Active config: `$XDG_CONFIG_HOME/nvim` (a symlink to the checkout)
+- Required repository file: `lua/chadrc.lua`
+- Default remote: `https://github.com/Katossh/Neovim.git`
+
+Git must already be authenticated for the private repository before running `dots install`. The installer deliberately disables interactive Git credential prompts, so missing credentials are reported as a clone failure. Set `DOTS_NVIM_REPO` to use another remote. To update the checkout, run `git -C "$XDG_CONFIG_HOME/nvim" pull --ff-only`; the installer validates existing checkouts but does not pull automatically.
+
+An existing `$XDG_CONFIG_HOME/nvim` path is backed up before the symlink is created. `dots uninstall` removes only the link and checkout that it can verify, then restores the previous path.
+
 Every clone uses a temporary staging directory. It is moved into place only after git clone succeeds and the required payload is present. The installer does not overwrite existing directories with an unrecognised Git origin or an incomplete checkout.
 
 Failed clones are retried three times by default. Set DOTS_GIT_CLONE_RETRIES to a positive integer to change the retry count:
@@ -77,6 +90,8 @@ This links local configuration but intentionally skips upstream Git downloads (i
 unset DOTS_SKIP_DOWNLOADS
 ./bin/dots install --no-packages
 ~~~
+
+This also provisions the NvChad configuration; authenticate Git for the private repository first.
 
 ## Package managers
 
