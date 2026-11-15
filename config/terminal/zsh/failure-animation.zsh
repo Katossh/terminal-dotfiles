@@ -261,9 +261,9 @@ _dots_failure_animation_gradient_line() {
     _DOTS_FAILURE_ANIMATION_GRADIENT_LINE_RAW="$raw_output"
 }
 
-# Animate the message in its final output position. Each frame replaces the
-# same terminal rows; the gradient loops until the command is submitted or the
-# banner is explicitly cleared. No graphics placement survives to scrollback.
+# Animate every notice in its final prompt position. Each frame recolours the
+# same rows; notices keep their own phase and remain active across submissions.
+# No graphics placement survives to scrollback.
 # Prepare message lines once; frame callbacks only recolour and display them.
 _dots_failure_animation_prepare_banner() {
     emulate -L zsh
@@ -312,8 +312,8 @@ _dots_failure_animation_prepare_banner() {
 
 
 # The worker emits phase numbers only. It has no terminal descriptor and
-# cannot read or consume keyboard input. Phases wrap continuously until the
-# prompt is submitted or explicitly reset.
+# cannot read or consume keyboard input. Phases wrap continuously; command
+# submission does not stop the worker, only an explicit reset closes it.
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
@@ -411,8 +411,8 @@ _dots_failure_animation_start_gradient() {
 }
 
 
-# Paint phase zero after the next prompt enters ZLE. The timer and FD watcher
-# have already been created by the precmd path, outside the editor widget.
+# Redraw newly added banner records after the next prompt enters ZLE. The
+# timer and FD watcher are created by precmd, outside the editor widget.
 _dots_failure_animation_gradient_line_init() {
     emulate -L zsh
     setopt localoptions no_ignore_braces
