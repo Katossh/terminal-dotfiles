@@ -86,7 +86,7 @@ On an unfamiliar distribution without a supported package manager or Nix, dots i
 
 Alacritty is configured to stay close to the repository's Kitty profile: JetBrainsMono Nerd Font (regular/bold/italic/bold-italic) at 14 pt, 20,000 lines of scrollback, a blinking beam cursor, 90% opacity with compositor blur, borderless windows, Alt-based scrollback/search/font-size shortcuts, the same Ctrl+Shift+C/V clipboard shortcuts, and no middle-click selection paste. Noto Color Emoji is appended as a weak Fontconfig fallback and rendered 8% larger with synthetic emboldening on Linux/BSD FreeType clients, so JetBrains remains the primary font.
 
-Alacritty does not implement Kitty's native split/stack layouts, startup sessions, or Kitty kittens. Use tmux for pane layouts and persistent sessions. The Fontconfig rule lives under `~/.config/fontconfig/conf.d/` and affects Linux/BSD Fontconfig clients; macOS uses its native font fallback after the Noto font Cask is installed.
+Alacritty does not implement Kitty's native split/stack layouts, startup sessions, or Kitty kittens. tmux remains the current default for pane layouts and persistent sessions; Zellij is included as an optional alternative for manual evaluation. Automatic tmux startup and the existing tmux configuration remain unchanged until the migration is deliberately completed. The Fontconfig rule lives under `~/.config/fontconfig/conf.d/` and affects Linux/BSD Fontconfig clients; macOS uses its native font fallback after the Noto font Cask is installed.
 
 ## Font fallback
 
@@ -100,7 +100,7 @@ Keep credentials, private keys and machine-specific secrets out of tracked files
 
 ## Repository layout
 
-- config/terminal/ — Zsh, Alacritty, Kitty, tmux, Yazi and CLI/TUI application settings.
+- config/terminal/ — Zsh, Alacritty, Kitty, tmux, Zellij, Yazi and CLI/TUI application settings.
 - dots/ — shared shell environment configuration.
 - bin/ — installer and portable helper commands.
 - manifest/ — configuration and package inventories.
