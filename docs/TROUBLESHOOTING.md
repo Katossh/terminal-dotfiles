@@ -45,11 +45,30 @@ The NvChad configuration is in a separate private repository. Confirm that Git c
 git ls-remote https://github.com/Katossh/Neovim.git HEAD
 ~~~
 
-If the command fails with an authentication error, configure GitHub access first (for example, with your existing Git credential helper or GitHub CLI), then rerun:
+If the command fails with an authentication error, configure Git first. With GitHub CLI, for example:
+
+~~~sh
+gh auth login
+gh auth setup-git
+git ls-remote https://github.com/Katossh/Neovim.git HEAD
+~~~
+
+Then install from your interactive terminal:
 
 ~~~sh
 dots install --no-packages
 ~~~
+
+Home Manager activation runs without a controlling terminal. It deliberately skips a missing private NvChad checkout with a warning, while continuing to install public shell components; this prevents a private GitHub credential failure from aborting NixOS activation. The configuration will not be available in Neovim until the authenticated install above succeeds.
+
+For SSH authentication, verify the same repository through your configured key and select that URL explicitly:
+
+~~~sh
+git ls-remote git@github.com:Katossh/Neovim.git HEAD
+DOTS_NVIM_REPO=git@github.com:Katossh/Neovim.git dots install --no-packages
+~~~
+
+Credentialed unattended provisioning is available by explicitly setting `DOTS_NVIM_ALLOW_NONINTERACTIVE=1`. Do not set it in Home Manager activation unless the service has a working non-interactive credential helper.
 
 The checkout lives at `$XDG_DATA_HOME/dots/upstreams/nvchad-config`; the active path `$XDG_CONFIG_HOME/nvim` is a symlink. To use a different repository, set `DOTS_NVIM_REPO` before installation. If you already have a non-managed checkout at the expected upstream path, the installer leaves its contents alone.
 

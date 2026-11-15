@@ -64,7 +64,13 @@ The installer also clones the private [Katossh/Neovim](https://github.com/Katoss
 - Required repository file: `lua/chadrc.lua`
 - Default remote: `https://github.com/Katossh/Neovim.git`
 
-Git must already be authenticated for the private repository before running `dots install`. The installer deliberately disables interactive Git credential prompts, so missing credentials are reported as a clone failure. Set `DOTS_NVIM_REPO` to use another remote. To update the checkout, run `git -C "$XDG_CONFIG_HOME/nvim" pull --ff-only`; the installer validates existing checkouts but does not pull automatically.
+Git must already be authenticated for the private repository before downloading it. The installer deliberately disables interactive Git credential prompts. In a non-interactive run (such as Home Manager activation under systemd), it reuses an existing valid checkout but skips a missing private checkout with a warning; it does not make system activation depend on GitHub credentials. After Home Manager activation, open an authenticated terminal and run:
+
+~~~sh
+dots install --no-packages
+~~~
+
+For GitHub CLI authentication, complete `gh auth login` and configure Git with `gh auth setup-git`. Alternatively, use an SSH remote with a key available to the user. Set `DOTS_NVIM_REPO` to select that remote. Automation that has a working non-interactive Git credential helper may explicitly opt in with `DOTS_NVIM_ALLOW_NONINTERACTIVE=1`. To update the checkout, run `git -C "$XDG_CONFIG_HOME/nvim" pull --ff-only`; the installer validates existing checkouts but does not pull automatically.
 
 An existing `$XDG_CONFIG_HOME/nvim` path is backed up before the symlink is created. `dots uninstall` removes only the link and checkout that it can verify, then restores the previous path.
 
@@ -91,7 +97,7 @@ unset DOTS_SKIP_DOWNLOADS
 ./bin/dots install --no-packages
 ~~~
 
-This also provisions the NvChad configuration; authenticate Git for the private repository first.
+This provisions public runtime downloads. The private NvChad checkout is installed only from an interactive authenticated run unless `DOTS_NVIM_ALLOW_NONINTERACTIVE=1` is explicitly set.
 
 ## Package managers
 
