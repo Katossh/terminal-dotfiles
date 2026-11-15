@@ -140,7 +140,7 @@ assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;
 local snapshot=''
 local -i frame_attempt=0 observed_frames=0
 while (( frame_attempt < 100 )); do
-    zpty -w -n "$PTY_NAME" $'\\x14'
+    zpty -w -n "$PTY_NAME" $'\x14'
     read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     snapshot="$REPLY"
     if [[ "$snapshot" =~ 'FRAMES_([0-9]+)' ]]; then
@@ -159,9 +159,9 @@ zpty -w -n "$PTY_NAME" "sleep 0.1; print -r -- EX'ECUTED_OK'"
 read_until_visible "EX'ECUTED_OK'"
 assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" "$REPLY"
 
-zpty -w -n "$PTY_NAME" $'\\r'
+zpty -w -n "$PTY_NAME" $'\r'
 read_until "SUBMITTED_ACTIVE_1_WORKER_1"
-assert_contains "command submission does not cancel the active gradient" \\
+assert_contains "command submission does not cancel the active gradient" \
     "SUBMITTED_ACTIVE_1_WORKER_1" "$REPLY"
 submitted_output="$REPLY"
 if [[ "$submitted_output" != *"EXECUTED_OK"* ]]; then
@@ -173,7 +173,7 @@ assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submi
 # The worker stops only after the foreground command returns. The submitted
 # banner remains in scrollback while the next editable prompt is clean.
 read_until "BASE_OUTPUT"
-zpty -w -n "$PTY_NAME" $'\\x14'
+zpty -w -n "$PTY_NAME" $'\x14'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 snapshot="$REPLY"
 assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
