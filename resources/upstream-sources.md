@@ -24,6 +24,16 @@ These repositories are installed by `dots install` into the user's XDG data dire
 
 Oh My Zsh includes the `zsh-autosuggestions` plugin, so it is not cloned separately.
 
+## Runtime-managed Neovim configuration
+
+The private Neovim configuration repository is cloned by `dots install` and exposed through a symlink. Its source remains independently versioned.
+
+| Runtime path | Upstream project |
+|---|---|
+| `$XDG_DATA_HOME/dots/upstreams/nvchad-config` | [Katossh/Neovim](https://github.com/Katossh/Neovim) — standalone NvChad configuration |
+
+The checkout requires preconfigured Git authentication. The active path is `$XDG_CONFIG_HOME/nvim`; update it with `git -C "$XDG_CONFIG_HOME/nvim" pull --ff-only`.
+
 ## Updating vendored code
 
 These directories are part of this repository's tracked tree. Updating one is therefore a normal file change, not a `git submodule update`. Before updating, check the upstream project's license and compatibility with the shell setup. Avoid editing third-party files directly unless the change is intentionally maintained as a local patch.
