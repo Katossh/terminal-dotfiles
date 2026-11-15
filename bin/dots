@@ -690,6 +690,31 @@ install_nvchad_config() {
         fi
     fi
 
+    # A previous interactive run may have downloaded the private repository
+    # without finishing the config link. Reuse that checkout without network.
+    if [[ -d "$checkout/.git" ]]; then
+        existing_origin="$(git -C "$checkout" remote get-url origin 2>/dev/null || true)"
+        if [[ "$existing_origin" == "$repository" &&
+              -f "$checkout/init.lua" &&
+              -f "$checkout/lua/chadrc.lua" ]]; then
+            if [[ "$DRY_RUN" == 1 ]]; then
+                info "Dry run: would link existing NvChad checkout to $CONFIG_DIR/nvim"
+                return 0
+            fi
+            link_file "nvim" "$checkout" "$CONFIG_DIR/nvim" ""
+            return 0
+        fi
+    fi
+
+    # Home Manager and other service managers run without a controlling TTY.
+    # Do not let an unauthenticated clone of this private, optional config fail
+    # the whole system/user activation. Install it later from an authenticated
+    # terminal, or explicitly opt in to credentialed unattended provisioning.
+    if [[ ! -t 0 && "${DOTS_NVIM_ALLOW_NONINTERACTIVE:-0}" != 1 ]]; then
+        warn "Skipping private Katossh/Neovim checkout in a non-interactive session. After activation, run 'dots install --no-packages' from an authenticated terminal."
+        return 0
+    fi
+
     install_git_checkout "$checkout" "$repository" "nvchad-config:$repository" \
         "NvChad configuration" "lua/chadrc.lua" || {
         error "NvChad configuration is unavailable. Verify GitHub access to $repository, then rerun: dots install --no-packages"
