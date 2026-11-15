@@ -58,6 +58,7 @@ jobs:
             config/terminal/zsh/handlers.zsh \
             config/terminal/zsh/prompt.zsh \
             themes/adapters/fzf.zsh \
+            tests/test-dev-alias.zsh \
             tests/test-command-state.zsh \
             tests/test-command-suggestions.zsh \
             tests/test-diagnostics.zsh \
@@ -72,6 +73,7 @@ jobs:
         run: |
           export PATH="$PWD/rust/dots-suggest/target/debug:$PATH"
           for test in \
+            tests/test-dev-alias.zsh \
             tests/test-command-state.zsh \
             tests/test-command-suggestions.zsh \
             tests/test-diagnostics.zsh \
