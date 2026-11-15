@@ -132,6 +132,19 @@ for path_dir in "${original_path_parts[@]}"; do
 done
 ln -s "$TEST_ROOT/bin/git" "$TEST_ROOT/no-zsh-bin/git"
 
+# Home Manager runs without a TTY. Public shell dependencies must still be
+# provisioned, while a missing private NvChad checkout must not fail activation.
+noninteractive_root="$TEST_ROOT/noninteractive"
+mkdir -p "$noninteractive_root/home"
+HOME="$noninteractive_root/home" \
+    XDG_CONFIG_HOME="$noninteractive_root/home/.config" \
+    XDG_DATA_HOME="$noninteractive_root/home/.local/share" \
+    PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/noninteractive-install.log"
+grep -Fq "Skipping private Katossh/Neovim checkout in a non-interactive session" "$TEST_ROOT/noninteractive-install.log"
+test -f "$noninteractive_root/home/.local/share/oh-my-zsh/oh-my-zsh.sh"
+test ! -e "$noninteractive_root/home/.local/share/dots/upstreams/nvchad-config"
+
 if PATH="$TEST_ROOT/no-zsh-bin" command -v zsh >/dev/null 2>&1; then
     echo "test PATH unexpectedly contains zsh" >&2
     exit 1
@@ -139,7 +152,7 @@ fi
 
 # A partial failure must be visible and must not prevent remaining clones.
 if PATH="$TEST_ROOT/no-zsh-bin" GIT_FAIL_URL="https://github.com/Aloxaf/fzf-tab.git" \
-    DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-failed.log" 2>&1; then
     echo "expected Zsh provisioning failure was not reported" >&2
     exit 1
@@ -151,7 +164,7 @@ test -d "$XDG_DATA_HOME/zsh/custom/plugins/zsh-completions/src"
 test ! -e "$XDG_DATA_HOME/zsh/custom/plugins/fzf-tab"
 
 # A normal rerun fills the missing checkout and validates each payload.
-PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install.log"
 test -f "$XDG_DATA_HOME/oh-my-zsh/oh-my-zsh.sh"
 test -f "$XDG_DATA_HOME/oh-my-zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.plugin.zsh"
@@ -171,13 +184,13 @@ grep -Fq "plugins+=(fast-syntax-highlighting)" "$XDG_CONFIG_HOME/zsh/.zshrc"
 # If an installer-owned clone later loses its required payload, repair it
 # without deleting the old checkout. The backup is retained for inspection.
 rm -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
-PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-repair.log"
 test -f "$XDG_DATA_HOME/zsh/custom/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
 test "$(find "$XDG_DATA_HOME/dots/backups/incomplete-downloads" -type d -name fast-syntax-highlighting | wc -l)" -eq 1
 
 clone_count="$(wc -l < "$GIT_TEST_LOG")"
-PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/zsh-install-2.log"
 test "$(wc -l < "$GIT_TEST_LOG")" -eq "$clone_count"
 
@@ -199,7 +212,7 @@ printf '%s\n' 'https://github.com/Katossh/Neovim.git' > "$XDG_CONFIG_HOME/nvim/.
 : > "$XDG_CONFIG_HOME/nvim/init.lua"
 : > "$XDG_CONFIG_HOME/nvim/lua/chadrc.lua"
 nvim_clones_before="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
-PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
     "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/nvim-existing.log"
 nvim_clones_after="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
 test "$nvim_clones_after" -eq "$nvim_clones_before"
