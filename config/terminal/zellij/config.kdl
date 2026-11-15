@@ -1,0 +1,11 @@
+// Shared Zellij configuration for terminal-dotfiles.
+//
+// Zellij is available for manual evaluation. tmux remains the default
+// multiplexer until the migration is completed deliberately.
+
+default_shell "zsh"
+scrollback_editor "nvim"
+scrollback_lines 10000
+session_serialization true
+on_force_close "detach"
+show_startup_tips false
