@@ -139,8 +139,8 @@ mkdir -p "$noninteractive_root/home"
 HOME="$noninteractive_root/home" \
     XDG_CONFIG_HOME="$noninteractive_root/home/.config" \
     XDG_DATA_HOME="$noninteractive_root/home/.local/share" \
-    PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 DOTS_NVIM_ALLOW_NONINTERACTIVE=1 \
-    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/noninteractive-install.log"
+    PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/noninteractive-install.log" 2>&1
 grep -Fq "Skipping private Katossh/Neovim checkout in a non-interactive session" "$TEST_ROOT/noninteractive-install.log"
 test -f "$noninteractive_root/home/.local/share/oh-my-zsh/oh-my-zsh.sh"
 test ! -e "$noninteractive_root/home/.local/share/dots/upstreams/nvchad-config"
