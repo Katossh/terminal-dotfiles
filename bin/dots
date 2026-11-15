@@ -671,12 +671,24 @@ install_zsh_upstreams() {
 
 install_nvchad_config() {
     local repository="${DOTS_NVIM_REPO:-https://github.com/Katossh/Neovim.git}"
-    local checkout="$STATE_DIR/upstreams/nvchad-config"
+    local checkout="$STATE_DIR/upstreams/nvchad-config" existing_origin
 
     command -v git >/dev/null 2>&1 || {
         error "Git is required to install the NvChad configuration."
         return 1
     }
+
+    # Reuse an already-installed copy of this exact private repository. This
+    # avoids moving the user's existing ~/.config/nvim checkout into backups.
+    if [[ -d "$CONFIG_DIR/nvim/.git" ]]; then
+        existing_origin="$(git -C "$CONFIG_DIR/nvim" remote get-url origin 2>/dev/null || true)"
+        if [[ "$existing_origin" == "$repository" &&
+              -f "$CONFIG_DIR/nvim/init.lua" &&
+              -f "$CONFIG_DIR/nvim/lua/chadrc.lua" ]]; then
+            info "NvChad configuration already present at $CONFIG_DIR/nvim; leaving the existing checkout in place."
+            return 0
+        fi
+    fi
 
     install_git_checkout "$checkout" "$repository" "nvchad-config:$repository" \
         "NvChad configuration" "lua/chadrc.lua" || {
