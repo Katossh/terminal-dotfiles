@@ -2,7 +2,9 @@
 
 set -euo pipefail
 
-: "${NIX_ARGS_FILE:?NIX_ARGS_FILE must point to a temporary output file}"
+NIX_ARGS_FILE=$(mktemp)
+trap 'command rm -f -- "$NIX_ARGS_FILE"' EXIT
+export NIX_ARGS_FILE
 
 setopt aliases
 source "${0:A:h}/../config/terminal/zsh/aliases.zsh"
