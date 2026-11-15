@@ -262,8 +262,8 @@ _dots_failure_animation_gradient_line() {
 }
 
 # Animate the message in its final output position. Each frame replaces the
-# same terminal rows; after the last frame the message remains plain selectable
-# text with its final gradient. No graphics placement survives to scrollback.
+# same terminal rows; the gradient loops until the command is submitted or the
+# banner is explicitly cleared. No graphics placement survives to scrollback.
 # Prepare message lines once; frame callbacks only recolour and display them.
 _dots_failure_animation_prepare_banner() {
     emulate -L zsh
@@ -306,17 +306,17 @@ _dots_failure_animation_prepare_banner() {
 }
 
 # The worker emits phase numbers only. It has no terminal descriptor and
-# cannot read or consume keyboard input.
+# cannot read or consume keyboard input. Phases wrap continuously until the
+# prompt is submitted or explicitly reset.
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
-    local -i frame=1
+    local -i phase=0
 
-    # Phase zero is rendered by zle-line-init so the message is visible
-    # immediately; the worker supplies the remaining 24 animated phases.
-    for (( frame = 1; frame < 25; frame++ )); do
+    while true; do
         command sleep "$interval" 2>/dev/null || return 0
-        print -r -- "$(( frame * 4 ))" || return 0
+        phase=$(( (phase + 4) % 100 ))
+        print -r -- "$phase" || return 0
     done
 }
 
@@ -653,10 +653,13 @@ _dots_failure_animation_reset() {
 _dots_failure_animation_preexec() {
     emulate -L zsh
 
-    # Do not cancel the failure gradient when a command is submitted. The
-    # worker keeps writing frame numbers while the foreground command runs;
-    # ZLE consumes the buffered frames when the next prompt becomes active.
-    [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]] && _DOTS_FAILURE_GRADIENT_SUBMITTED=1
+    # Keep animating while the banner belongs to the editable prompt. Once a
+    # command is submitted, its rendered copy stays in scrollback; close the
+    # pipe so the worker exits instead of buffering frames during execution.
+    if [[ -n "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
+        _DOTS_FAILURE_GRADIENT_SUBMITTED=1
+        _dots_failure_animation_gradient_cleanup
+    fi
 
     local -a command_words
     command_words=( "${(@z)1}" )
