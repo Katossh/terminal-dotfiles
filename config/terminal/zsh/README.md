@@ -35,7 +35,7 @@ Downloads can be skipped for offline/config-only setups with `DOTS_SKIP_DOWNLOAD
 
 ## Dependencies
 
-The setup requires `zsh`, Starship, `git`, `fzf`, `bat`, `nvim`, and `tmux`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. On NixOS, the imported `nix/packages.nix` module also builds and installs the Rust `dots-suggest` command-ranking helper. Other systems retain a pure-Zsh fallback; the helper can be built with `cargo build --release --manifest-path rust/dots-suggest/Cargo.toml`.
+The current automatic multiplexer startup still requires `tmux`; `zellij` is installed as an optional alternative and can be launched manually with `zellij` while the migration is evaluated. The rest of the setup requires `zsh`, Starship, `git`, `fzf`, `bat`, and `nvim`. Starship is initialized by `prompt.zsh` and reads the linked `config/starship.toml`. On NixOS, the imported `nix/packages.nix` module also builds and installs the Rust `dots-suggest` command-ranking helper. Other systems retain a pure-Zsh fallback; the helper can be built with `cargo build --release --manifest-path rust/dots-suggest/Cargo.toml`.
 
 ## Portability and local settings
 - `dots/zshenv` contains shared defaults only. Keep passwords, API tokens, private keys, and machine-specific credentials out of tracked files.
