@@ -37,9 +37,25 @@ git -C "$data/zsh/custom/plugins/zsh-completions" remote get-url origin
 
 The expected origins are listed in resources/upstream-sources.md.
 
+## NvChad configuration clone or authentication failure
+
+The NvChad configuration is in a separate private repository. Confirm that Git can read it using the credentials already configured on this machine:
+
+~~~sh
+git ls-remote https://github.com/Katossh/Neovim.git HEAD
+~~~
+
+If the command fails with an authentication error, configure GitHub access first (for example, with your existing Git credential helper or GitHub CLI), then rerun:
+
+~~~sh
+dots install --no-packages
+~~~
+
+The checkout lives at `$XDG_DATA_HOME/dots/upstreams/nvchad-config`; the active path `$XDG_CONFIG_HOME/nvim` is a symlink. To use a different repository, set `DOTS_NVIM_REPO` before installation. If you already have a non-managed checkout at the expected upstream path, the installer leaves its contents alone.
+
 ## GitHub/network failures
 
-The installer retries Zsh clones three times by default and exits non-zero if a required clone still fails. Test connectivity without changing the repository:
+The installer retries required Git clones three times by default and exits non-zero if a required clone still fails. Test public GitHub connectivity without changing the repository:
 
 ~~~sh
 git ls-remote https://github.com/ohmyzsh/ohmyzsh.git HEAD
