@@ -11,7 +11,7 @@ fi
 alias rm="rm -i"
 
 # Enter the shared Nix programming environment from any directory.
-alias dev='nix develop github:Katossh/shiny-rotary-phone#general'
+alias dev='nix develop "github:Katossh/shiny-rotary-phone#general"'
 
 preview() {
   while true; do
