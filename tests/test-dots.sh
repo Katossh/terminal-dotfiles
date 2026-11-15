@@ -192,6 +192,20 @@ test -f "$XDG_CONFIG_HOME/nvim/init.lua"
 grep -Fq 'user-owned Neovim configuration' "$XDG_CONFIG_HOME/nvim/init.lua"
 test ! -e "$XDG_DATA_HOME/dots/upstreams/nvchad-config"
 
+# A pre-existing checkout of the exact same repository is reused in place.
+rm -rf "$XDG_CONFIG_HOME/nvim"
+mkdir -p "$XDG_CONFIG_HOME/nvim/.git" "$XDG_CONFIG_HOME/nvim/lua"
+printf '%s\n' 'https://github.com/Katossh/Neovim.git' > "$XDG_CONFIG_HOME/nvim/.git/test-origin"
+: > "$XDG_CONFIG_HOME/nvim/init.lua"
+: > "$XDG_CONFIG_HOME/nvim/lua/chadrc.lua"
+nvim_clones_before="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
+PATH="$TEST_ROOT/no-zsh-bin" DOTS_GIT_CLONE_RETRIES=1 DOTS_SKIP_DOWNLOADS=0 \
+    "$REPO_DIR/bin/dots" install --no-packages --yes > "$TEST_ROOT/nvim-existing.log"
+nvim_clones_after="$(grep -Fc 'clone https://github.com/Katossh/Neovim.git' "$GIT_TEST_LOG" || true)"
+test "$nvim_clones_after" -eq "$nvim_clones_before"
+test ! -L "$XDG_CONFIG_HOME/nvim"
+test -f "$XDG_CONFIG_HOME/nvim/lua/chadrc.lua"
+
 # NixOS gets the same user configuration links and installs dependencies into
 # the invoking user's Nix profile. A fake nix executable keeps this test safe.
 mkdir -p "$TEST_ROOT/bin"
