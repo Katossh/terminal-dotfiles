@@ -14,6 +14,7 @@ htop	tree	config/terminal/htop	config:htop	all
 fastfetch	tree	config/terminal/fastfetch	config:fastfetch	all
 cava	tree	config/terminal/cava	config:cava	all
 yazi	tree	config/terminal/yazi	config:yazi	all
+zellij	tree	config/terminal/zellij	config:zellij	all
 starship	file	config/terminal/starship.toml	config:starship.toml	all
 stylua	file	config/terminal/stylua.toml	config:stylua.toml	all
 tmux.conf	file	config/terminal/tmux/.tmux.conf	home:.tmux.conf	all
