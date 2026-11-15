@@ -124,6 +124,10 @@ The command starts an interactive Nix development shell. Exit it with
 exit or Ctrl-D. The first invocation may need to download the flake source
 and toolchain from the configured Nix caches.
 
+The flake reference is quoted inside the alias intentionally: Zsh treats an unquoted
+`#` in this context as a glob qualifier and may report `no matches found` before
+Nix receives the argument.
+
 ## Local customization
 
 Do not modify runtime-managed upstream directories to customize the prompt or aliases. Put local configuration in ~/.config/zsh/zprofile.local or use the repository's personal override mechanism:
