@@ -155,6 +155,8 @@ jobs:
           assert {"key": "T", "mods": "Alt", "action": "CreateNewTab"} in bindings
           assert {"key": "]", "mods": "Alt", "action": "SelectNextTab"} in bindings
           assert {"key": "[", "mods": "Alt", "action": "SelectPreviousTab"} in bindings
+          assert {"key": "C", "mods": "Control|Shift", "action": "Copy"} in bindings
+          assert {"key": "V", "mods": "Control|Shift", "action": "Paste"} in bindings
           assert frappe["colors"]["primary"]["background"] == "#303446"
           assert frappe["colors"]["primary"]["foreground"] == "#c6d0f5"
           assert frappe["colors"]["normal"]["blue"] == "#8caaee"
@@ -166,6 +168,13 @@ jobs:
           assert fallback_test is not None and fallback_test.findtext("string") == "JetBrainsMono Nerd Font"
           assert fallback_edit is not None and fallback_edit.attrib["mode"] == "append"
           assert fallback_edit.findtext("string") == "Noto Color Emoji"
+          emoji_rendering = fontconfig.find("./match[@target='font']")
+          assert emoji_rendering is not None
+          assert emoji_rendering.find("./test[@name='family']/string").text == "Noto Color Emoji"
+          assert emoji_rendering.find("./edit[@name='embolden']/bool").text == "true"
+          assert emoji_rendering.find("./edit[@name='pixelsizefixupfactor']/times/double").text == "1.08"
+          assert emoji_rendering.find("./edit[@name='matrix']") is not None
+          assert emoji_rendering.find("./edit[@name='size']") is not None
           print("Yazi, Alacritty TOML, Fontconfig XML, and Catppuccin Frappé configuration are valid.")
           PY
 

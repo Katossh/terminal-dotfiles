@@ -54,7 +54,8 @@ bindings = [
   { key = "/", mods = "Alt", action = "SearchForward" },
   { key = ".", mods = "Alt", action = "SearchBackward" },
 
-  # Keep the same explicit OS-clipboard shortcuts as Kitty.
+  # Match Kitty's Ctrl+Shift+C/V selection-copy and OS-clipboard paste shortcuts.
+  # Alacritty cannot forward Ctrl+Shift+C to tmux when no selection exists.
   { key = "C", mods = "Control|Shift", action = "Copy" },
   { key = "V", mods = "Control|Shift", action = "Paste" },
 
