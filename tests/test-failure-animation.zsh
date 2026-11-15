@@ -141,10 +141,7 @@ assert_absent "gradient does not emit printable caret escape notation" '^[[38;2;
 local persistent_snapshot='' frame_count=''
 local -i animation_attempt=0
 while (( animation_attempt < 120 )); do
-    zpty -w -n "$PTY_NAME" 
-
-print -- "All single-gradient failure animation integration tests passed."
-\x14'
+    zpty -w -n "$PTY_NAME" $'\C-T'
     read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
     persistent_snapshot="$REPLY"
     frame_count="${persistent_snapshot##*FRAMES_}"
@@ -167,10 +164,7 @@ assert_contains "input is accepted while the gradient animates" "EX'ECUTED_OK'" 
 
 # Submitting the command stops the worker; the already-rendered banner remains
 # in scrollback, and the next prompt starts without carrying the old banner.
-zpty -w -n "$PTY_NAME" 
-
-print -- "All single-gradient failure animation integration tests passed."
-\r'
+zpty -w -n "$PTY_NAME" $'\C-M'
 read_until "SUBMITTED_ACTIVE_0_WORKER_0"
 assert_contains "command submission stops the infinite gradient worker" \
     "SUBMITTED_ACTIVE_0_WORKER_0" "$REPLY"
@@ -183,10 +177,7 @@ assert_contains "the submitted command executes unchanged" "EXECUTED_OK" "$submi
 
 read_until "BASE_OUTPUT"
 local snapshot=''
-zpty -w -n "$PTY_NAME" 
-
-print -- "All single-gradient failure animation integration tests passed."
-\x14'
+zpty -w -n "$PTY_NAME" $'\C-T'
 read_until_visible "BUFFER_SNAPSHOT_BEGIN:"
 snapshot="$REPLY"
 assert_contains "the submitted command leaves a clean editable prompt" "BUFFER_SNAPSHOT_BEGIN::CURSOR_0" "$snapshot"
