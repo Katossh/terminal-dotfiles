@@ -310,13 +310,16 @@ _dots_failure_animation_prepare_banner() {
 _dots_failure_animation_gradient_stream() {
     emulate -L zsh
     local interval="${1:-0.08}"
-    local -i frame=1
+    local -i phase=0
 
-    # Phase zero is rendered by zle-line-init so the message is visible
-    # immediately; the worker supplies the remaining 24 animated phases.
-    for (( frame = 1; frame < 25; frame++ )); do
+    # Phase zero is rendered by zle-line-init. Continue cycling through the
+    # full gradient indefinitely; the ZLE FD watcher remains the only renderer.
+    # The pipe naturally back-pressures while a foreground command is running,
+    # so the worker cannot accumulate an unbounded queue of animation frames.
+    while true; do
         command sleep "$interval" 2>/dev/null || return 0
-        print -r -- "$(( frame * 4 ))" || return 0
+        phase=$(((phase + 4) % 100))
+        print -r -- "$phase" || return 0
     done
 }
 
@@ -608,9 +611,11 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
-    # If the animation already finished while a foreground command ran, its
-    # submitted banner only needs to be removed from the next prompt.
-    if (( _DOTS_FAILURE_GRADIENT_SUBMITTED && !_DOTS_FAILURE_ANIMATION_ACTIVE )); then
+    # The worker continues independently while the foreground command runs.
+    # Stop it only when the command returns, then remove the submitted banner
+    # from the fresh prompt.
+    if (( _DOTS_FAILURE_GRADIENT_SUBMITTED )); then
+        _dots_failure_animation_cleanup
         _DOTS_FAILURE_GRADIENT_SUBMITTED=0
         _DOTS_FAILURE_ANIMATION_BANNER=''
         _DOTS_FAILURE_GRADIENT_LINES=()
