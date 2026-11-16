@@ -9,6 +9,15 @@ if [[ "$OSTYPE" == linux* ]] && command -v objdump >/dev/null 2>&1; then
   alias objdump='objdump --disassembler-color=extended --visualize-jumps=extended-color'
 fi
 alias rm="rm -i"
+alias sl='ls'
+
+# Linux system diagnostics.
+if [[ "$OSTYPE" == linux* ]]; then
+  alias jerr='journalctl -p err -b'
+  alias ports='ss -tulpen'
+  alias mem='free -h'
+  alias myip='ip -brief address'
+fi
 
 # Enter the shared Nix programming environment from any directory.
 alias dev='nix develop github:Katossh/shiny-rotary-phone#general'
@@ -25,4 +34,3 @@ preview() {
     fi
   done
 }
-
