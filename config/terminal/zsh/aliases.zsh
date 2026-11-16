@@ -19,9 +19,6 @@ if [[ "$OSTYPE" == linux* ]]; then
   alias myip='ip -brief address'
 fi
 
-# Enter the shared Nix programming environment from any directory.
-alias dev='nix develop github:Katossh/shiny-rotary-phone#general'
-
 preview() {
   while true; do
     local file
