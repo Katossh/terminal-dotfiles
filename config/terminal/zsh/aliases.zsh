@@ -4,6 +4,7 @@ if type hub > /dev/null; then
 fi
 
 alias info='info --vi-keys'
+alias zed='zeditor'
 # GNU objdump supports these flags; Apple's objdump does not.
 if [[ "$OSTYPE" == linux* ]] && command -v objdump >/dev/null 2>&1; then
   alias objdump='objdump --disassembler-color=extended --visualize-jumps=extended-color'
