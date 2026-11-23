@@ -112,8 +112,6 @@ done
 (( ${#concurrent_seen} == normal_count )) || fail "concurrent terminals did not consume one complete unique pool"
 print -- "ok - concurrent terminal starts are serialized without repeats"
 
-print -- "All startup emoji state tests passed."
-
 # The selected value is wired into the prompt renderer directly at module
 # load time, under the interactive-TTY guard. No later prompt animation can
 # replace it with an untracked random glyph.
