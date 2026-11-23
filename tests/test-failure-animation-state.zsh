@@ -128,9 +128,8 @@ zmodload zsh/zpty 2>/dev/null || {
 typeset pty_state="$TEST_ROOT/pty-state"
 typeset -A pty_seen=()
 
-# Exercise actual interactive prompt rendering with the normal animation
-# setting enabled. Keep the PTYs sequential here; a separate test above starts
-# concurrent Zsh processes to verify lock contention and pool uniqueness.
+# Exercise actual prompt rendering with animation enabled. Keep PTYs sequential;
+# a separate process-level test above covers concurrent draws and lock handling.
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
@@ -148,7 +147,13 @@ for (( index = 1; index <= normal_count; index++ )); do
     done
     [[ -n "$startup_output" ]] || fail "$pty_name did not reach its initial interactive prompt"
 
-    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'"
+    # Disable terminal echo so the next captured marker comes from the real
+    # prompt renderer, not from the shell echoing the command we send.
+    zpty -w "$pty_name" "stty -echo"
+    command sleep 0.05
+    if zpty -r -t "$pty_name" data; then :; fi
+
+    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'; print -r -- \"VISIBLE_EMOJI \$( _dots_failure_animation_render_prompt )\""
 
     typeset output='' visible='' frame=''
     tries=0
@@ -156,17 +161,17 @@ for (( index = 1; index <= normal_count; index++ )); do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
         fi
-        [[ "$output" == *SYNC_PROMPT*' ❯'* ]] && break
+        [[ "$output" == *VISIBLE_EMOJI* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
 
     visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
+    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"VISIBLE_EMOJI SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
     [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across terminal starts"
 
-    # Continue collecting output after the prompt appears. The previous
+    # Continue collecting output after the prompt is selected. The old
     # implementation asynchronously replaced the reserved emoji.
     typeset -i quiet_round=0
     while (( quiet_round < 20 )); do
