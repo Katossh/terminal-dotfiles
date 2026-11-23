@@ -132,7 +132,7 @@ typeset -A pty_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-        PROMPT="SYNC_PROMPT ❯ " XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZSH_DIR="$ZSH_DIR" \
+        PROMPT=SYNC_PROMPTMARKER DOTS_FAILURE_ANIMATION_PROMPT_MARKER=MARK XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZSH_DIR="$ZSH_DIR" \
         zsh -f -i -c 'source "$ZSH_DIR/failure-animation.zsh"; _dots_failure_animation_render_prompt'
 
     typeset output='' data='' visible='' frame=''
@@ -142,7 +142,7 @@ for (( index = 1; index <= normal_count; index++ )); do
             output+="$data"
         fi
         visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-        [[ "$visible" == *SYNC_PROMPT*' ❯'* ]] && break
+        [[ "$visible" == *SYNC_PROMPT*MARK* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
