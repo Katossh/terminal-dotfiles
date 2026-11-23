@@ -126,18 +126,18 @@ source "$DOTS_TEST_ZSH_DIR/failure-animation.zsh"
 ZSH_INIT
 
 for (( index = 1; index <= normal_count; index++ )); do
-    typeset pty_name="dots_startup_emoji_\${index}"
+    typeset pty_name="dots_startup_emoji_${index}"
     pty_names+=( "$pty_name" )
-    zpty -b "$pty_name" env \\
-        TERM=xterm-256color COLUMNS=120 LINES=30 \\
-        ZDOTDIR="$pty_zdotdir" \\
-        DOTS_TEST_ZSH_DIR="$ZSH_DIR" \\
-        XDG_STATE_HOME="$pty_state" \\
-        DOTS_FAILURE_ANIMATION=0 \\
+    zpty -b "$pty_name" env \
+        TERM=xterm-256color COLUMNS=120 LINES=30 \
+        ZDOTDIR="$pty_zdotdir" \
+        DOTS_TEST_ZSH_DIR="$ZSH_DIR" \
+        XDG_STATE_HOME="$pty_state" \
+        DOTS_FAILURE_ANIMATION=0 \
         zsh -i
 done
 
-for pty_name in "\${pty_names[@]}"; do
+for pty_name in "${pty_names[@]}"; do
     typeset output='' data='' visible='' frame=''
     typeset -i tries=0
     while (( tries < 120 )); do
@@ -152,11 +152,11 @@ for pty_name in "\${pty_names[@]}"; do
     visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
     frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji"
-    [[ -z "\${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
+    [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
     pty_seen[$frame]=1
     print -- "ok - $pty_name rendered $frame before any animation started"
     zpty -d "$pty_name" 2>/dev/null || true
 done
 
-(( \${#pty_seen} == normal_count )) || fail "concurrent interactive prompts did not receive unique startup emojis"
+(( ${#pty_seen} == normal_count )) || fail "concurrent interactive prompts did not receive unique startup emojis"
 
