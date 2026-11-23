@@ -45,11 +45,11 @@ The disabled zsh-manydots-magic experiment is not part of the active setup.
 
 ## Failure messages
 
-Every failed command uses one stable message:
+Ordinary failed commands use one stable message:
 
 \`✖ Command "<command>" failed.\`
 
-An optional diagnostic detail is displayed on the next line. The failure category is still classified internally for diagnostics, but it no longer selects different wording, random jokes, rarity tiers, or colour palettes.
+An optional diagnostic detail is displayed on the next line. The failure category remains available to diagnostics but does not change the ordinary wording. In automatic mode, two independent rarity tiers can replace that ordinary message: **Legendary** (1% by default) and **Mythic** (0.1% by default). Each tier has one fixed placeholder message. Mythic is checked first; if configured probabilities overlap, it keeps priority and the Legendary range is reduced so the combined probability never exceeds 100%. These rarity rolls are independent of the failure category and the shared prompt-emoji reservation pool.
 
 On an interactive colour-capable terminal, this exact message is animated with one moving 24-bit gradient that loops continuously while the banner remains on the editable prompt. The banner occupies its own prompt row above the normal prompt. Each colour sequence is wrapped in Zsh's prompt-aware \`%{...%}\` markers, so ZLE treats it as zero-width instead of printing escape notation or shifting the input cursor. The background worker only sends phase numbers through a private pipe; ZLE alone redraws the prompt and the worker never reads keyboard input.
 
@@ -63,7 +63,10 @@ Each interactive shell first reserves exactly one final prompt emoji synchronous
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| \`DOTS_FAILURE_MESSAGE_CHANCE\` | \`100\` | Percentage chance (0–100) that the single failure notice is shown. |
+| \`DOTS_FAILURE_MESSAGE_CHANCE\` | \`100\` | Percentage chance (0–100) that a failure notice is shown. |
+| \`DOTS_FAILURE_STYLE\` | \`auto\` | Select \`auto\` (rarity rolls), \`normal\` (disable rare rolls), \`legendary\`, or \`mythic\` (force a preview). Unknown legacy styles fall back to Normal. |
+| \`DOTS_FAILURE_LEGENDARY_CHANCE\` | \`100\` | Legendary chance in basis points: 100 = 1%. Applies only when style is \`auto\`. |
+| \`DOTS_FAILURE_MYTHIC_CHANCE\` | \`10\` | Mythic chance in basis points: 10 = 0.1%. Rolled before Legendary; applies only when style is \`auto\`. |
 | \`DOTS_FAILURE_GRADIENT_INTERVAL\` | \`0.08\` | Delay between failure-gradient frames in seconds (valid range: 0.01–1.00). |
 | \`DOTS_FAILURE_ANIMATION_INTERVAL\` | \`0.08\` | Delay between prompt-emoji frames in seconds (valid range: 0.01–2.00). |
 | \`DOTS_FAILURE_ANIMATION_INFINITE\` | \`0\` | Set to \`1\`, \`true\`, \`yes\`, or \`on\` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |
