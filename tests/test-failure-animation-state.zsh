@@ -43,74 +43,78 @@ print -- "ok - only the prompt-rendering tmux shell consumes a startup emoji"
 source "$ZSH_DIR/failure-animation.zsh"
 
 _dots_failure_animation_pool_for_style normal
+typeset -a expected_pool=(
+    '👀' '😳' '✨' '💀' '😂' '🤡' '🪿' '🔥' '💔' '🫠'
+    '😭' '🥰' '🥺' '😏' '❤️'
+    '🧡' '💛' '💚' '💙' '🐽'
+)
 normal_count="${#_DOTS_FAILURE_ANIMATION_POOL}"
+(( normal_count == 20 )) || fail "unified emoji pool contains $normal_count entries instead of 20"
+[[ "${_DOTS_FAILURE_ANIMATION_POOL[*]}" == "${expected_pool[*]}" ]] ||
+    fail "unified emoji pool contents or ordering changed unexpectedly"
 
-# Normal, sarcastic, and dramatic all draw from the same reaction pool.
-typeset -A shared_seen=()
-typeset frame=''
+# Every former style now exposes exactly the same combined pool.
 typeset style=''
+for style in normal sarcastic dramatic anime ecchi rainbow; do
+    _dots_failure_animation_pool_for_style "$style"
+    [[ "${_DOTS_FAILURE_ANIMATION_POOL[*]}" == "${expected_pool[*]}" ]] ||
+        fail "$style does not use the unified emoji pool"
+done
+
+# Keep only the broken heart and ordinary red heart; reject every other variant.
+for frame in '💖' '💗' '💓' '💕' '🩷' '💘' '🖤' '🤎' '💜' '🤍'; do
+    [[ " ${expected_pool[*]} " != *" $frame "* ]] ||
+        fail "removed heart variant unexpectedly remains in the pool: $frame"
+done
+for frame in '💔' '❤️' '🐽'; do
+    [[ " ${expected_pool[*]} " == *" $frame "* ]] ||
+        fail "required emoji is missing from the unified pool: $frame"
+done
+print -- "ok - all styles use one 20-emoji pool with only two heart variants and a pig snout"
+
+# Reservations across different styles consume one shared no-repeat cycle.
+typeset -A shared_seen=()
+typeset -a shared_styles=( normal anime ecchi rainbow sarcastic dramatic )
 typeset -i index=0
 for (( index = 1; index <= normal_count; index++ )); do
-    case $(( (index - 1) % 3 )) in
-        0) style=normal ;;
-        1) style=sarcastic ;;
-        2) style=dramatic ;;
-    esac
+    style="${shared_styles[$(( (index - 1) % ${#shared_styles} + 1 ))]}"
     frame="$(_dots_failure_animation_next_startup_frame "$style")"
-    [[ -n "$frame" ]] || fail "shared reaction pool returned an empty emoji"
-    [[ -z "${shared_seen[$frame]-}" ]] || fail "shared reaction pool repeated $frame"
+    [[ -n "$frame" ]] || fail "shared emoji pool returned an empty emoji"
+    [[ -z "${shared_seen[$frame]-}" ]] || fail "shared pool repeated $frame before exhaustion"
     shared_seen[$frame]=1
 done
-(( ${#shared_seen} == normal_count )) || fail "shared reaction styles did not consume one complete pool"
-print -- "ok - normal, sarcastic, and dramatic share a no-repeat cycle"
+(( ${#shared_seen} == normal_count )) || fail "mixed styles did not consume one complete shared pool"
+[[ -f "$XDG_STATE_HOME/dots/failure-animation/all.state" ]] ||
+    fail "unified reservations were not persisted to all.state"
+print -- "ok - all prompt styles share one persistent no-repeat cycle"
 
 # The next draw after exhaustion replenishes the pool, then that new cycle is
 # also unique until every item has appeared.
-assert_unique_batch normal "$normal_count" "normal pool starts a fresh unique cycle"
+assert_unique_batch normal "$normal_count" "unified pool starts a fresh unique cycle"
 
-_dots_failure_animation_pool_for_style anime
-assert_unique_batch anime "${#_DOTS_FAILURE_ANIMATION_POOL}" "anime pool has an independent cycle"
-
-_dots_failure_animation_pool_for_style ecchi
-assert_unique_batch ecchi "${#_DOTS_FAILURE_ANIMATION_POOL}" "ecchi pool has an independent cycle"
-
-_dots_failure_animation_pool_for_style rainbow
-assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has an independent cycle"
-
-# Upgrade the v1 state written by the previous implementation without
-# throwing away its unconsumed shuffled entries.
+# Old releases kept one state file per style. The unified pool intentionally
+# starts one clean shared cycle instead of mixing incompatible partial bags.
 typeset legacy_home="$TEST_ROOT/legacy-state"
-typeset legacy_signature='v1:normal'
-typeset legacy_state_file="$legacy_home/dots/failure-animation/normal.state"
-typeset legacy_frame legacy_last_frame legacy_migrated_signature
-typeset -a legacy_expected=()
-typeset -A legacy_seen=()
-_dots_failure_animation_pool_for_style normal
-for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
-    legacy_signature+="|$emoji"
-done
-legacy_expected=( "${_DOTS_FAILURE_ANIMATION_POOL[2]}" "${_DOTS_FAILURE_ANIMATION_POOL[4]}" "${_DOTS_FAILURE_ANIMATION_POOL[6]}" )
-command mkdir -p "${legacy_state_file:h}"
-print -r -- "$legacy_signature" > "$legacy_state_file"
-print -r -- "2 4 6" >> "$legacy_state_file"
+typeset legacy_normal_file="$legacy_home/dots/failure-animation/all.state"
+typeset legacy_anime_file="$legacy_home/dots/failure-animation/anime.state"
+command mkdir -p "${legacy_normal_file:h}"
+print -r -- 'legacy-normal-state' > "$legacy_normal_file"
+print -r -- 'legacy-anime-state' > "$legacy_anime_file"
 XDG_STATE_HOME="$legacy_home"
-
-for (( index = 1; index <= 3; index++ )); do
-    legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
-    [[ " ${legacy_expected[*]} " == *" $legacy_frame "* ]] ||
-        fail "v1 migration discarded unconsumed pool item ordering (selected $legacy_frame)"
-    [[ -z "${legacy_seen[$legacy_frame]-}" ]] ||
-        fail "v1 migration repeated $legacy_frame before exhausting its remaining bag"
-    legacy_seen[$legacy_frame]=1
-    legacy_last_frame="$legacy_frame"
+typeset -A legacy_seen=()
+for style in normal anime ecchi; do
+    frame="$(_dots_failure_animation_next_startup_frame "$style")"
+    [[ -z "${legacy_seen[$frame]-}" ]] ||
+        fail "legacy state migration repeated a unified-pool reservation: $frame"
+    legacy_seen[$frame]=1
 done
-(( ${#legacy_seen} == 3 )) || fail "v1 state migration did not preserve all three remaining entries"
-IFS= read -r legacy_migrated_signature < "$legacy_state_file"
-[[ "$legacy_migrated_signature" == v2:* ]] || fail "legacy state was not upgraded to v2"
-legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
-[[ "$legacy_frame" != "$legacy_last_frame" ]] ||
-    fail "the new cycle repeated the migrated pool's final emoji"
-print -- "ok - v1 pool state migrates without resetting the remaining bag"
+[[ -f "$legacy_home/dots/failure-animation/all.state" ]] ||
+    fail "unified pool did not create its shared state file"
+[[ "$(<"$legacy_normal_file")" == 'legacy-normal-state' ]] ||
+    fail "unified pool modified a legacy style-specific state file"
+[[ "$(<"$legacy_anime_file")" == 'legacy-anime-state' ]] ||
+    fail "unified pool modified a legacy style-specific state file"
+print -- "ok - old per-style bags are left untouched while the unified bag starts cleanly"
 
 # The reserved final emoji and transient animation frames use separate pools.
 typeset animation_home="$TEST_ROOT/animation-state"
@@ -121,11 +125,11 @@ XDG_STATE_HOME="$animation_home"
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.01
 _dots_failure_animation_pool_for_style normal
 normal_count="${#_DOTS_FAILURE_ANIMATION_POOL}"
-startup_frame="$(_dots_failure_animation_next_startup_frame normal)"
+startup_frame="$(_dots_failure_animation_next_startup_frame anime)"
 [[ -n "$startup_frame" ]] || fail "synchronous reservation returned an empty final emoji"
-state_before="$(<"$animation_home/dots/failure-animation/normal.state")"
+state_before="$(<"$animation_home/dots/failure-animation/all.state")"
 
-stream_output="$(_dots_failure_animation_stream normal 0 "$startup_frame" 12)"
+stream_output="$(_dots_failure_animation_stream ecchi 0 "$startup_frame" 12)"
 stream_frames=( "${(@f)stream_output}" )
 (( ${#stream_frames} == 12 )) || fail "animation emitted ${#stream_frames} frames instead of 12"
 [[ "${stream_frames[-1]}" == "$startup_frame" ]] ||
@@ -144,7 +148,7 @@ done
 (( stream_count == 11 )) || fail "animation did not emit eleven transient frames"
 [[ "${stream_frames[-2]}" != "$startup_frame" ]] ||
     fail "penultimate animation frame repeated the reserved final emoji"
-state_after="$(<"$animation_home/dots/failure-animation/normal.state")"
+state_after="$(<"$animation_home/dots/failure-animation/all.state")"
 [[ "$state_after" == "$state_before" ]] ||
     fail "transient animation frames modified the persistent no-repeat reservation bag"
 print -- "ok - animation uses the full style pool and finishes on the reserved emoji without consuming reservations"
@@ -156,13 +160,19 @@ typeset -a pids=()
 typeset -A concurrent_seen=()
 typeset -i concurrent_sessions=3 concurrent_count=0
 for (( index = 1; index <= concurrent_sessions; index++ )); do
-    DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
+    case "$index" in
+        1) style=normal ;;
+        2) style=anime ;;
+        *) style=rainbow ;;
+    esac
+    DOTS_TEST_STYLE="$style" \
+        DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
         XDG_STATE_HOME="$concurrent_home" \
         zsh -f -c '
             source "$DOTS_TEST_ZSH_FILE"
             _DOTS_FAILURE_ANIMATION_INTERVAL=0.01
-            reserved="$(_dots_failure_animation_next_startup_frame normal)" || exit
-            animation="$(_dots_failure_animation_stream normal 0 "$reserved" 12)" || exit
+            reserved="$(_dots_failure_animation_next_startup_frame "$DOTS_TEST_STYLE")" || exit
+            animation="$(_dots_failure_animation_stream "$DOTS_TEST_STYLE" 0 "$reserved" 12)" || exit
             print -r -- "reserved:$reserved"
             print -r -- "$animation"
         ' > "$TEST_ROOT/concurrent.$index" &
