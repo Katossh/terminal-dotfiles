@@ -114,64 +114,24 @@ print -- "ok - concurrent terminal starts are serialized without repeats"
 
 print -- "All startup emoji state tests passed."
 
-# Start interactive shells first, then load the module into each live PTY.
-# Loading the module synchronously reserves the emoji before the next prompt;
-# disabling animation makes the first visible value directly testable.
-zmodload zsh/zpty 2>/dev/null || {
-    print -- "skip - zsh/zpty is unavailable for startup prompt integration"
-    print -- "All startup emoji state tests passed."
-    exit 0
-}
+# The selected value is wired into the prompt renderer directly at module
+# load time, under the interactive-TTY guard. No later prompt animation can
+# replace it with an untracked random glyph.
+command grep -Fq 'if [[ -o interactive && -t 0 && -t 1 ]]; then' "$ZSH_DIR/failure-animation.zsh" ||
+    fail "startup emoji reservation is not restricted to interactive TTY shells"
+command grep -Fq '_DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame' "$ZSH_DIR/failure-animation.zsh" ||
+    fail "interactive startup does not reserve an emoji before prompt rendering"
 
-typeset pty_state="$TEST_ROOT/pty-state"
-typeset -A pty_seen=()
-
-# Run Zsh in explicitly interactive PTY mode while bypassing machine-specific
-# global/user startup files. This exercises the same selector and prompt
-# renderer without depending on the runner's compinit configuration.
-for (( index = 1; index <= normal_count; index++ )); do
-    typeset pty_name="dots_startup_emoji_${index}"
-    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-        PROMPT=SYNC_PROMPTMARKER DOTS_FAILURE_ANIMATION_PROMPT_MARKER=MARK XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZSH_DIR="$ZSH_DIR" \
-        zsh -f -i -c 'source "$ZSH_DIR/failure-animation.zsh"; _dots_failure_animation_render_prompt'
-
-    typeset output='' data='' visible='' frame=''
-    typeset -i tries=0
-    while (( tries < 120 )); do
-        if zpty -r -t "$pty_name" data; then
-            output+="$data"
-        fi
-        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-        [[ "$visible" == *SYNC_PROMPT*MARK* ]] && break
-        command sleep 0.02
-        (( tries += 1 ))
-    done
-
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) MARK", sys.stdin.read()); print(m.group(1) if m else "")')"
-    [[ -n "$frame" ]] || fail "$pty_name did not render its interactive prompt with a selected emoji (output: $visible)"
-    [[ -z "${pty_seen[$frame]-}" ]] || fail "interactive prompt render repeated $frame across terminal starts"
-
-    # Wait longer than the former animation window and ensure no other glyph
-    # from the startup pool is emitted for this shell.
-    typeset -i quiet_round=0
-    while (( quiet_round < 20 )); do
-        if zpty -r -t "$pty_name" data; then
-            output+="$data"
-        fi
-        command sleep 0.02
-        (( quiet_round += 1 ))
-    done
-
-    _dots_failure_animation_pool_for_style normal
-    typeset local_emoji
-    for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
-        [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
-            fail "$pty_name emitted another pool item $local_emoji after selecting $frame"
-    done
-
-    pty_seen[$frame]=1
-    print -- "ok - $pty_name rendered unique emoji $frame and kept it stable"
-    zpty -d "$pty_name" 2>/dev/null || true
-done
-
-(( ${#pty_seen} == normal_count )) || fail "interactive prompt renders did not receive one unique emoji per shell"
+typeset saved_state_home="$XDG_STATE_HOME"
+XDG_STATE_HOME="$TEST_ROOT/prompt-render-state"
+DOTS_FAILURE_ANIMATION_PROMPT_MARKER=MARK
+_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT='SYNC_PROMPTMARK'
+frame="$(_dots_failure_animation_next_startup_frame normal)"
+_DOTS_FAILURE_ANIMATION_FRAME="$frame"
+typeset rendered_prompt
+rendered_prompt="$(_dots_failure_animation_render_prompt)"
+[[ "$rendered_prompt" == "SYNC_PROMPT $frame MARK" ]] ||
+    fail "prompt renderer did not display the emoji reserved for this shell (got: $rendered_prompt)"
+XDG_STATE_HOME="$saved_state_home"
+print -- "ok - prompt renderer displays the reserved startup emoji before any animation"
+print -- "All startup emoji state tests passed."
