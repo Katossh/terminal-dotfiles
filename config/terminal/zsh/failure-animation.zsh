@@ -89,6 +89,7 @@ _dots_failure_animation_pool_for_style() {
     esac
 }
 
+
 # Draw the first prompt emoji from a persistent shuffled bag. The bag lives in
 # XDG_STATE_HOME, so separate terminal processes consume it in order without
 # repeating an emoji until the style's complete pool has been exhausted.
@@ -760,8 +761,8 @@ fi
         return 0
     }
 
-    # Creating a symlink is an atomic lock operation on the supported
-    # platforms. A dead owner's PID identifies a lock left by a crashed shell.
+    # Atomic symlink creation serializes terminal starts without requiring
+    # flock, which is not available in every supported shell environment.
     while (( attempts < 250 )); do
         if command ln -s "$" "$lock_file" 2>/dev/null; then
             lock_acquired=1
@@ -833,7 +834,7 @@ fi
         remaining_line+="$candidate"
     done
 
-    # Replace the state atomically so a terminal never sees a half-written bag.
+    # Replace the state atomically so another shell cannot read a partial bag.
     temp_file="${state_file}.tmp.$.$RANDOM"
     if ! (
         umask 077
