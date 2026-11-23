@@ -149,11 +149,11 @@ for (( index = 1; index <= normal_count; index++ )); do
 
     # Disable terminal echo so the next captured marker comes from the real
     # prompt renderer, not from the shell echoing the command we send.
-    zpty -w "$pty_name" "stty -echo"
+    zpty -w "$pty_name" "stty -echo"$'\n'
     command sleep 0.05
     if zpty -r -t "$pty_name" data; then :; fi
 
-    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'; print -r -- VISIBLE_EMOJI:$_DOTS_FAILURE_ANIMATION_FRAME"
+    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'; print -r -- VISIBLE_EMOJI:$_DOTS_FAILURE_ANIMATION_FRAME"$'\n'
 
     typeset output='' visible='' frame=''
     tries=0
