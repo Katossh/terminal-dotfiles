@@ -117,21 +117,17 @@ _dots_failure_animation_next_startup_frame() {
         return 1
     fi
 
-    if ! zmodload zsh/system 2>/dev/null; then
-        print -u2 -r -- "dots: zsh/system is required for safe startup emoji selection"
-        return 1
-    fi
-    local process_id="${sysparams[pid]:-}"
-    if [[ "$process_id" != <-> ]]; then
-        print -u2 -r -- "dots: could not determine the process ID for startup emoji locking"
+    if ! zmodload zsh/system 2>/dev/null || ! zsystem supports flock; then
+        print -u2 -r -- "dots: zsh/system file locking is required for no-repeat emoji selection"
         return 1
     fi
 
     local state_dir="${state_home%/}/dots/failure-animation"
     local state_file="${state_dir}/${pool_key}.state"
     local lock_file="${state_file}.lock"
+    local lock_fd=''
     local signature="v1:${pool_key}"
-    local emoji candidate stored_signature='' remaining_line='' owner_pid=''
+    local emoji candidate stored_signature='' remaining_line=''
     local temp_file='' swap_value='' selected_emoji=''
     local -a remaining=() next_remaining=()
     local -A seen=()
@@ -146,28 +142,17 @@ _dots_failure_animation_next_startup_frame() {
         print -u2 -r -- "dots: cannot create startup emoji state directory: $state_dir"
         return 1
     }
+    command touch "$lock_file" 2>/dev/null || {
+        print -u2 -r -- "dots: cannot create startup emoji lock file: $lock_file"
+        return 1
+    }
 
-    # Atomic symlink creation serializes terminal starts without requiring
-    # flock, which is not available in every supported shell environment.
-    while true; do
-        if command ln -s "$process_id" "$lock_file" 2>/dev/null; then
-            break
-        fi
-
-        owner_pid="$(command readlink "$lock_file" 2>/dev/null || true)"
-        if [[ "$owner_pid" == <-> ]]; then
-            if ! builtin kill -0 "$owner_pid" 2>/dev/null; then
-                command rm -f "$lock_file" 2>/dev/null
-                continue
-            fi
-        elif [[ -e "$lock_file" || -L "$lock_file" ]]; then
-            # A malformed lock cannot belong to a running instance of this helper.
-            command rm -f "$lock_file" 2>/dev/null
-            continue
-        fi
-
-        command sleep 0.02 2>/dev/null || return 1
-    done
+    # fcntl locking is released automatically if a shell exits unexpectedly.
+    # Every terminal shares this stable lock file while updating the shuffled bag.
+    if ! zsystem flock -f lock_fd "$lock_file"; then
+        print -u2 -r -- "dots: could not acquire startup emoji state lock: $lock_file"
+        return 1
+    fi
 
     if [[ -f "$state_file" ]]; then
         {
@@ -228,12 +213,12 @@ _dots_failure_animation_next_startup_frame() {
             command mv -f "$temp_file" "$state_file"
     ); then
         command rm -f "$temp_file" 2>/dev/null
-        command rm -f "$lock_file" 2>/dev/null
+        exec {lock_fd}>&-
         print -u2 -r -- "dots: could not persist startup emoji selection: $state_file"
         return 1
     fi
 
-    command rm -f "$lock_file" 2>/dev/null
+    exec {lock_fd}>&-
     print -r -- "$selected_emoji"
 }
 
