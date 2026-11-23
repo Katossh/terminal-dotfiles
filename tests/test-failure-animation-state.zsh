@@ -136,6 +136,20 @@ for (( index = 1; index <= normal_count; index++ )); do
 done
 
 for pty_name in "${pty_names[@]}"; do
+    typeset startup_output='' data=''
+    typeset -i tries=0
+    while (( tries < 120 )); do
+        if zpty -r -t "$pty_name" data; then
+            startup_output+="$data"
+        fi
+        [[ -n "$startup_output" ]] && break
+        command sleep 0.02
+        (( tries += 1 ))
+    done
+    [[ -n "$startup_output" ]] || fail "$pty_name did not reach its initial interactive prompt"
+done
+
+for pty_name in "${pty_names[@]}"; do
     zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'"
 done
 
