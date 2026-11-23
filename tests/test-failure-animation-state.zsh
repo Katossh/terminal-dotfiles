@@ -11,10 +11,10 @@ fail() {
 }
 
 assert_unique_batch() {
-    local style="$1"
+    typeset style="$1"
     local -i count="$2"
     local label="$3"
-    local frame=''
+    typeset frame=''
     local -A seen=()
 
     for (( index = 1; index <= count; index++ )); do
@@ -37,10 +37,10 @@ _dots_failure_animation_pool_for_style normal
 normal_count="${#_DOTS_FAILURE_ANIMATION_POOL}"
 
 # Normal, sarcastic, and dramatic all draw from the same reaction pool.
-local -A shared_seen=()
-local frame=''
-local style=''
-local -i index=0
+typeset -A shared_seen=()
+typeset frame=''
+typeset style=''
+typeset -i index=0
 for (( index = 1; index <= normal_count; index++ )); do
     case $(( (index - 1) % 3 )) in
         0) style=normal ;;
@@ -70,8 +70,8 @@ assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has
 
 # Confirm the chosen persistent startup emoji is actually the first frame shown
 # by the regular animation stream, without changing the remaining frame logic.
-local startup_frame stream_output
-local -a stream_frames=()
+typeset startup_frame stream_output
+typeset -a stream_frames=()
 startup_frame="$(_dots_failure_animation_next_startup_frame rainbow)"
 _DOTS_FAILURE_ANIMATION_INTERVAL=0.01
 stream_output="$(_dots_failure_animation_stream rainbow 0 "$startup_frame")"
@@ -81,9 +81,9 @@ print -- "ok - persistent selection is used as the animation's first frame"
 
 # Start every draw in a separate Zsh process at once. The atomic lock must
 # serialize them so concurrent terminals still receive one complete unique bag.
-local concurrent_home="$TEST_ROOT/concurrent-state"
-local -a pids=()
-local -A concurrent_seen=()
+typeset concurrent_home="$TEST_ROOT/concurrent-state"
+typeset -a pids=()
+typeset -A concurrent_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
         XDG_STATE_HOME="$concurrent_home" \
