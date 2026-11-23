@@ -132,7 +132,7 @@ typeset -A pty_seen=()
 # setting enabled. Keep the PTYs sequential here; a separate test above starts
 # concurrent Zsh processes to verify lock contention and pool uniqueness.
 for (( index = 1; index <= normal_count; index++ )); do
-    typeset pty_name="dots_startup_emoji_\${index}"
+    typeset pty_name="dots_startup_emoji_${index}"
     zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
         XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 zsh -f -i
 
@@ -164,7 +164,7 @@ for (( index = 1; index <= normal_count; index++ )); do
     visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
     frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
-    [[ -z "\${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across terminal starts"
+    [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across terminal starts"
 
     # Continue collecting output after the prompt appears. The previous
     # implementation asynchronously replaced the reserved emoji.
@@ -179,7 +179,7 @@ for (( index = 1; index <= normal_count; index++ )); do
 
     _dots_failure_animation_pool_for_style normal
     typeset local_emoji
-    for local_emoji in "\${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+    for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
             fail "$pty_name replaced its reserved emoji $frame with another pool item $local_emoji"
     done
@@ -189,4 +189,4 @@ for (( index = 1; index <= normal_count; index++ )); do
     zpty -d "$pty_name" 2>/dev/null || true
 done
 
-(( \${#pty_seen} == normal_count )) || fail "interactive prompts did not receive one unique emoji per shell startup"
+(( ${#pty_seen} == normal_count )) || fail "interactive prompts did not receive one unique emoji per shell startup"
