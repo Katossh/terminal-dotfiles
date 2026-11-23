@@ -55,7 +55,7 @@ On an interactive colour-capable terminal, this exact message is animated with o
 
 Typing remains fully responsive while the gradient runs. Submitting a command stops the worker and removes the banner from the next live prompt, while the already-submitted copy remains in scrollback. This prevents frames from accumulating while a foreground command owns the terminal. The animation also stops when the banner is explicitly cleared (for example, with Ctrl+L). The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
 
-\`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between failure-gradient frames. \`DOTS_FAILURE_ANIMATION_INTERVAL\` controls the delay between prompt-emoji frames.
+\`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between failure-gradient frames. \`DOTS_FAILURE_ANIMATION_INTERVAL\` controls the delay between prompt badge-pulse phases.
 
 Each interactive shell reserves exactly one prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt expansion. That reservation is the shell's identity and is the only operation that consumes the persisted, lock-protected shuffled bag under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`. The prompt animation pulses a coloured badge around the reserved glyph; it never replaces the glyph or draws additional pool entries. Consequently, opening several terminals quickly still consumes one distinct emoji per shell, regardless of how many animation frames run concurrently. A new shuffled cycle begins only after every emoji in that style's pool has been reserved by a shell. Normal, Sarcastic, and Dramatic share one pool; Anime, Ecchi, and Rainbow use independent pools. The default startup badge animation runs for 12 phases. Infinite mode repeats the badge pulse without consuming any more emoji entries.
 
@@ -65,7 +65,7 @@ Each interactive shell reserves exactly one prompt emoji synchronously while loa
 |---|---:|---|
 | \`DOTS_FAILURE_MESSAGE_CHANCE\` | \`100\` | Percentage chance (0–100) that the single failure notice is shown. |
 | \`DOTS_FAILURE_GRADIENT_INTERVAL\` | \`0.08\` | Delay between failure-gradient frames in seconds (valid range: 0.01–1.00). |
-| \`DOTS_FAILURE_ANIMATION_INTERVAL\` | \`0.08\` | Delay between ordinary prompt emoji frames in seconds (valid range: 0.01–2.00). |
+| \`DOTS_FAILURE_ANIMATION_INTERVAL\` | \`0.08\` | Delay between prompt badge-pulse phases in seconds (valid range: 0.01–2.00). |
 | \`DOTS_FAILURE_ANIMATION_INFINITE\` | \`0\` | Set to \`1\`, \`true\`, \`yes\`, or \`on\` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |
 | \`DOTS_FAILURE_EMOJI_ANIMATION_INFINITE\` | \`0\` | Compatibility alias for the earlier main-branch name; used only when the newer Infinite variable is unset. |
 | \`DOTS_FAILURE_ANIMATION_CONTINUOUS\` | \`0\` | Older compatibility alias for Infinite mode; used only when both newer names are unset. |
