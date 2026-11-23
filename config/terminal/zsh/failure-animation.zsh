@@ -10,7 +10,6 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
-typeset -gi _DOTS_FAILURE_ANIMATION_EMOJI_PHASE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
@@ -25,6 +24,7 @@ typeset -g _DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT=''
 typeset -g _DOTS_FAILURE_ANIMATION_STATE='loaded'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_STATE=''
 typeset -g _DOTS_FAILURE_ANIMATION_FRAME='💀'
+typeset -g _DOTS_FAILURE_ANIMATION_RESERVED_FRAME=''
 typeset -g _DOTS_FAILURE_ANIMATION_STYLE='normal'
 typeset -g _DOTS_FAILURE_ANIMATION_MODE='emoji'
 typeset -g _DOTS_FAILURE_ANIMATION_BANNER=''
@@ -257,28 +257,72 @@ _dots_failure_animation_next_startup_frame() {
 # Reserve the first visible emoji synchronously, before the animation worker
 # starts or the first interactive prompt is expanded.
 if [[ -o interactive && -t 0 && -t 1 ]]; then
-    _DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
-        _DOTS_FAILURE_ANIMATION_FRAME=''
+    _DOTS_FAILURE_ANIMATION_RESERVED_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
+        _DOTS_FAILURE_ANIMATION_RESERVED_FRAME=''
+    _DOTS_FAILURE_ANIMATION_FRAME="$_DOTS_FAILURE_ANIMATION_RESERVED_FRAME"
 fi
 
 _dots_failure_animation_stream() {
     emulate -L zsh
+
+    local style="${1:-normal}"
     local infinite="${2:-0}"
+    local final_frame="${3-}"
     local interval="${_DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
-    local -i frame_limit="${4:-12}" frame_number=0 phase=0
+    local frame=''
+    local -i frame_limit="${4:-12}" frame_number=0
+    local -i pool_size=0 random_index=0 previous_index=0 final_index=0 index=0
+    local -a animation_pool=()
+
+    _dots_failure_animation_pool_for_style "$style"
+    animation_pool=( "${_DOTS_FAILURE_ANIMATION_POOL[@]}" )
+    pool_size="${#animation_pool}"
+    (( pool_size > 0 )) || return 0
     [[ "$frame_limit" == <-> ]] && (( frame_limit >= 1 && frame_limit <= 10000 )) || frame_limit=12
-    # One emoji is reserved per shell; animation only pulses its badge.
+    [[ -n "$final_frame" ]] || return 1
+
+    # The final emoji is already reserved in the shared no-repeat bag.
+    # Animation deliberately uses the complete style pool independently;
+    # these transient choices never consume or mutate the reservation bag.
+    for (( index = 1; index <= pool_size; index++ )); do
+        if [[ "${animation_pool[index]}" == "$final_frame" ]]; then
+            final_index="$index"
+            break
+        fi
+    done
+
+    # Start away from the already visible final emoji. It may still appear
+    # among intermediate frames, but the sequence always settles on it.
+    previous_index="$final_index"
     command sleep "$interval" 2>/dev/null || return 0
+
     while true; do
-        for (( frame_number = 0; frame_number < frame_limit; frame_number++ )); do
-            phase=$(( (phase + 1) % 12 ))
-            print -r -- "$phase" || return 0
+        for (( frame_number = 0; frame_number < frame_limit - 1; frame_number++ )); do
+            random_index=$(( (RANDOM % pool_size) + 1 ))
+            while (( pool_size > 1 && random_index == previous_index )); do
+                random_index=$(( (RANDOM % pool_size) + 1 ))
+            done
+
+            # Keep the penultimate frame distinct from the reserved final
+            # frame as well as its predecessor, when the pool permits it.
+            if (( frame_number == frame_limit - 2 && final_index > 0 && pool_size > 2 )); then
+                while (( random_index == previous_index || random_index == final_index )); do
+                    random_index=$(( (RANDOM % pool_size) + 1 ))
+                done
+            fi
+
+            frame="${animation_pool[random_index]}"
+            previous_index="$random_index"
+            print -r -- "$frame" || return 0
             command sleep "$interval" 2>/dev/null || return 0
         done
+
+        print -r -- "$final_frame" || return 0
+        command sleep "$interval" 2>/dev/null || return 0
         [[ "$infinite" == 1 ]] || break
+        previous_index="$final_index"
     done
 }
-
 _dots_failure_animation_gradient_line() {
     emulate -L zsh
 
@@ -572,27 +616,7 @@ _dots_failure_animation_gradient_line_init() {
 
 
 
-_dots_failure_animation_emoji_badge_color() {
-    emulate -L zsh
-    local style="${1:-normal}"
-    local -i phase="${2:-0}"
-    local -a colors=()
-    case "$style" in
-        anime)
-            colors=($'\e[48;2;72;39;65m' $'\e[48;2;91;43;79m' $'\e[48;2;112;49;98m' $'\e[48;2;139;59;119m' $'\e[48;2;161;71;139m' $'\e[48;2;175;87;151m' $'\e[48;2;161;71;139m' $'\e[48;2;139;59;119m' $'\e[48;2;112;49;98m' $'\e[48;2;91;43;79m' $'\e[48;2;78;40;70m' $'\e[48;2;72;39;65m')
-            ;;
-        ecchi)
-            colors=($'\e[48;2;76;34;48m' $'\e[48;2;97;37;57m' $'\e[48;2;122;42;69m' $'\e[48;2;148;48;82m' $'\e[48;2;170;59;97m' $'\e[48;2;183;75;109m' $'\e[48;2;170;59;97m' $'\e[48;2;148;48;82m' $'\e[48;2;122;42;69m' $'\e[48;2;97;37;57m' $'\e[48;2;83;35;51m' $'\e[48;2;76;34;48m')
-            ;;
-        rainbow)
-            colors=($'\e[48;2;91;43;51m' $'\e[48;2;105;63;42m' $'\e[48;2;103;82;39m' $'\e[48;2;64;91;52m' $'\e[48;2;42;91;80m' $'\e[48;2;42;75;105m' $'\e[48;2;55;57;112m' $'\e[48;2;82;51;111m' $'\e[48;2;106;48;96m' $'\e[48;2;119;46;76m' $'\e[48;2;105;43;61m' $'\e[48;2;91;43;51m')
-            ;;
-        *)
-            colors=($'\e[48;2;43;58;75m' $'\e[48;2;47;70;91m' $'\e[48;2;53;83;108m' $'\e[48;2;63;95;128m' $'\e[48;2;79;101;145m' $'\e[48;2;99;99;157m' $'\e[48;2;121;94;162m' $'\e[48;2;143;91;157m' $'\e[48;2;157;87;139m' $'\e[48;2;157;88;116m' $'\e[48;2;133;91;95m' $'\e[48;2;43;58;75m')
-            ;;
-    esac
-    REPLY="${colors[$(( (phase % ${#colors}) + 1 ))]}"
-}
+
 _dots_failure_animation_render_prompt() {
     emulate -L zsh
 
@@ -613,12 +637,6 @@ _dots_failure_animation_render_prompt() {
 
     # Ordinary prompt emoji remains immediately before the final input marker.
     local marker="${DOTS_FAILURE_ANIMATION_PROMPT_MARKER:-❯}"
-    local emoji_rendered="$_DOTS_FAILURE_ANIMATION_FRAME"
-    local reset_color=$'\e[0m'
-    if (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && [[ -n "$emoji_rendered" ]]; then
-        _dots_failure_animation_emoji_badge_color "$_DOTS_FAILURE_ANIMATION_STYLE" "$_DOTS_FAILURE_ANIMATION_EMOJI_PHASE"
-        emoji_rendered="%{${REPLY}%} ${emoji_rendered} %{${reset_color}%}"
-    fi
     if [[ -n "$marker" ]]; then
         local marker_pattern="${(b)marker}"
         if [[ "$rendered" == *"$marker"* ]]; then
@@ -629,14 +647,14 @@ _dots_failure_animation_render_prompt() {
                 prefix="${prefix% }"
             done
             if [[ -n "$_DOTS_FAILURE_ANIMATION_FRAME" ]]; then
-                rendered="${prefix} ${emoji_rendered} ${marker}${suffix}"
+                rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
             else
                 rendered="${prefix} ${marker}${suffix}"
             fi
         else
             rendered="${rendered% }"
             if [[ -n "$_DOTS_FAILURE_ANIMATION_FRAME" ]]; then
-                rendered="${rendered} ${emoji_rendered} ${marker}"
+                rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
             else
                 rendered="${rendered} ${marker}"
             fi
@@ -666,7 +684,9 @@ _dots_failure_animation_cleanup() {
 
     _DOTS_FAILURE_GRADIENT_ACTIVE=0
     _DOTS_FAILURE_GRADIENT_FD=-1
-    _DOTS_FAILURE_ANIMATION_EMOJI_PHASE=0
+    if [[ -n "$_DOTS_FAILURE_ANIMATION_RESERVED_FRAME" ]]; then
+        _DOTS_FAILURE_ANIMATION_FRAME="$_DOTS_FAILURE_ANIMATION_RESERVED_FRAME"
+    fi
 
     if (( redraw )) && zle; then
         zle .reset-prompt
@@ -716,9 +736,8 @@ _dots_failure_animation_fd_handler() {
         return 0
     fi
 
-    [[ "$frame" == <-> ]] || return 0
-    _DOTS_FAILURE_ANIMATION_EMOJI_PHASE=$(( frame % 12 ))
-    _DOTS_FAILURE_ANIMATION_STATE='emoji-badge-frame-rendered'
+    _DOTS_FAILURE_ANIMATION_FRAME="$frame"
+    _DOTS_FAILURE_ANIMATION_STATE='frame-rendered'
     zle && zle .reset-prompt
 }
 
@@ -784,6 +803,7 @@ _dots_failure_animation_begin() {
 
     local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
     local infinite=0
+    local final_frame="${_DOTS_FAILURE_ANIMATION_RESERVED_FRAME:-}"
     local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
     if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
         interval=0.08
@@ -793,8 +813,9 @@ _dots_failure_animation_begin() {
     _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
 
     _dots_failure_animation_infinite_enabled && infinite=1
+    [[ -n "$final_frame" ]] || return 0
 
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" '' 12)
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" "$final_frame" 12)
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
