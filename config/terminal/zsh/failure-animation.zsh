@@ -664,7 +664,6 @@ _dots_failure_animation_start() {
 
     _DOTS_FAILURE_ANIMATION_MODE='emoji'
     _DOTS_FAILURE_ANIMATION_BANNER=''
-    _DOTS_FAILURE_ANIMATION_PENDING=1
     return 0
 }
 
@@ -731,7 +730,6 @@ _dots_failure_animation_clear_screen_widget() {
 }
 
 _dots_failure_animation_line_finish() {
-    _DOTS_FAILURE_ANIMATION_PENDING=0
 
     # The prompt emoji stays fixed for this shell. Only a failure gradient
     # has a worker lifecycle, and it is cancelled in preexec.
