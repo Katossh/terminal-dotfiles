@@ -95,7 +95,7 @@ assert_unique_batch normal "$normal_count" "unified pool starts a fresh unique c
 # Old releases kept one state file per style. The unified pool intentionally
 # starts one clean shared cycle instead of mixing incompatible partial bags.
 typeset legacy_home="$TEST_ROOT/legacy-state"
-typeset legacy_normal_file="$legacy_home/dots/failure-animation/all.state"
+typeset legacy_normal_file="$legacy_home/dots/failure-animation/normal.state"
 typeset legacy_anime_file="$legacy_home/dots/failure-animation/anime.state"
 command mkdir -p "${legacy_normal_file:h}"
 print -r -- 'legacy-normal-state' > "$legacy_normal_file"
