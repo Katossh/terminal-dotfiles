@@ -102,11 +102,12 @@ fi
 # Initialize the prompt after aliases, completions, plugins, and local helpers.
 source "$ZDOTDIR/prompt.zsh"
 
-# Register the animation after Starship so it decorates the freshly built prompt.
-source "$ZDOTDIR/failure-animation.zsh"
-
 # Start tmux automatically for interactive shells, but never nest tmux sessions.
 if command -v tmux >/dev/null 2>&1 && [[ -n "$PS1" ]] &&
     [[ "$TERM" != screen* && "$TERM" != tmux* ]] && [[ -z "${TMUX:-}" ]]; then
     exec tmux
 fi
+
+# Load animation only in the shell that will actually render the prompt.
+# The outer shell above is replaced by tmux and must not consume a hidden draw.
+source "$ZDOTDIR/failure-animation.zsh"
