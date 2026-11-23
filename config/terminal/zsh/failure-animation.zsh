@@ -3,14 +3,11 @@
 # Failure gradients are rendered as prompt-safe rows above the input line.
 # A background timer sends phase numbers only; ZLE renders each frame without
 # reading input or modifying the editable command buffer.
-# Prompt emoji and failure-gradient frames share one ZLE file-descriptor watcher.
+# Prompt emoji is reserved once per shell; only failure gradients use the ZLE frame watcher.
 
-typeset -gi _DOTS_FAILURE_ANIMATION_PENDING=${_DOTS_FAILURE_ANIMATION_PENDING:-0}
 typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
-typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
-typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
@@ -34,7 +31,6 @@ typeset -ga _DOTS_FAILURE_ANIMATION_POOL=()
 typeset -g _DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT="${PROMPT-}"
 typeset -g _DOTS_FAILURE_ANIMATION_PROMPT_MODE='static'
 typeset -g _DOTS_FAILURE_ANIMATION_LAST_RENDERED_PROMPT=''
-typeset -g _DOTS_FAILURE_ANIMATION_INTERVAL='0.08'
 
 if [[ "$_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT" == '$('*')' ]]; then
     _DOTS_FAILURE_ANIMATION_PROMPT_MODE='command'
@@ -44,23 +40,6 @@ fi
 setopt promptsubst
 PROMPT='$(_dots_failure_animation_render_prompt)'
 
-_dots_failure_animation_infinite_enabled() {
-    emulate -L zsh
-
-    # CONTINUOUS remains a backwards-compatible alias. The new INFINITE
-    # variable takes precedence when both are set.
-    # Preserve both historic names: the Emoji-specific setting from main and
-    # the earlier Continuous alias. The PR32 name takes precedence.
-    local setting="${DOTS_FAILURE_ANIMATION_INFINITE-${DOTS_FAILURE_EMOJI_ANIMATION_INFINITE-${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}}}"
-    setting="${setting:l}"
-    case "$setting" in
-        1|true|yes|on) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# Normal, Sarcastic and Dramatic share the general reaction pool. Anime,
-# Ecchi and Rainbow keep separate identities.
 _dots_failure_animation_pool_for_style() {
     emulate -L zsh
 
@@ -229,54 +208,6 @@ if [[ -o interactive && -t 0 && -t 1 ]]; then
     _DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
         _DOTS_FAILURE_ANIMATION_FRAME=''
 fi
-
-_dots_failure_animation_stream() {
-    emulate -L zsh
-
-    local style="${1:-normal}"
-    local infinite="${2:-0}"
-    local startup_frame="${3-}"
-    local frame
-    local -i pool_size=0 previous_index=0 frame_number=0 index=0 startup_index=0
-
-    _dots_failure_animation_pool_for_style "$style"
-    pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
-    (( pool_size > 0 )) || return 0
-
-    if [[ -n "$startup_frame" ]]; then
-        for (( index = 1; index <= pool_size; index++ )); do
-            if [[ "${_DOTS_FAILURE_ANIMATION_POOL[index]}" == "$startup_frame" ]]; then
-                startup_index="$index"
-                break
-            fi
-        done
-    fi
-
-    while true; do
-        previous_index=0
-        for (( frame_number = 0; frame_number < 12; frame_number++ )); do
-            if (( frame_number == 11 )) && [[ -n "$startup_frame" ]]; then
-                frame="$startup_frame"
-                startup_frame=''
-            else
-                index=$(( (RANDOM % pool_size) + 1 ))
-                if (( pool_size > 1 && index == previous_index )); then
-                    index=$(( (index % pool_size) + 1 ))
-                fi
-                if (( frame_number == 10 && startup_index > 0 && pool_size > 2 )); then
-                    while (( index == previous_index || index == startup_index )); do
-                        index=$(( (index % pool_size) + 1 ))
-                    done
-                fi
-                frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
-                previous_index="$index"
-            fi
-            print -r -- "$frame" || return 0
-            command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
-        done
-        [[ "$infinite" == 1 ]] || break
-    done
-}
 
 _dots_failure_animation_gradient_line() {
     emulate -L zsh
@@ -737,46 +668,6 @@ _dots_failure_animation_start() {
     return 0
 }
 
-_dots_failure_animation_begin() {
-    emulate -L zsh
-    setopt localoptions no_ignore_braces
-
-    (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
-    [[ -o interactive && -t 0 && -t 1 &&
-        "${TERM:-dumb}" != dumb &&
-        "${DOTS_FAILURE_ANIMATION:-1}" != 0 ]] || return 0
-
-    _DOTS_FAILURE_ANIMATION_STEP=0
-    _DOTS_FAILURE_ANIMATION_FRAMES=0
-    _DOTS_FAILURE_ANIMATION_STATE='starting'
-
-    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
-    local infinite=0
-    local startup_frame=''
-    local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
-    if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
-        interval=0.08
-    elif (( interval < 0.01 || interval > 2.0 )); then
-        interval=0.08
-    fi
-    _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
-
-    _dots_failure_animation_infinite_enabled && infinite=1
-    if (( _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING )); then
-        startup_frame="$_DOTS_FAILURE_ANIMATION_FRAME"
-        _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=0
-    fi
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" "$startup_frame")
-    _DOTS_FAILURE_ANIMATION_ACTIVE=1
-
-    if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
-        _DOTS_FAILURE_ANIMATION_STATE='registered'
-    else
-        _DOTS_FAILURE_ANIMATION_STATE='registration-failed'
-        _dots_failure_animation_cleanup
-    fi
-}
-
 _dots_failure_animation_precmd() {
     emulate -L zsh
 
@@ -794,18 +685,6 @@ _dots_failure_animation_precmd() {
         _DOTS_FAILURE_ANIMATION_STYLE='normal'
     fi
 
-    if _dots_failure_animation_infinite_enabled; then
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
-        _DOTS_FAILURE_ANIMATION_PENDING=1
-    fi
-
-    if (( _DOTS_FAILURE_ANIMATION_PENDING )); then
-        _DOTS_FAILURE_ANIMATION_PENDING=0
-        _dots_failure_animation_begin
-    fi
 }
 
 _dots_failure_animation_reset() {
@@ -815,7 +694,6 @@ _dots_failure_animation_reset() {
     _dots_failure_animation_gradient_cleanup
     _DOTS_FAILURE_GRADIENT_PENDING=0
     _DOTS_FAILURE_GRADIENT_SUBMITTED=0
-    _DOTS_FAILURE_ANIMATION_PENDING=0
     _DOTS_FAILURE_ANIMATION_BANNER=''
     _DOTS_FAILURE_GRADIENT_LINES=()
     _DOTS_FAILURE_ANIMATION_GRADIENT_MESSAGE=''
@@ -855,8 +733,8 @@ _dots_failure_animation_clear_screen_widget() {
 _dots_failure_animation_line_finish() {
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
-    # Ordinary prompt emoji animation is still tied to line submission. A
-    # failure gradient has its own lifecycle and is cancelled in preexec.
+    # The prompt emoji stays fixed for this shell. Only a failure gradient
+    # has a worker lifecycle, and it is cancelled in preexec.
     if (( !_DOTS_FAILURE_GRADIENT_ACTIVE )) && [[ -z "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
         _dots_failure_animation_cleanup
         _DOTS_FAILURE_GRADIENT_PENDING=0
