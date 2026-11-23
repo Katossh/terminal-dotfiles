@@ -45,11 +45,10 @@ source "$ZSH_DIR/failure-animation.zsh"
 _dots_failure_animation_pool_for_style normal
 typeset -a expected_pool=(
     '👀' '😳' '✨' '💀' '😂' '🤡' '🪿' '🔥' '💔' '🫠'
-    '😭' '🥰' '🥺' '😏' '❤️'
-    '🧡' '💛' '💚' '💙' '🐽'
+    '😭' '🥰' '🥺' '😏' '❤️' '🐽'
 )
 normal_count="${#_DOTS_FAILURE_ANIMATION_POOL}"
-(( normal_count == 20 )) || fail "unified emoji pool contains $normal_count entries instead of 20"
+(( normal_count == 16 )) || fail "unified emoji pool contains $normal_count entries instead of 16"
 [[ "${_DOTS_FAILURE_ANIMATION_POOL[*]}" == "${expected_pool[*]}" ]] ||
     fail "unified emoji pool contents or ordering changed unexpectedly"
 
@@ -62,7 +61,7 @@ for style in normal sarcastic dramatic anime ecchi rainbow; do
 done
 
 # Keep only the broken heart and ordinary red heart; reject every other variant.
-for frame in '💖' '💗' '💓' '💕' '🩷' '💘' '🖤' '🤎' '💜' '🤍'; do
+for frame in '💖' '💗' '💓' '💕' '🩷' '💘' '🖤' '🤎' '💜' '🤍' '🧡' '💛' '💚' '💙'; do
     [[ " ${expected_pool[*]} " != *" $frame "* ]] ||
         fail "removed heart variant unexpectedly remains in the pool: $frame"
 done
