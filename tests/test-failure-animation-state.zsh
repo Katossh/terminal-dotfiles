@@ -88,15 +88,15 @@ print -- "ok - prompt emoji cannot be replaced by transient random frames"
 assert_unique_batch normal "$normal_count" "normal pool completes a second unique cycle"
 assert_unique_batch normal "$normal_count" "normal pool completes a third unique cycle"
 
-# Start every draw in a separate Zsh process at once. The atomic lock must
-# serialize them so concurrent terminals still receive one complete unique bag.
+# Start every draw in a separate Zsh process at once, through the same command
+# substitution used during interactive module loading. The lock must serialize them.
 typeset concurrent_home="$TEST_ROOT/concurrent-state"
 typeset -a pids=()
 typeset -A concurrent_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
         XDG_STATE_HOME="$concurrent_home" \
-        zsh -f -c 'source "$DOTS_TEST_ZSH_FILE"; _dots_failure_animation_next_startup_frame normal' \
+        zsh -f -c 'source "$DOTS_TEST_ZSH_FILE"; selected="$(_dots_failure_animation_next_startup_frame normal)" || exit; print -r -- "$selected"' \
         > "$TEST_ROOT/concurrent.$index" &
     pids+=( "$!" )
 done
