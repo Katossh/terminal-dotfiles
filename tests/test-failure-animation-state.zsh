@@ -172,7 +172,7 @@ for pty_name in "${pty_names[@]}"; do
 
     # Continue collecting output after the prompt appears. With animation
     # enabled, the old implementation replaced the reserved emoji repeatedly.
-    local -i quiet_round=0
+    typeset -i quiet_round=0
     while (( quiet_round < 20 )); do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
@@ -182,6 +182,7 @@ for pty_name in "${pty_names[@]}"; do
     done
 
     _dots_failure_animation_pool_for_style normal
+    typeset local_emoji
     for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
             fail "$pty_name replaced its reserved emoji $frame with another pool item $local_emoji"
