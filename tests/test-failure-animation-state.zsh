@@ -157,7 +157,9 @@ done
     fail "concurrent animation frames were not globally unique"
 print -- "ok - concurrent animated shells consume one shared no-repeat pool"
 
-# One item remains in the 13-entry normal pool; the next draw must return it.
+# One item remains in the 13-entry normal pool; inspect the same shared
+# state directory the concurrent workers consumed.
+XDG_STATE_HOME="$concurrent_home"
 frame="$(_dots_failure_animation_next_startup_frame normal)"
 [[ -z "${concurrent_seen[$frame]-}" ]] || fail "concurrent workers exhausted the pool early or repeated $frame"
 concurrent_seen[$frame]=1
