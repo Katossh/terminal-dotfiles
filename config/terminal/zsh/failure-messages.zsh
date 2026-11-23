@@ -42,7 +42,6 @@ dots_failure_message() {
     emulate -L zsh
     setopt localoptions no_aliases
 
-    local category="${1:-generic}"
     local command="${2:-unknown}"
     local detail="${3-}"
     local chance="${DOTS_FAILURE_MESSAGE_CHANCE:-100}"
