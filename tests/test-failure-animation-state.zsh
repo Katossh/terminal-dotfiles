@@ -156,7 +156,7 @@ for (( index = 1; index <= normal_count; index++ )); do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
         fi
-        [[ "$output" == *"SYNC_PROMPT "* " ❯"* ]] && break
+        [[ "$output" == *SYNC_PROMPT*' ❯'* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
