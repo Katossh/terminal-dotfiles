@@ -61,8 +61,7 @@ _dots_failure_animation_pool_for_style() {
     # Every prompt style draws from the same shared no-repeat emoji pool.
     _DOTS_FAILURE_ANIMATION_POOL=(
         '👀' '😳' '✨' '💀' '😂' '🤡' '🪿' '🔥' '💔' '🫠'
-        '😭' '🥰' '🥺' '😏' '❤️'
-        '🧡' '💛' '💚' '💙' '🐽'
+        '😭' '🥰' '🥺' '😏' '❤️' '🐽'
     )
 }
 
