@@ -136,7 +136,7 @@ _dots_failure_animation_next_startup_frame() {
     local -a remaining=() next_remaining=()
     local -A seen=()
     local -i loop_index=0 random_index=0 selected_index=0
-    local -i lock_acquired=0 invalid=0
+    local -i invalid=0
 
     for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         signature+="|$emoji"
@@ -151,7 +151,6 @@ _dots_failure_animation_next_startup_frame() {
     # flock, which is not available in every supported shell environment.
     while true; do
         if command ln -s "$process_id" "$lock_file" 2>/dev/null; then
-            lock_acquired=1
             break
         fi
 
