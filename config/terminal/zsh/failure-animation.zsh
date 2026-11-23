@@ -113,8 +113,8 @@ _dots_failure_animation_next_startup_frame() {
         state_home="${HOME}/.local/state"
     fi
     if [[ -z "$state_home" ]]; then
-        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
-        return 0
+        print -u2 -r -- "dots: HOME or XDG_STATE_HOME is required for no-repeat startup emoji selection"
+        return 1
     fi
 
     if ! zmodload zsh/system 2>/dev/null; then
@@ -241,7 +241,7 @@ _dots_failure_animation_next_startup_frame() {
 # expands the first prompt or starts the asynchronous animation worker.
 if [[ -o interactive && -t 0 && -t 1 ]]; then
     _DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
-        _DOTS_FAILURE_ANIMATION_FRAME='💀'
+        _DOTS_FAILURE_ANIMATION_FRAME=''
 fi
 
 _dots_failure_animation_stream() {
@@ -613,10 +613,18 @@ _dots_failure_animation_render_prompt() {
             while [[ "$prefix" == *' ' ]]; do
                 prefix="${prefix% }"
             done
-            rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
+            if [[ -n "$_DOTS_FAILURE_ANIMATION_FRAME" ]]; then
+                rendered="${prefix} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}${suffix}"
+            else
+                rendered="${prefix} ${marker}${suffix}"
+            fi
         else
             rendered="${rendered% }"
-            rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
+            if [[ -n "$_DOTS_FAILURE_ANIMATION_FRAME" ]]; then
+                rendered="${rendered} ${_DOTS_FAILURE_ANIMATION_FRAME} ${marker}"
+            else
+                rendered="${rendered} ${marker}"
+            fi
         fi
     fi
 
