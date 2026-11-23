@@ -121,6 +121,7 @@ _dots_failure_animation_next_startup_frame() {
         print -u2 -r -- "dots: zsh/system file locking is required for no-repeat emoji selection"
         return 1
     fi
+    local process_id="${sysparams[pid]:-}"
 
     local state_dir="${state_home%/}/dots/failure-animation"
     local state_file="${state_dir}/${pool_key}.state"
