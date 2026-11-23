@@ -114,8 +114,6 @@ print -- "ok - concurrent terminal starts are serialized without repeats"
 
 print -- "All startup emoji state tests passed."
 
-
-
 # Start interactive shells first, then load the module into each live PTY.
 # Loading the module synchronously reserves the emoji before the next prompt;
 # disabling animation makes the first visible value directly testable.
@@ -134,8 +132,8 @@ typeset -A pty_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-        XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZSH_DIR="$ZSH_DIR" \
-        zsh -f -i -c 'PROMPT="SYNC_PROMPT ❯ "; source "$ZSH_DIR/failure-animation.zsh"; _dots_failure_animation_render_prompt'
+        PROMPT="SYNC_PROMPT ❯ " XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZSH_DIR="$ZSH_DIR" \
+        zsh -f -i -c 'source "$ZSH_DIR/failure-animation.zsh"; _dots_failure_animation_render_prompt'
 
     typeset output='' data='' visible='' frame=''
     typeset -i tries=0
