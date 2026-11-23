@@ -50,7 +50,9 @@ capture_message() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_ANIMATION=1
-export DOTS_FAILURE_STYLE=ecchi
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+export DOTS_FAILURE_MYTHIC_CHANCE=0
 export DOTS_FAILURE_ANIMATION_CHANCE=0
 export DOTS_FAILURE_MESSAGE_ESCALATION=1
 
@@ -75,6 +77,85 @@ assert_eq "repeated failures use identical wording" "$first" "$DOTS_TEST_ANIMATI
 capture_message git 'git push' 'remote rejected the update'
 assert_eq "detail does not create another message variant" '✖ Command "git push" failed.' "$DOTS_TEST_ANIMATION_BANNER"
 assert_eq "diagnostic detail is preserved" 'remote rejected the update' "$DOTS_TEST_ANIMATION_DETAIL"
+
+# Each rarity has exactly one stable placeholder message and its own gradient.
+export DOTS_FAILURE_STYLE=legendary
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic 'legendary-placeholder'
+assert_eq "forced Legendary selects its rarity gradient" legendary "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "Legendary has one placeholder message" '🏆 LEGENDARY FAILURE — "legendary-placeholder" failed in spectacular fashion.' "$DOTS_TEST_ANIMATION_BANNER"
+
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic 'mythic-placeholder'
+assert_eq "forced Mythic selects its rarity gradient" mythic "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "Mythic has one placeholder message" '🌠 MYTHIC FAILURE — "mythic-placeholder" failed in defiance of probability itself.' "$DOTS_TEST_ANIMATION_BANNER"
+
+# Automatic selection uses basis points: Mythic defaults to 10 (0.1%),
+# Legendary to 100 (1%). Forced 100% values make both branches deterministic.
+export DOTS_FAILURE_STYLE=auto
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+export DOTS_FAILURE_LEGENDARY_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'automatic-mythic-placeholder'
+assert_eq "Mythic has priority when rarity ranges overlap" mythic "$DOTS_TEST_ANIMATION_STYLE"
+
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'automatic-legendary-placeholder'
+assert_eq "automatic Legendary chance can be forced for testing" legendary "$DOTS_TEST_ANIMATION_STYLE"
+
+# Explicit Normal disables rare rolls even when Mythic is configured at 100%.
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'explicit-normal-placeholder'
+assert_eq "explicit Normal bypasses rarity rolls" normal "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "explicit Normal retains the ordinary template" '✖ Command "explicit-normal-placeholder" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+
+# Rare messages remain readable when the animated gradient cannot start.
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_AVAILABLE=0
+capture_message generic 'static-mythic-placeholder' 'inspect the diagnostic'
+assert_eq "static Mythic fallback preserves its placeholder" # If animation cannot start, the same message falls back to plain output.
+DOTS_TEST_ANIMATION_AVAILABLE=0
+capture_message generic 'static-fallback' 'inspect stderr'
+assert_eq "plain fallback keeps the one message format" $'✖ Command "static-fallback" failed.\n  ↳ inspect stderr' "$DOTS_TEST_OUTPUT"
+DOTS_TEST_ANIMATION_AVAILABLE=1
+
+# Sanitise terminal controls in both the command and diagnostic detail.
+DOTS_TEST_ANIMATION_AVAILABLE=0
+unsafe_command=$'curl\a\b\t\v\f\r\n\e\x7fhttps://example.invalid'
+capture_message network "$unsafe_command"
+assert_control_free "command fallback contains no control bytes" "$DOTS_TEST_OUTPUT"
+assert_absent "command newline is replaced, not rendered as a new message" $'\n  ↳' "$DOTS_TEST_OUTPUT"
+
+unsafe_detail=$'detail\a\b\t\v\f\r\n\e\x7ftext'
+capture_message network curl "$unsafe_detail"
+assert_control_free "detail fallback contains no control bytes" "$DOTS_TEST_OUTPUT"
+detail_lines=( "${(@f)DOTS_TEST_OUTPUT}" )
+assert_eq "detail is kept on one additional row" 2 "${#detail_lines}"
+
+# A zero chance remains a supported opt-out and never invokes the animator.
+export DOTS_FAILURE_MESSAGE_CHANCE=0
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic suppressed
+assert_eq "zero chance suppresses the message" '' "$DOTS_TEST_OUTPUT"
+assert_eq "zero chance skips the animator" '' "$DOTS_TEST_ANIMATION_STYLE"
+
+# Rendering must not alter the failed command's status.
+dots_failure_message generic status-check >/dev/null
+assert_eq "renderer returns success" 0 "$?"
+
+print -- "All single-template failure-message tests passed."
+🌠 MYTHIC FAILURE — "static-mythic-placeholder" failed in defiance of probability itself.\\n  ↳ inspect the diagnostic' "$DOTS_TEST_OUTPUT"
+DOTS_TEST_ANIMATION_AVAILABLE=1
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
 
 # If animation cannot start, the same message falls back to plain output.
 DOTS_TEST_ANIMATION_AVAILABLE=0
