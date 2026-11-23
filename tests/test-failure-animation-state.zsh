@@ -208,11 +208,7 @@ typeset rendered_prompt
 _DOTS_FAILURE_ANIMATION_ACTIVE=1
 _DOTS_FAILURE_ANIMATION_EMOJI_PHASE=4
 rendered_prompt="$(_dots_failure_animation_render_prompt)"
-[[ "$rendered_prompt" == *"$frame"* && "$rendered_prompt" == *
-XDG_STATE_HOME="$saved_state_home"
-print -- "ok - prompt renderer animates the reserved emoji without replacing it"
-print -- "All startup emoji state tests passed."
-\e[48;2;'* ]] ||
+[[ "$rendered_prompt" == *"$frame"* && "$rendered_prompt" == *$'\e[48;2;'* ]] ||
     fail "prompt renderer did not preserve the reserved emoji inside its animated badge (got: $rendered_prompt)"
 XDG_STATE_HOME="$saved_state_home"
 print -- "ok - prompt renderer animates the reserved emoji without replacing it"
