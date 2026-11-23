@@ -69,7 +69,7 @@ for frame in '💔' '❤️' '🐽'; do
     [[ " ${expected_pool[*]} " == *" $frame "* ]] ||
         fail "required emoji is missing from the unified pool: $frame"
 done
-print -- "ok - all styles use one 20-emoji pool with only two heart variants and a pig snout"
+print -- "ok - all styles use one 16-emoji pool with only two heart variants and a pig snout"
 
 # Reservations across different styles consume one shared no-repeat cycle.
 typeset -A shared_seen=()
