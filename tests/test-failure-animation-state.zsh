@@ -31,6 +31,15 @@ assert_unique_batch() {
 trap 'command rm -rf "$TEST_ROOT"' EXIT
 
 export XDG_STATE_HOME="$TEST_ROOT/state"
+
+# Only the shell inside tmux renders a prompt; the replaced outer shell must
+# not consume a hidden startup selection before it execs tmux.
+typeset tmux_exec_line animation_source_line
+tmux_exec_line="$(command grep -nF 'exec tmux' "$ZSH_DIR/.zshrc" | command cut -d: -f1)"
+animation_source_line="$(command grep -nF 'source "$ZDOTDIR/failure-animation.zsh"' "$ZSH_DIR/.zshrc" | command cut -d: -f1)"
+(( tmux_exec_line < animation_source_line )) || fail "startup animation is sourced before the tmux handoff"
+print -- "ok - only the prompt-rendering tmux shell consumes a startup emoji"
+
 source "$ZSH_DIR/failure-animation.zsh"
 
 _dots_failure_animation_pool_for_style normal
