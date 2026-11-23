@@ -117,11 +117,14 @@ _dots_failure_animation_next_startup_frame() {
         return 0
     fi
 
-    zmodload zsh/system 2>/dev/null || true
+    if ! zmodload zsh/system 2>/dev/null; then
+        print -u2 -r -- "dots: zsh/system is required for safe startup emoji selection"
+        return 1
+    fi
     local process_id="${sysparams[pid]:-}"
     if [[ "$process_id" != <-> ]]; then
-        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
-        return 0
+        print -u2 -r -- "dots: could not determine the process ID for startup emoji locking"
+        return 1
     fi
 
     local state_dir="${state_home%/}/dots/failure-animation"
@@ -132,7 +135,7 @@ _dots_failure_animation_next_startup_frame() {
     local temp_file='' swap_value='' selected_emoji=''
     local -a remaining=() next_remaining=()
     local -A seen=()
-    local -i loop_index=0 random_index=0 selected_index=0 attempts=0
+    local -i loop_index=0 random_index=0 selected_index=0
     local -i lock_acquired=0 invalid=0
 
     for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
@@ -140,32 +143,32 @@ _dots_failure_animation_next_startup_frame() {
     done
 
     command mkdir -p "$state_dir" 2>/dev/null || {
-        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
-        return 0
+        print -u2 -r -- "dots: cannot create startup emoji state directory: $state_dir"
+        return 1
     }
 
     # Atomic symlink creation serializes terminal starts without requiring
     # flock, which is not available in every supported shell environment.
-    while (( attempts < 250 )); do
+    while true; do
         if command ln -s "$process_id" "$lock_file" 2>/dev/null; then
             lock_acquired=1
             break
         fi
 
         owner_pid="$(command readlink "$lock_file" 2>/dev/null || true)"
-        if [[ "$owner_pid" == <-> ]] && ! builtin kill -0 "$owner_pid" 2>/dev/null; then
+        if [[ "$owner_pid" == <-> ]]; then
+            if ! builtin kill -0 "$owner_pid" 2>/dev/null; then
+                command rm -f "$lock_file" 2>/dev/null
+                continue
+            fi
+        elif [[ -e "$lock_file" || -L "$lock_file" ]]; then
+            # A malformed lock cannot belong to a running instance of this helper.
             command rm -f "$lock_file" 2>/dev/null
             continue
         fi
 
-        command sleep 0.02 2>/dev/null || break
-        (( attempts += 1 ))
+        command sleep 0.02 2>/dev/null || return 1
     done
-
-    if (( !lock_acquired )); then
-        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
-        return 0
-    fi
 
     if [[ -f "$state_file" ]]; then
         {
@@ -227,13 +230,20 @@ _dots_failure_animation_next_startup_frame() {
     ); then
         command rm -f "$temp_file" 2>/dev/null
         command rm -f "$lock_file" 2>/dev/null
-        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
-        return 0
+        print -u2 -r -- "dots: could not persist startup emoji selection: $state_file"
+        return 1
     fi
 
     command rm -f "$lock_file" 2>/dev/null
     print -r -- "$selected_emoji"
 }
+
+# Reserve the session's final emoji while loading this module, before Zsh
+# expands the first prompt or starts the asynchronous animation worker.
+if [[ -o interactive && -t 0 && -t 1 ]]; then
+    _DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
+        _DOTS_FAILURE_ANIMATION_FRAME='💀'
+fi
 
 _dots_failure_animation_stream() {
     emulate -L zsh
@@ -242,27 +252,36 @@ _dots_failure_animation_stream() {
     local infinite="${2:-0}"
     local startup_frame="${3-}"
     local frame
-    local -i pool_size=0 previous_index=0 frame_number=0 index=0
+    local -i pool_size=0 previous_index=0 frame_number=0 index=0 startup_index=0
 
     _dots_failure_animation_pool_for_style "$style"
     pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 0
 
+    if [[ -n "$startup_frame" ]]; then
+        for (( index = 1; index <= pool_size; index++ )); do
+            if [[ "${_DOTS_FAILURE_ANIMATION_POOL[index]}" == "$startup_frame" ]]; then
+                startup_index="$index"
+                break
+            fi
+        done
+    fi
+
     while true; do
         previous_index=0
         for (( frame_number = 0; frame_number < 12; frame_number++ )); do
-            if (( frame_number == 0 )) && [[ -n "$startup_frame" ]]; then
+            if (( frame_number == 11 )) && [[ -n "$startup_frame" ]]; then
                 frame="$startup_frame"
-                for (( index = 1; index <= pool_size; index++ )); do
-                    if [[ "${_DOTS_FAILURE_ANIMATION_POOL[index]}" == "$frame" ]]; then
-                        previous_index="$index"
-                        break
-                    fi
-                done
+                startup_frame=''
             else
                 index=$(( (RANDOM % pool_size) + 1 ))
                 if (( pool_size > 1 && index == previous_index )); then
                     index=$(( (index % pool_size) + 1 ))
+                fi
+                if (( frame_number == 10 && startup_index > 0 && pool_size > 2 )); then
+                    while (( index == previous_index || index == startup_index )); do
+                        index=$(( (index % pool_size) + 1 ))
+                    done
                 fi
                 frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
                 previous_index="$index"
@@ -751,7 +770,7 @@ _dots_failure_animation_begin() {
 
     _dots_failure_animation_infinite_enabled && infinite=1
     if (( _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING )); then
-        startup_frame="$(_dots_failure_animation_next_startup_frame "$style")" || startup_frame=''
+        startup_frame="$_DOTS_FAILURE_ANIMATION_FRAME"
         _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=0
     fi
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" "$startup_frame")
