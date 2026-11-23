@@ -126,16 +126,16 @@ zmodload zsh/zpty 2>/dev/null || {
 }
 
 typeset pty_state="$TEST_ROOT/pty-state"
-typeset -a pty_names=()
 typeset -A pty_seen=()
 
+# Exercise actual interactive prompt rendering with the normal animation
+# setting enabled. Keep the PTYs sequential here; a separate test above starts
+# concurrent Zsh processes to verify lock contention and pool uniqueness.
 for (( index = 1; index <= normal_count; index++ )); do
-    typeset pty_name="dots_startup_emoji_${index}"
-    pty_names+=( "$pty_name" )
-    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 zsh -f -i
-done
+    typeset pty_name="dots_startup_emoji_\${index}"
+    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
+        XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 zsh -f -i
 
-for pty_name in "${pty_names[@]}"; do
     typeset startup_output='' data=''
     typeset -i tries=0
     while (( tries < 120 )); do
@@ -147,20 +147,16 @@ for pty_name in "${pty_names[@]}"; do
         (( tries += 1 ))
     done
     [[ -n "$startup_output" ]] || fail "$pty_name did not reach its initial interactive prompt"
-done
 
-for pty_name in "${pty_names[@]}"; do
     zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'"
-done
 
-for pty_name in "${pty_names[@]}"; do
-    typeset output='' data='' visible='' frame=''
-    typeset -i tries=0
+    typeset output='' visible='' frame=''
+    tries=0
     while (( tries < 120 )); do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
         fi
-        [[ "$output" == *"SYNC_PROMPT "?*" ❯"* ]] && break
+        [[ "$output" == *"SYNC_PROMPT "* " ❯"* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
@@ -168,10 +164,10 @@ for pty_name in "${pty_names[@]}"; do
     visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
     frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
-    [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
+    [[ -z "\${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across terminal starts"
 
-    # Continue collecting output after the prompt appears. With animation
-    # enabled, the old implementation replaced the reserved emoji repeatedly.
+    # Continue collecting output after the prompt appears. The previous
+    # implementation asynchronously replaced the reserved emoji.
     typeset -i quiet_round=0
     while (( quiet_round < 20 )); do
         if zpty -r -t "$pty_name" data; then
@@ -183,7 +179,7 @@ for pty_name in "${pty_names[@]}"; do
 
     _dots_failure_animation_pool_for_style normal
     typeset local_emoji
-    for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+    for local_emoji in "\${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
             fail "$pty_name replaced its reserved emoji $frame with another pool item $local_emoji"
     done
@@ -193,5 +189,4 @@ for pty_name in "${pty_names[@]}"; do
     zpty -d "$pty_name" 2>/dev/null || true
 done
 
-(( ${#pty_seen} == normal_count )) || fail "concurrent interactive prompts did not receive unique startup emojis"
-
+(( \${#pty_seen} == normal_count )) || fail "interactive prompts did not receive one unique emoji per shell startup"
