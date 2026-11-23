@@ -53,7 +53,7 @@ normal_count="${#_DOTS_FAILURE_ANIMATION_POOL}"
     fail "unified emoji pool contents or ordering changed unexpectedly"
 
 # Every former style now exposes exactly the same combined pool.
-typeset style=''
+typeset style='' frame=''
 for style in normal sarcastic dramatic anime ecchi rainbow; do
     _dots_failure_animation_pool_for_style "$style"
     [[ "${_DOTS_FAILURE_ANIMATION_POOL[*]}" == "${expected_pool[*]}" ]] ||
