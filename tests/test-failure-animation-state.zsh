@@ -106,35 +106,28 @@ print -- "ok - concurrent terminal starts are serialized without repeats"
 print -- "All startup emoji state tests passed."
 
 
-# Launch four real interactive Zsh sessions at once. With the animation disabled,
-# their very first visible prompt must still show the synchronously reserved
-# startup emoji (not the old hard-coded skull placeholder).
+
+# Start interactive shells first, then load the module into each live PTY.
+# Loading the module synchronously reserves the emoji before the next prompt;
+# disabling animation makes the first visible value directly testable.
 zmodload zsh/zpty 2>/dev/null || {
     print -- "skip - zsh/zpty is unavailable for startup prompt integration"
     print -- "All startup emoji state tests passed."
     exit 0
 }
 
-typeset pty_zdotdir="$TEST_ROOT/pty-zdotdir"
 typeset pty_state="$TEST_ROOT/pty-state"
 typeset -a pty_names=()
 typeset -A pty_seen=()
-mkdir -p "$pty_zdotdir"
-cat > "$pty_zdotdir/.zshrc" <<'ZSH_INIT'
-PROMPT='SYNC_PROMPT ❯ '
-source "$DOTS_TEST_ZSH_DIR/failure-animation.zsh"
-ZSH_INIT
 
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     pty_names+=( "$pty_name" )
-    zpty -b "$pty_name" env \
-        TERM=xterm-256color COLUMNS=120 LINES=30 \
-        ZDOTDIR="$pty_zdotdir" \
-        DOTS_TEST_ZSH_DIR="$ZSH_DIR" \
-        XDG_STATE_HOME="$pty_state" \
-        DOTS_FAILURE_ANIMATION=0 \
-        zsh -i
+    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=0 zsh -f -i
+done
+
+for pty_name in "${pty_names[@]}"; do
+    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'"
 done
 
 for pty_name in "${pty_names[@]}"; do
@@ -149,9 +142,9 @@ for pty_name in "${pty_names[@]}"; do
         (( tries += 1 ))
     done
 
-    visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
-    [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji"
+    visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\\x1b|\\^\\[)\\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
+    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
+    [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
     [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
     pty_seen[$frame]=1
     print -- "ok - $pty_name rendered $frame before any animation started"
