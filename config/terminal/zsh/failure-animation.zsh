@@ -47,8 +47,8 @@ PROMPT='$(_dots_failure_animation_render_prompt)'
 _dots_failure_animation_infinite_enabled() {
     emulate -L zsh
 
-    local setting="\${DOTS_FAILURE_ANIMATION_INFINITE-\${DOTS_FAILURE_EMOJI_ANIMATION_INFINITE-\${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}}}"
-    setting="\${setting:l}"
+    local setting="${DOTS_FAILURE_ANIMATION_INFINITE-${DOTS_FAILURE_EMOJI_ANIMATION_INFINITE-${DOTS_FAILURE_ANIMATION_CONTINUOUS:-0}}}"
+    setting="${setting:l}"
     case "$setting" in
         1|true|yes|on) return 0 ;;
         *) return 1 ;;
@@ -91,7 +91,7 @@ _dots_failure_animation_pool_for_style() {
 _dots_failure_animation_next_startup_frame() {
     emulate -L zsh
 
-    local style="\${1:-normal}"
+    local style="${1:-normal}"
     local pool_key
     case "$style" in
         anime|ecchi|rainbow) pool_key="$style" ;;
@@ -99,12 +99,12 @@ _dots_failure_animation_next_startup_frame() {
     esac
 
     _dots_failure_animation_pool_for_style "$style"
-    local -i pool_size="\${#_DOTS_FAILURE_ANIMATION_POOL}"
+    local -i pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
     (( pool_size > 0 )) || return 1
 
-    local state_home="\${XDG_STATE_HOME:-}"
-    if [[ -z "$state_home" && -n "\${HOME:-}" ]]; then
-        state_home="\${HOME}/.local/state"
+    local state_home="${XDG_STATE_HOME:-}"
+    if [[ -z "$state_home" && -n "${HOME:-}" ]]; then
+        state_home="${HOME}/.local/state"
     fi
     if [[ -z "$state_home" ]]; then
         print -u2 -r -- "dots: HOME or XDG_STATE_HOME is required for no-repeat emoji selection"
@@ -115,14 +115,14 @@ _dots_failure_animation_next_startup_frame() {
         print -u2 -r -- "dots: zsh/system file locking is required for no-repeat emoji selection"
         return 1
     fi
-    local process_id="\${sysparams[pid]:-$$}"
+    local process_id="${sysparams[pid]:-$$}"
 
-    local state_dir="\${state_home%/}/dots/failure-animation"
-    local state_file="\${state_dir}/\${pool_key}.state"
-    local lock_file="\${state_file}.lock"
+    local state_dir="${state_home%/}/dots/failure-animation"
+    local state_file="${state_dir}/${pool_key}.state"
+    local lock_file="${state_file}.lock"
     local lock_fd=''
-    local signature="v2:\${pool_key}"
-    local legacy_signature="v1:\${pool_key}"
+    local signature="v2:${pool_key}"
+    local legacy_signature="v1:${pool_key}"
     local emoji candidate stored_signature='' stored_last_line='' remaining_line=''
     local temp_file='' swap_value='' selected_emoji=''
     local -a remaining=() next_remaining=()
@@ -130,7 +130,7 @@ _dots_failure_animation_next_startup_frame() {
     local -i loop_index=0 random_index=0 selected_index=0 previous_index=0
     local -i invalid=0 legacy_state=0
 
-    for emoji in "\${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+    for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         signature+="|$emoji"
         legacy_signature+="|$emoji"
     done
@@ -182,10 +182,10 @@ _dots_failure_animation_next_startup_frame() {
     if (( !invalid )); then
         local IFS=' '
         read -rA remaining <<< "$remaining_line"
-        for candidate in "\${remaining[@]}"; do
+        for candidate in "${remaining[@]}"; do
             if [[ "$candidate" != <-> ]] ||
                 (( candidate < 1 || candidate > pool_size )) ||
-                [[ -n "\${seen[$candidate]-}" ]] ||
+                [[ -n "${seen[$candidate]-}" ]] ||
                 (( !legacy_state && candidate == previous_index )); then
                 invalid=1
                 break
@@ -202,7 +202,7 @@ _dots_failure_animation_next_startup_frame() {
     # Empty or invalid state begins a new Fisher-Yates shuffle. The first
     # item of a new cycle is kept different from the previous cycle's last
     # item when the pool contains more than one emoji.
-    if (( invalid || \${#remaining} == 0 )); then
+    if (( invalid || ${#remaining} == 0 )); then
         remaining=()
         for (( loop_index = 1; loop_index <= pool_size; loop_index++ )); do
             remaining+=( "$loop_index" )
@@ -210,33 +210,33 @@ _dots_failure_animation_next_startup_frame() {
 
         for (( loop_index = pool_size; loop_index > 1; loop_index-- )); do
             random_index=$(( (RANDOM % loop_index) + 1 ))
-            swap_value="\${remaining[loop_index]}"
-            remaining[loop_index]="\${remaining[random_index]}"
+            swap_value="${remaining[loop_index]}"
+            remaining[loop_index]="${remaining[random_index]}"
             remaining[random_index]="$swap_value"
         done
 
         if (( previous_index > 0 && pool_size > 1 && remaining[1] == previous_index )); then
             random_index=$(( (RANDOM % (pool_size - 1)) + 2 ))
-            swap_value="\${remaining[1]}"
-            remaining[1]="\${remaining[random_index]}"
+            swap_value="${remaining[1]}"
+            remaining[1]="${remaining[random_index]}"
             remaining[random_index]="$swap_value"
         fi
     fi
 
-    selected_index="\${remaining[1]}"
-    selected_emoji="\${_DOTS_FAILURE_ANIMATION_POOL[selected_index]}"
-    for (( loop_index = 2; loop_index <= \${#remaining}; loop_index++ )); do
-        next_remaining+=( "\${remaining[loop_index]}" )
+    selected_index="${remaining[1]}"
+    selected_emoji="${_DOTS_FAILURE_ANIMATION_POOL[selected_index]}"
+    for (( loop_index = 2; loop_index <= ${#remaining}; loop_index++ )); do
+        next_remaining+=( "${remaining[loop_index]}" )
     done
 
     remaining_line=''
-    for candidate in "\${next_remaining[@]}"; do
+    for candidate in "${next_remaining[@]}"; do
         [[ -n "$remaining_line" ]] && remaining_line+=" "
         remaining_line+="$candidate"
     done
 
     # Persist the last draw and remaining bag together, atomically.
-    temp_file="\${state_file}.tmp.\${process_id}.$RANDOM"
+    temp_file="${state_file}.tmp.${process_id}.$RANDOM"
     if ! (
         umask 077
         print -r -- "$signature" > "$temp_file" &&
@@ -254,8 +254,8 @@ _dots_failure_animation_next_startup_frame() {
     print -r -- "$selected_emoji"
 }
 
-# Reserve the session's final emoji while loading this module, before Zsh
-# expands the first prompt or starts the asynchronous animation worker.
+# Reserve the first visible emoji synchronously, before the animation worker
+# starts or the first interactive prompt is expanded.
 if [[ -o interactive && -t 0 && -t 1 ]]; then
     _DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame "$_DOTS_FAILURE_ANIMATION_STYLE")" ||
         _DOTS_FAILURE_ANIMATION_FRAME=''
@@ -264,14 +264,14 @@ fi
 _dots_failure_animation_stream() {
     emulate -L zsh
 
-    local style="\${1:-normal}"
-    local infinite="\${2:-0}"
-    local startup_frame="\${3-}"
+    local style="${1:-normal}"
+    local infinite="${2:-0}"
+    local startup_frame="${3-}"
     local frame
-    local -i frame_limit="\${4:-11}" frame_number=0
+    local -i frame_limit="${4:-11}" frame_number=0
 
     _dots_failure_animation_pool_for_style "$style"
-    (( \${#_DOTS_FAILURE_ANIMATION_POOL} > 0 )) || return 0
+    (( ${#_DOTS_FAILURE_ANIMATION_POOL} > 0 )) || return 0
     [[ "$frame_limit" == <-> ]] && (( frame_limit >= 1 && frame_limit <= 10000 )) || frame_limit=11
 
     # startup_frame is already visible in the first prompt. Hold it briefly,
@@ -753,18 +753,18 @@ _dots_failure_animation_begin() {
 
     (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && return 0
     [[ -o interactive && -t 0 && -t 1 &&
-        "\${TERM:-dumb}" != dumb &&
-        "\${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
-        -z "\${NO_COLOR:-}" ]] || return 0
+        "${TERM:-dumb}" != dumb &&
+        "${DOTS_FAILURE_ANIMATION:-1}" != 0 &&
+        -z "${NO_COLOR:-}" ]] || return 0
 
     _DOTS_FAILURE_ANIMATION_STEP=0
     _DOTS_FAILURE_ANIMATION_FRAMES=0
     _DOTS_FAILURE_ANIMATION_STATE='starting'
 
-    local style="\${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
+    local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
     local infinite=0
     local startup_frame=''
-    local interval="\${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
+    local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
     if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
         interval=0.08
     elif (( interval < 0.01 || interval > 2.0 )); then
@@ -866,10 +866,9 @@ _dots_failure_animation_clear_screen_widget() {
 _dots_failure_animation_line_finish() {
     _DOTS_FAILURE_ANIMATION_PENDING=0
 
-    # Prompt emoji animation ends on submission. Infinite mode may start it again
-    # at the next idle prompt; the persistent bag continues where it left off.
-    # A failure gradient
-    # has a worker lifecycle, and it is cancelled in preexec.
+    # Prompt emoji animation ends on submission. Infinite mode starts it again
+    # at the next idle prompt, continuing from the same persistent shuffled bag.
+    # A failure gradient has its own lifecycle and is cancelled in preexec.
     if (( !_DOTS_FAILURE_GRADIENT_ACTIVE )) && [[ -z "$_DOTS_FAILURE_ANIMATION_GRADIENT_PROMPT" ]]; then
         _dots_failure_animation_cleanup
         _DOTS_FAILURE_GRADIENT_PENDING=0
