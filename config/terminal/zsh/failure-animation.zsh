@@ -179,7 +179,7 @@ _dots_failure_animation_next_startup_frame() {
         invalid=1
     fi
 
-    if (( !invalid )); then
+    if (( !invalid )) && [[ -n "$remaining_line" ]]; then
         local IFS=' '
         read -rA remaining <<< "$remaining_line"
         for candidate in "${remaining[@]}"; do
