@@ -77,40 +77,130 @@ assert_unique_batch ecchi "${#_DOTS_FAILURE_ANIMATION_POOL}" "ecchi pool has an 
 _dots_failure_animation_pool_for_style rainbow
 assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has an independent cycle"
 
-# A random animation stream must not exist: it bypassed the persistent bag
-# and visibly replaced the already-reserved emoji in each new terminal.
-(( ${+functions[_dots_failure_animation_stream]} == 0 )) ||
-    fail "random emoji stream still exists and can replace the reserved prompt emoji"
-print -- "ok - prompt emoji cannot be replaced by transient random frames"
+# Upgrade the v1 state written by the previous implementation without
+# throwing away its unconsumed shuffled entries.
+typeset legacy_home="$TEST_ROOT/legacy-state"
+typeset legacy_signature='v1:normal'
+typeset legacy_state_file="$legacy_home/dots/failure-animation/normal.state"
+typeset legacy_frame legacy_last_frame legacy_migrated_signature
+typeset -a legacy_expected=()
+typeset -A legacy_seen=()
+_dots_failure_animation_pool_for_style normal
+for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+    legacy_signature+="|$emoji"
+done
+legacy_expected=( "${_DOTS_FAILURE_ANIMATION_POOL[2]}" "${_DOTS_FAILURE_ANIMATION_POOL[4]}" "${_DOTS_FAILURE_ANIMATION_POOL[6]}" )
+command mkdir -p "${legacy_state_file:h}"
+print -r -- "$legacy_signature" > "$legacy_state_file"
+print -r -- "2 4 6" >> "$legacy_state_file"
+XDG_STATE_HOME="$legacy_home"
 
-# Exhaust and restart the normal pool repeatedly. Every complete cycle must
-# contain every available emoji exactly once.
-assert_unique_batch normal "$normal_count" "normal pool completes a second unique cycle"
-assert_unique_batch normal "$normal_count" "normal pool completes a third unique cycle"
+for (( index = 1; index <= 3; index++ )); do
+    legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
+    [[ " ${legacy_expected[*]} " == *" $legacy_frame "* ]] ||
+        fail "v1 migration discarded unconsumed pool item ordering (selected $legacy_frame)"
+    [[ -z "${legacy_seen[$legacy_frame]-}" ]] ||
+        fail "v1 migration repeated $legacy_frame before exhausting its remaining bag"
+    legacy_seen[$legacy_frame]=1
+    legacy_last_frame="$legacy_frame"
+done
+(( ${#legacy_seen} == 3 )) || fail "v1 state migration did not preserve all three remaining entries"
+IFS= read -r legacy_migrated_signature < "$legacy_state_file"
+[[ "$legacy_migrated_signature" == v2:* ]] || fail "legacy state was not upgraded to v2"
+legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ "$legacy_frame" != "$legacy_last_frame" ]] ||
+    fail "the new cycle repeated the migrated pool's final emoji"
+print -- "ok - v1 pool state migrates without resetting the remaining bag"
 
-# Start every draw in a separate Zsh process at once, through the same command
-# substitution used during interactive module loading. The lock must serialize them.
+# The first emoji is reserved synchronously; every later visible animation
+# frame must draw from the same persistent shuffled bag, not from RANDOM.
+(( ${+functions[_dots_failure_animation_stream]} == 1 )) ||
+    fail "the prompt emoji animation stream is missing"
+
+typeset animation_home="$TEST_ROOT/animation-state"
+typeset startup_frame stream_output stream_frame wrapped_frame
+typeset -a stream_frames=()
+typeset -A visible_cycle=()
+typeset -i stream_count=0
+XDG_STATE_HOME="$animation_home"
+_DOTS_FAILURE_ANIMATION_INTERVAL=0.01
+startup_frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ -n "$startup_frame" ]] || fail "synchronous startup selection returned an empty emoji"
+visible_cycle[$startup_frame]=1
+stream_output="$(_dots_failure_animation_stream normal 0 "$startup_frame" 11)"
+stream_frames=( "${(@f)stream_output}" )
+(( ${#stream_frames} == 11 )) || fail "startup animation emitted ${#stream_frames} frames instead of 11"
+
+_dots_failure_animation_pool_for_style normal
+for stream_frame in "${stream_frames[@]}"; do
+    [[ -n "$stream_frame" ]] || fail "animation stream emitted an empty frame"
+    [[ -z "${visible_cycle[$stream_frame]-}" ]] ||
+        fail "animation repeated $stream_frame before exhausting the pool"
+    [[ " ${_DOTS_FAILURE_ANIMATION_POOL[*]} " == *" $stream_frame "* ]] ||
+        fail "animation emitted a glyph outside its style pool: $stream_frame"
+    visible_cycle[$stream_frame]=1
+    (( stream_count += 1 ))
+done
+(( stream_count == 11 && ${#visible_cycle} == 12 )) ||
+    fail "the visible startup sequence did not contain 12 unique emojis"
+
+# Consume the thirteenth and final item; only the following draw may start a
+# new shuffled cycle. The boundary must not repeat the immediately previous item.
+frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ -z "${visible_cycle[$frame]-}" ]] || fail "pool repeated $frame before all 13 entries were shown"
+visible_cycle[$frame]=1
+(( ${#visible_cycle} == normal_count )) || fail "the full visible sequence did not exhaust the normal pool"
+wrapped_frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ "$wrapped_frame" != "$frame" ]] || fail "the new cycle repeated the previous cycle's final emoji"
+print -- "ok - the startup animation consumes one globally unique emoji per frame until pool exhaustion"
+# Start several animated shells simultaneously. Every shell reserves its first
+# frame synchronously, then its worker consumes three more frames from the same
+# global pool. The combined 12-frame sequence must contain no duplicates.
 typeset concurrent_home="$TEST_ROOT/concurrent-state"
 typeset -a pids=()
 typeset -A concurrent_seen=()
-for (( index = 1; index <= normal_count; index++ )); do
+typeset -i concurrent_sessions=3 frames_per_session=3 concurrent_count=0
+for (( index = 1; index <= concurrent_sessions; index++ )); do
     DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
         XDG_STATE_HOME="$concurrent_home" \
-        zsh -f -c 'source "$DOTS_TEST_ZSH_FILE"; selected="$(_dots_failure_animation_next_startup_frame normal)" || exit; print -r -- "$selected"' \
-        > "$TEST_ROOT/concurrent.$index" &
+        zsh -f -c '
+            source "$DOTS_TEST_ZSH_FILE"
+            _DOTS_FAILURE_ANIMATION_INTERVAL=0.01
+            startup="$(_dots_failure_animation_next_startup_frame normal)" || exit
+            animation="$(_dots_failure_animation_stream normal 0 "$startup" 3)" || exit
+            print -r -- "$startup"
+            print -r -- "$animation"
+        ' > "$TEST_ROOT/concurrent.$index" &
     pids+=( "$!" )
 done
 for pid in "${pids[@]}"; do
     wait "$pid"
 done
-for (( index = 1; index <= normal_count; index++ )); do
-    IFS= read -r frame < "$TEST_ROOT/concurrent.$index"
-    [[ -n "$frame" ]] || fail "concurrent terminal $index returned an empty emoji"
-    [[ -z "${concurrent_seen[$frame]-}" ]] || fail "concurrent terminals repeated $frame"
-    concurrent_seen[$frame]=1
+
+for (( index = 1; index <= concurrent_sessions; index++ )); do
+    while IFS= read -r frame; do
+        [[ -n "$frame" ]] || fail "concurrent animation emitted an empty frame"
+        [[ -z "${concurrent_seen[$frame]-}" ]] ||
+            fail "concurrent animated shells repeated $frame before pool exhaustion"
+        concurrent_seen[$frame]=1
+        (( concurrent_count += 1 ))
+    done < "$TEST_ROOT/concurrent.$index"
 done
-(( ${#concurrent_seen} == normal_count )) || fail "concurrent terminals did not consume one complete unique pool"
-print -- "ok - concurrent terminal starts are serialized without repeats"
+(( concurrent_count == concurrent_sessions * (frames_per_session + 1) )) ||
+    fail "concurrent sessions emitted an unexpected number of frames"
+(( ${#concurrent_seen} == concurrent_count )) ||
+    fail "concurrent animation frames were not globally unique"
+print -- "ok - concurrent animated shells consume one shared no-repeat pool"
+
+# One item remains in the 13-entry normal pool; inspect the same shared
+# state directory the concurrent workers consumed.
+XDG_STATE_HOME="$concurrent_home"
+frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ -z "${concurrent_seen[$frame]-}" ]] || fail "concurrent workers exhausted the pool early or repeated $frame"
+concurrent_seen[$frame]=1
+(( ${#concurrent_seen} == normal_count )) || fail "concurrent animation did not leave exactly one unique item"
+wrapped_frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ "$wrapped_frame" != "$frame" ]] || fail "concurrent pool restart repeated its previous final item"
 
 # The selected value is wired into the prompt renderer directly at module
 # load time, under the interactive-TTY guard. No later prompt animation can
