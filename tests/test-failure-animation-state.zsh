@@ -160,7 +160,7 @@ for pty_name in "${pty_names[@]}"; do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
         fi
-        [[ "$output" == *"SYNC_PROMPT"* ]] && break
+        [[ "$output" == *"SYNC_PROMPT "?*" ❯"* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
