@@ -10,6 +10,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
+typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
@@ -749,9 +750,9 @@ _dots_failure_animation_begin() {
     _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
 
     _dots_failure_animation_infinite_enabled && infinite=1
-    if (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
+    if (( _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING )); then
         startup_frame="$(_dots_failure_animation_next_startup_frame "$style")" || startup_frame=''
-        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
+        _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=0
     fi
     exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" "$startup_frame")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
@@ -782,8 +783,10 @@ _dots_failure_animation_precmd() {
     fi
 
     if _dots_failure_animation_infinite_enabled; then
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
     elif (( _DOTS_FAILURE_ANIMATION_STARTUP_PENDING )); then
+        _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=0
         _DOTS_FAILURE_ANIMATION_PENDING=1
     fi
 
