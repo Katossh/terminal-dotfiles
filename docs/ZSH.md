@@ -11,7 +11,7 @@ The zshenv file is linked to ~/.zshenv. It defines XDG paths, sets ZDOTDIR=$XDG_
 5. command-suggestions.zsh and diagnostics.zsh — offer safe typo candidates and provide why / why --verbose without rerunning the previous command.
 6. handlers.zsh — reports each failed command once and runs a typo correction only after explicit confirmation.
 7. prompt.zsh — Starship initialization (or a simple fallback prompt when Starship is unavailable).
-8. failure-animation.zsh — registers after Starship, animates ordinary emoji before the input marker, and renders the single failure-gradient banner on a prompt row above the input.
+8. failure-animation.zsh — registers after Starship, reserves one no-repeat prompt emoji per shell session, and renders the single failure-gradient banner on a prompt row above the input.
 
 The framework, plugins, history and completion caches stay outside the Git checkout.
 
@@ -55,9 +55,9 @@ On an interactive colour-capable terminal, this exact message is animated with o
 
 Typing remains fully responsive while the gradient runs. Submitting a command stops the worker and removes the banner from the next live prompt, while the already-submitted copy remains in scrollback. This prevents frames from accumulating while a foreground command owns the terminal. The animation also stops when the banner is explicitly cleared (for example, with Ctrl+L). The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
 
-\`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
+\`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between gradient frames. The prompt emoji is selected once per interactive shell and remains fixed for that session; it is not replaced by transient random animation frames. This is deliberate: otherwise the visible frames could repeat across terminals even while the final reserved emoji was unique.
 
-Each interactive shell reserves its ordinary prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt is rendered. The selection comes from a persisted shuffled pool under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`; it is not reused by another shell startup until every emoji in that pool has been drawn. The prompt displays this reserved emoji immediately, and the startup animation settles back on it as its final frame. Normal, Sarcastic, and Dramatic share one pool; Anime, Ecchi, and Rainbow use independent pools. Transient animation frames remain random.
+Each interactive shell reserves its prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt is rendered. The selection comes from a persisted shuffled pool under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`. A selected emoji is not reused by another shell startup until every emoji in that pool has been drawn; only then is a new shuffled cycle created. The selected emoji remains the only prompt emoji shown for the entire shell session, including while the failure-message gradient runs. There are no transient random emoji frames to bypass the pool. Normal, Sarcastic, and Dramatic share one pool; Anime, Ecchi, and Rainbow use independent pools.
 
 ## Environment variables
 
