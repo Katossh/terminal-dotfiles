@@ -77,6 +77,40 @@ assert_unique_batch ecchi "${#_DOTS_FAILURE_ANIMATION_POOL}" "ecchi pool has an 
 _dots_failure_animation_pool_for_style rainbow
 assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has an independent cycle"
 
+# Upgrade the v1 state written by the previous implementation without
+# throwing away its unconsumed shuffled entries.
+typeset legacy_home="$TEST_ROOT/legacy-state"
+typeset legacy_signature='v1:normal'
+typeset legacy_state_file="$legacy_home/dots/failure-animation/normal.state"
+typeset legacy_frame legacy_migrated_signature
+typeset -a legacy_expected=()
+typeset -A legacy_seen=()
+_dots_failure_animation_pool_for_style normal
+for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+    legacy_signature+="|$emoji"
+done
+legacy_expected=( "${_DOTS_FAILURE_ANIMATION_POOL[2]}" "${_DOTS_FAILURE_ANIMATION_POOL[4]}" "${_DOTS_FAILURE_ANIMATION_POOL[6]}" )
+command mkdir -p "${legacy_state_file:h}"
+print -r -- "$legacy_signature" > "$legacy_state_file"
+print -r -- "2 4 6" >> "$legacy_state_file"
+XDG_STATE_HOME="$legacy_home"
+
+for (( index = 1; index <= 3; index++ )); do
+    legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
+    [[ " ${legacy_expected[*]} " == *" $legacy_frame "* ]] ||
+        fail "v1 migration discarded unconsumed pool item ordering (selected $legacy_frame)"
+    [[ -z "${legacy_seen[$legacy_frame]-}" ]] ||
+        fail "v1 migration repeated $legacy_frame before exhausting its remaining bag"
+    legacy_seen[$legacy_frame]=1
+done
+(( ${#legacy_seen} == 3 )) || fail "v1 state migration did not preserve all three remaining entries"
+IFS= read -r legacy_migrated_signature < "$legacy_state_file"
+[[ "$legacy_migrated_signature" == v2:* ]] || fail "legacy state was not upgraded to v2"
+legacy_frame="$(_dots_failure_animation_next_startup_frame normal)"
+[[ "$legacy_frame" != "${legacy_expected[1]}" || "$legacy_frame" != "${legacy_expected[2]}" ]] ||
+    fail "the new cycle failed to continue after the migrated pool was exhausted"
+print -- "ok - v1 pool state migrates without resetting the remaining bag"
+
 # The first emoji is reserved synchronously; every later visible animation
 # frame must draw from the same persistent shuffled bag, not from RANDOM.
 (( ${+functions[_dots_failure_animation_stream]} == 1 )) ||
