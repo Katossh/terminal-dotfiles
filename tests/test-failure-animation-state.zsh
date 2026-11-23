@@ -215,8 +215,8 @@ print -- "ok - concurrent shell reservations stay unique while animations remain
 # reserved final glyph when the stream completes.
 command grep -Fq 'if [[ -o interactive && -t 0 && -t 1 ]]; then' "$ZSH_DIR/failure-animation.zsh" ||
     fail "startup emoji reservation is not restricted to interactive TTY shells"
-command grep -Fq '_DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame' "$ZSH_DIR/failure-animation.zsh" ||
-    fail "interactive startup does not reserve an emoji before prompt rendering"
+command grep -Fq '_DOTS_FAILURE_ANIMATION_RESERVED_FRAME="$(_dots_failure_animation_next_startup_frame' "$ZSH_DIR/failure-animation.zsh" ||
+    fail "interactive startup does not reserve its final emoji before prompt rendering"
 
 typeset saved_state_home="$XDG_STATE_HOME"
 XDG_STATE_HOME="$TEST_ROOT/prompt-render-state"
