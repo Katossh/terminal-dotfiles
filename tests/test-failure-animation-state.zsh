@@ -128,51 +128,38 @@ zmodload zsh/zpty 2>/dev/null || {
 typeset pty_state="$TEST_ROOT/pty-state"
 typeset -A pty_seen=()
 
-# Exercise actual prompt rendering with animation enabled. Keep PTYs sequential;
-# a separate process-level test above covers concurrent draws and lock handling.
+# Load the module from a temporary .zshrc so the selector runs during genuine
+# interactive startup, before Zsh expands the first prompt.
+cat > "$TEST_ROOT/.zshrc" <<ZSHRC
+PROMPT='SYNC_PROMPT ❯ '
+source "$ZSH_DIR/failure-animation.zsh"
+ZSHRC
+
+# Start one interactive shell at a time. The separate process-level test above
+# already verifies that concurrent draws serialize correctly under contention.
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 \
-        XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 zsh -f -i
+        XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 ZDOTDIR="$TEST_ROOT" zsh -i
 
-    typeset startup_output='' data=''
+    typeset output='' data='' visible='' frame=''
     typeset -i tries=0
-    while (( tries < 120 )); do
-        if zpty -r -t "$pty_name" data; then
-            startup_output+="$data"
-        fi
-        [[ -n "$startup_output" ]] && break
-        command sleep 0.02
-        (( tries += 1 ))
-    done
-    [[ -n "$startup_output" ]] || fail "$pty_name did not reach its initial interactive prompt"
-
-    # Disable terminal echo so the next captured marker comes from the real
-    # prompt renderer, not from the shell echoing the command we send.
-    zpty -w "$pty_name" "stty -echo"$'\n'
-    command sleep 0.05
-    if zpty -r -t "$pty_name" data; then :; fi
-
-    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'; print -r -- VISIBLE_EMOJI:$_DOTS_FAILURE_ANIMATION_FRAME"$'\n'
-
-    typeset output='' visible='' frame=''
-    tries=0
     while (( tries < 120 )); do
         if zpty -r -t "$pty_name" data; then
             output+="$data"
         fi
-        [[ "$output" == *VISIBLE_EMOJI* ]] && break
+        visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
+        [[ "$visible" == *SYNC_PROMPT*' ❯'* ]] && break
         command sleep 0.02
         (( tries += 1 ))
     done
 
-    visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"VISIBLE_EMOJI SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
-    [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
+    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
+    [[ -n "$frame" ]] || fail "$pty_name did not render its first prompt with a selected emoji (output: $visible)"
     [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across terminal starts"
 
-    # Continue collecting output after the prompt is selected. The old
-    # implementation asynchronously replaced the reserved emoji.
+    # Watch beyond the former 12-frame animation window. No other emoji from
+    # the pool may replace the value shown in the first prompt.
     typeset -i quiet_round=0
     while (( quiet_round < 20 )); do
         if zpty -r -t "$pty_name" data; then
@@ -186,12 +173,12 @@ for (( index = 1; index <= normal_count; index++ )); do
     typeset local_emoji
     for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
         [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
-            fail "$pty_name replaced its reserved emoji $frame with another pool item $local_emoji"
+            fail "$pty_name replaced its first-prompt emoji $frame with another pool item $local_emoji"
     done
 
     pty_seen[$frame]=1
-    print -- "ok - $pty_name kept $frame stable with animation enabled"
+    print -- "ok - $pty_name started with unique emoji $frame and kept it stable"
     zpty -d "$pty_name" 2>/dev/null || true
 done
 
-(( ${#pty_seen} == normal_count )) || fail "interactive prompts did not receive one unique emoji per shell startup"
+(( ${#pty_seen} == normal_count )) || fail "interactive startups did not receive one unique emoji per shell"
