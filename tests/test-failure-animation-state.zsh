@@ -77,16 +77,16 @@ assert_unique_batch ecchi "${#_DOTS_FAILURE_ANIMATION_POOL}" "ecchi pool has an 
 _dots_failure_animation_pool_for_style rainbow
 assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has an independent cycle"
 
-# Confirm the chosen persistent startup emoji is actually the first frame shown
-# by the regular animation stream, without changing the remaining frame logic.
-typeset startup_frame stream_output
-typeset -a stream_frames=()
-startup_frame="$(_dots_failure_animation_next_startup_frame rainbow)"
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.01
-stream_output="$(_dots_failure_animation_stream rainbow 0 "$startup_frame")"
-stream_frames=( "${(@f)stream_output}" )
-[[ "${stream_frames[-1]}" == "$startup_frame" ]] || fail "the animation did not settle on the preselected startup emoji"
-print -- "ok - animation settles on the emoji selected before it starts"
+# A random animation stream must not exist: it bypassed the persistent bag
+# and visibly replaced the already-reserved emoji in each new terminal.
+(( ${+functions[_dots_failure_animation_stream]} == 0 )) ||
+    fail "random emoji stream still exists and can replace the reserved prompt emoji"
+print -- "ok - prompt emoji cannot be replaced by transient random frames"
+
+# Exhaust and restart the normal pool repeatedly. Every complete cycle must
+# contain every available emoji exactly once.
+assert_unique_batch normal "$normal_count" "normal pool completes a second unique cycle"
+assert_unique_batch normal "$normal_count" "normal pool completes a third unique cycle"
 
 # Start every draw in a separate Zsh process at once. The atomic lock must
 # serialize them so concurrent terminals still receive one complete unique bag.
@@ -132,7 +132,7 @@ typeset -A pty_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     typeset pty_name="dots_startup_emoji_${index}"
     pty_names+=( "$pty_name" )
-    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=0 zsh -f -i
+    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=1 zsh -f -i
 done
 
 for pty_name in "${pty_names[@]}"; do
@@ -166,11 +166,29 @@ for pty_name in "${pty_names[@]}"; do
     done
 
     visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
+    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
     [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
+
+    # Continue collecting output after the prompt appears. With animation
+    # enabled, the old implementation replaced the reserved emoji repeatedly.
+    local -i quiet_round=0
+    while (( quiet_round < 20 )); do
+        if zpty -r -t "$pty_name" data; then
+            output+="$data"
+        fi
+        command sleep 0.02
+        (( quiet_round += 1 ))
+    done
+
+    _dots_failure_animation_pool_for_style normal
+    for local_emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+        [[ "$local_emoji" == "$frame" || "$output" != *"$local_emoji"* ]] ||
+            fail "$pty_name replaced its reserved emoji $frame with another pool item $local_emoji"
+    done
+
     pty_seen[$frame]=1
-    print -- "ok - $pty_name rendered $frame before any animation started"
+    print -- "ok - $pty_name kept $frame stable with animation enabled"
     zpty -d "$pty_name" 2>/dev/null || true
 done
 
