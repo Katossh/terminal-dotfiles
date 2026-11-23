@@ -147,7 +147,7 @@ for (( index = 1; index <= normal_count; index++ )); do
         (( tries += 1 ))
     done
 
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
+    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) MARK", sys.stdin.read()); print(m.group(1) if m else "")')"
     [[ -n "$frame" ]] || fail "$pty_name did not render its interactive prompt with a selected emoji (output: $visible)"
     [[ -z "${pty_seen[$frame]-}" ]] || fail "interactive prompt render repeated $frame across terminal starts"
 
