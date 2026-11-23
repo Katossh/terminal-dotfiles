@@ -57,7 +57,7 @@ Typing remains fully responsive while the gradient runs. Submitting a command st
 
 \`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between gradient frames. The ordinary prompt emoji animation remains a separate feature and keeps its own timing and Infinite-mode settings.
 
-The first ordinary prompt emoji in each interactive shell session is selected from a persisted shuffled pool under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`. A selected emoji is not reused for another shell startup until every emoji in that pool has been drawn. Normal, Sarcastic, and Dramatic share one pool; Anime, Ecchi, and Rainbow use independent pools. Subsequent animation frames retain their existing random selection behaviour.
+Each interactive shell reserves its ordinary prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt is rendered. The selection comes from a persisted shuffled pool under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`; it is not reused by another shell startup until every emoji in that pool has been drawn. The prompt displays this reserved emoji immediately, and the startup animation settles back on it as its final frame. Normal, Sarcastic, and Dramatic share one pool; Anime, Ecchi, and Rainbow use independent pools. Transient animation frames remain random.
 
 ## Environment variables
 
