@@ -617,7 +617,7 @@ _dots_failure_animation_render_prompt() {
     local reset_color=$'\e[0m'
     if (( _DOTS_FAILURE_ANIMATION_ACTIVE )) && [[ -n "$emoji_rendered" ]]; then
         _dots_failure_animation_emoji_badge_color "$_DOTS_FAILURE_ANIMATION_STYLE" "$_DOTS_FAILURE_ANIMATION_EMOJI_PHASE"
-        emoji_rendered="%{\${REPLY}%} \${emoji_rendered} %{\${reset_color}%}"
+        emoji_rendered="%{${REPLY}%} ${emoji_rendered} %{${reset_color}%}"
     fi
     if [[ -n "$marker" ]]; then
         local marker_pattern="${(b)marker}"
