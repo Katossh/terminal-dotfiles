@@ -10,6 +10,7 @@ typeset -gi _DOTS_FAILURE_ANIMATION_FD=-1
 typeset -gi _DOTS_FAILURE_ANIMATION_STEP=0
 typeset -gi _DOTS_FAILURE_ANIMATION_ACTIVE=0
 typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_PENDING=1
+typeset -gi _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=1
 typeset -gi _DOTS_FAILURE_ANIMATION_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_FRAMES=0
 typeset -gi _DOTS_FAILURE_ANIMATION_LAST_BANNER_FRAMES=0
@@ -89,11 +90,157 @@ _dots_failure_animation_pool_for_style() {
     esac
 }
 
+
+# Draw the first prompt emoji from a persistent shuffled bag. The bag lives in
+# XDG_STATE_HOME, so separate terminal processes consume it in order without
+# repeating an emoji until the style's complete pool has been exhausted.
+_dots_failure_animation_next_startup_frame() {
+    emulate -L zsh
+
+    local style="${1:-normal}"
+    local pool_key
+    case "$style" in
+        anime|ecchi|rainbow) pool_key="$style" ;;
+        *) pool_key=normal ;;
+    esac
+
+    _dots_failure_animation_pool_for_style "$style"
+    local -i pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
+    (( pool_size > 0 )) || return 1
+
+    local state_home="${XDG_STATE_HOME:-}"
+    if [[ -z "$state_home" && -n "${HOME:-}" ]]; then
+        state_home="${HOME}/.local/state"
+    fi
+    if [[ -z "$state_home" ]]; then
+        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
+        return 0
+    fi
+
+    zmodload zsh/system 2>/dev/null || true
+    local process_id="${sysparams[pid]:-}"
+    if [[ "$process_id" != <-> ]]; then
+        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
+        return 0
+    fi
+
+    local state_dir="${state_home%/}/dots/failure-animation"
+    local state_file="${state_dir}/${pool_key}.state"
+    local lock_file="${state_file}.lock"
+    local signature="v1:${pool_key}"
+    local emoji candidate stored_signature='' remaining_line='' owner_pid=''
+    local temp_file='' swap_value='' selected_emoji=''
+    local -a remaining=() next_remaining=()
+    local -A seen=()
+    local -i loop_index=0 random_index=0 selected_index=0 attempts=0
+    local -i lock_acquired=0 invalid=0
+
+    for emoji in "${_DOTS_FAILURE_ANIMATION_POOL[@]}"; do
+        signature+="|$emoji"
+    done
+
+    command mkdir -p "$state_dir" 2>/dev/null || {
+        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
+        return 0
+    }
+
+    # Atomic symlink creation serializes terminal starts without requiring
+    # flock, which is not available in every supported shell environment.
+    while (( attempts < 250 )); do
+        if command ln -s "$process_id" "$lock_file" 2>/dev/null; then
+            lock_acquired=1
+            break
+        fi
+
+        owner_pid="$(command readlink "$lock_file" 2>/dev/null || true)"
+        if [[ "$owner_pid" == <-> ]] && ! builtin kill -0 "$owner_pid" 2>/dev/null; then
+            command rm -f "$lock_file" 2>/dev/null
+            continue
+        fi
+
+        command sleep 0.02 2>/dev/null || break
+        (( attempts += 1 ))
+    done
+
+    if (( !lock_acquired )); then
+        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
+        return 0
+    fi
+
+    if [[ -f "$state_file" ]]; then
+        {
+            IFS= read -r stored_signature || stored_signature=''
+            IFS= read -r remaining_line || remaining_line=''
+        } < "$state_file"
+    fi
+
+    if [[ "$stored_signature" == "$signature" ]]; then
+        local IFS=' '
+        read -rA remaining <<< "$remaining_line"
+        for candidate in "${remaining[@]}"; do
+            if [[ "$candidate" != <-> ]] ||
+                (( candidate < 1 || candidate > pool_size )) ||
+                [[ -n "${seen[$candidate]-}" ]]; then
+                invalid=1
+                break
+            fi
+            seen[$candidate]=1
+        done
+    else
+        invalid=1
+    fi
+
+    # Empty, stale, or malformed state starts a fresh Fisher-Yates shuffle.
+    if (( invalid || ${#remaining} == 0 )); then
+        remaining=()
+        for (( loop_index = 1; loop_index <= pool_size; loop_index++ )); do
+            remaining+=( "$loop_index" )
+        done
+
+        for (( loop_index = pool_size; loop_index > 1; loop_index-- )); do
+            random_index=$(( (RANDOM % loop_index) + 1 ))
+            swap_value="${remaining[loop_index]}"
+            remaining[loop_index]="${remaining[random_index]}"
+            remaining[random_index]="$swap_value"
+        done
+    fi
+
+    selected_index="${remaining[1]}"
+    selected_emoji="${_DOTS_FAILURE_ANIMATION_POOL[selected_index]}"
+    for (( loop_index = 2; loop_index <= ${#remaining}; loop_index++ )); do
+        next_remaining+=( "${remaining[loop_index]}" )
+    done
+
+    remaining_line=''
+    for candidate in "${next_remaining[@]}"; do
+        [[ -n "$remaining_line" ]] && remaining_line+=" "
+        remaining_line+="$candidate"
+    done
+
+    # Replace the state atomically so another shell cannot read a partial bag.
+    temp_file="${state_file}.tmp.${process_id}.$RANDOM"
+    if ! (
+        umask 077
+        print -r -- "$signature" > "$temp_file" &&
+            print -r -- "$remaining_line" >> "$temp_file" &&
+            command mv -f "$temp_file" "$state_file"
+    ); then
+        command rm -f "$temp_file" 2>/dev/null
+        command rm -f "$lock_file" 2>/dev/null
+        print -r -- "${_DOTS_FAILURE_ANIMATION_POOL[$(( (RANDOM % pool_size) + 1 ))]}"
+        return 0
+    fi
+
+    command rm -f "$lock_file" 2>/dev/null
+    print -r -- "$selected_emoji"
+}
+
 _dots_failure_animation_stream() {
     emulate -L zsh
 
     local style="${1:-normal}"
     local infinite="${2:-0}"
+    local startup_frame="${3-}"
     local frame
     local -i pool_size=0 previous_index=0 frame_number=0 index=0
 
@@ -104,13 +251,23 @@ _dots_failure_animation_stream() {
     while true; do
         previous_index=0
         for (( frame_number = 0; frame_number < 12; frame_number++ )); do
-            index=$(( (RANDOM % pool_size) + 1 ))
-            if (( pool_size > 1 && index == previous_index )); then
-                index=$(( (index % pool_size) + 1 ))
+            if (( frame_number == 0 )) && [[ -n "$startup_frame" ]]; then
+                frame="$startup_frame"
+                for (( index = 1; index <= pool_size; index++ )); do
+                    if [[ "${_DOTS_FAILURE_ANIMATION_POOL[index]}" == "$frame" ]]; then
+                        previous_index="$index"
+                        break
+                    fi
+                done
+            else
+                index=$(( (RANDOM % pool_size) + 1 ))
+                if (( pool_size > 1 && index == previous_index )); then
+                    index=$(( (index % pool_size) + 1 ))
+                fi
+                frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
+                previous_index="$index"
             fi
-            frame="${_DOTS_FAILURE_ANIMATION_POOL[index]}"
             print -r -- "$frame" || return 0
-            previous_index="$index"
             command sleep "$_DOTS_FAILURE_ANIMATION_INTERVAL" 2>/dev/null || return 0
         done
         [[ "$infinite" == 1 ]] || break
@@ -583,6 +740,7 @@ _dots_failure_animation_begin() {
 
     local style="${_DOTS_FAILURE_ANIMATION_STYLE:-normal}"
     local infinite=0
+    local startup_frame=''
     local interval="${DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
     if [[ "$interval" != <-> && "$interval" != <->.<-> ]]; then
         interval=0.08
@@ -592,7 +750,11 @@ _dots_failure_animation_begin() {
     _DOTS_FAILURE_ANIMATION_INTERVAL="$interval"
 
     _dots_failure_animation_infinite_enabled && infinite=1
-    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite")
+    if (( _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING )); then
+        startup_frame="$(_dots_failure_animation_next_startup_frame "$style")" || startup_frame=''
+        _DOTS_FAILURE_ANIMATION_STARTUP_FRAME_PENDING=0
+    fi
+    exec {_DOTS_FAILURE_ANIMATION_FD}< <(_dots_failure_animation_stream "$style" "$infinite" "$startup_frame")
     _DOTS_FAILURE_ANIMATION_ACTIVE=1
 
     if zle -F "$_DOTS_FAILURE_ANIMATION_FD" _dots_failure_animation_fd_handler; then
