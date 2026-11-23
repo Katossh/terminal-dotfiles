@@ -77,26 +77,26 @@ assert_unique_batch ecchi "${#_DOTS_FAILURE_ANIMATION_POOL}" "ecchi pool has an 
 _dots_failure_animation_pool_for_style rainbow
 assert_unique_batch rainbow "${#_DOTS_FAILURE_ANIMATION_POOL}" "rainbow pool has an independent cycle"
 
-# Confirm the chosen persistent startup emoji is actually the first frame shown
-# by the regular animation stream, without changing the remaining frame logic.
-typeset startup_frame stream_output
-typeset -a stream_frames=()
-startup_frame="$(_dots_failure_animation_next_startup_frame rainbow)"
-_DOTS_FAILURE_ANIMATION_INTERVAL=0.01
-stream_output="$(_dots_failure_animation_stream rainbow 0 "$startup_frame")"
-stream_frames=( "${(@f)stream_output}" )
-[[ "${stream_frames[-1]}" == "$startup_frame" ]] || fail "the animation did not settle on the preselected startup emoji"
-print -- "ok - animation settles on the emoji selected before it starts"
+# A random animation stream must not exist: it bypassed the persistent bag
+# and visibly replaced the already-reserved emoji in each new terminal.
+(( ${+functions[_dots_failure_animation_stream]} == 0 )) ||
+    fail "random emoji stream still exists and can replace the reserved prompt emoji"
+print -- "ok - prompt emoji cannot be replaced by transient random frames"
 
-# Start every draw in a separate Zsh process at once. The atomic lock must
-# serialize them so concurrent terminals still receive one complete unique bag.
+# Exhaust and restart the normal pool repeatedly. Every complete cycle must
+# contain every available emoji exactly once.
+assert_unique_batch normal "$normal_count" "normal pool completes a second unique cycle"
+assert_unique_batch normal "$normal_count" "normal pool completes a third unique cycle"
+
+# Start every draw in a separate Zsh process at once, through the same command
+# substitution used during interactive module loading. The lock must serialize them.
 typeset concurrent_home="$TEST_ROOT/concurrent-state"
 typeset -a pids=()
 typeset -A concurrent_seen=()
 for (( index = 1; index <= normal_count; index++ )); do
     DOTS_TEST_ZSH_FILE="$ZSH_DIR/failure-animation.zsh" \
         XDG_STATE_HOME="$concurrent_home" \
-        zsh -f -c 'source "$DOTS_TEST_ZSH_FILE"; _dots_failure_animation_next_startup_frame normal' \
+        zsh -f -c 'source "$DOTS_TEST_ZSH_FILE"; selected="$(_dots_failure_animation_next_startup_frame normal)" || exit; print -r -- "$selected"' \
         > "$TEST_ROOT/concurrent.$index" &
     pids+=( "$!" )
 done
@@ -112,67 +112,24 @@ done
 (( ${#concurrent_seen} == normal_count )) || fail "concurrent terminals did not consume one complete unique pool"
 print -- "ok - concurrent terminal starts are serialized without repeats"
 
+# The selected value is wired into the prompt renderer directly at module
+# load time, under the interactive-TTY guard. No later prompt animation can
+# replace it with an untracked random glyph.
+command grep -Fq 'if [[ -o interactive && -t 0 && -t 1 ]]; then' "$ZSH_DIR/failure-animation.zsh" ||
+    fail "startup emoji reservation is not restricted to interactive TTY shells"
+command grep -Fq '_DOTS_FAILURE_ANIMATION_FRAME="$(_dots_failure_animation_next_startup_frame' "$ZSH_DIR/failure-animation.zsh" ||
+    fail "interactive startup does not reserve an emoji before prompt rendering"
+
+typeset saved_state_home="$XDG_STATE_HOME"
+XDG_STATE_HOME="$TEST_ROOT/prompt-render-state"
+DOTS_FAILURE_ANIMATION_PROMPT_MARKER=MARK
+_DOTS_FAILURE_ANIMATION_ORIGINAL_PROMPT='SYNC_PROMPTMARK'
+frame="$(_dots_failure_animation_next_startup_frame normal)"
+_DOTS_FAILURE_ANIMATION_FRAME="$frame"
+typeset rendered_prompt
+rendered_prompt="$(_dots_failure_animation_render_prompt)"
+[[ "$rendered_prompt" == "SYNC_PROMPT $frame MARK" ]] ||
+    fail "prompt renderer did not display the emoji reserved for this shell (got: $rendered_prompt)"
+XDG_STATE_HOME="$saved_state_home"
+print -- "ok - prompt renderer displays the reserved startup emoji before any animation"
 print -- "All startup emoji state tests passed."
-
-
-
-# Start interactive shells first, then load the module into each live PTY.
-# Loading the module synchronously reserves the emoji before the next prompt;
-# disabling animation makes the first visible value directly testable.
-zmodload zsh/zpty 2>/dev/null || {
-    print -- "skip - zsh/zpty is unavailable for startup prompt integration"
-    print -- "All startup emoji state tests passed."
-    exit 0
-}
-
-typeset pty_state="$TEST_ROOT/pty-state"
-typeset -a pty_names=()
-typeset -A pty_seen=()
-
-for (( index = 1; index <= normal_count; index++ )); do
-    typeset pty_name="dots_startup_emoji_${index}"
-    pty_names+=( "$pty_name" )
-    zpty -b "$pty_name" env TERM=xterm-256color COLUMNS=120 LINES=30 XDG_STATE_HOME="$pty_state" DOTS_FAILURE_ANIMATION=0 zsh -f -i
-done
-
-for pty_name in "${pty_names[@]}"; do
-    typeset startup_output='' data=''
-    typeset -i tries=0
-    while (( tries < 120 )); do
-        if zpty -r -t "$pty_name" data; then
-            startup_output+="$data"
-        fi
-        [[ -n "$startup_output" ]] && break
-        command sleep 0.02
-        (( tries += 1 ))
-    done
-    [[ -n "$startup_output" ]] || fail "$pty_name did not reach its initial interactive prompt"
-done
-
-for pty_name in "${pty_names[@]}"; do
-    zpty -w "$pty_name" "PROMPT='SYNC_PROMPT ❯ '; source '$ZSH_DIR/failure-animation.zsh'"
-done
-
-for pty_name in "${pty_names[@]}"; do
-    typeset output='' data='' visible='' frame=''
-    typeset -i tries=0
-    while (( tries < 120 )); do
-        if zpty -r -t "$pty_name" data; then
-            output+="$data"
-        fi
-        [[ "$output" == *"SYNC_PROMPT "?*" ❯"* ]] && break
-        command sleep 0.02
-        (( tries += 1 ))
-    done
-
-    visible="$(print -rn -- "$output" | command python3 -c 'import re, sys; sys.stdout.write(re.sub(r"(?:\x1b|\^\[)\[[0-9;?]*[ -/]*[@-~]", "", sys.stdin.read()))')"
-    frame="$(print -rn -- "$visible" | command python3 -c 'import re, sys; m=re.search(r"SYNC_PROMPT (\S+) ❯", sys.stdin.read()); print(m.group(1) if m else "")')"
-    [[ -n "$frame" ]] || fail "$pty_name did not render a synchronously selected startup emoji (output: $visible)"
-    [[ -z "${pty_seen[$frame]-}" ]] || fail "first visible prompts repeated $frame across concurrent terminals"
-    pty_seen[$frame]=1
-    print -- "ok - $pty_name rendered $frame before any animation started"
-    zpty -d "$pty_name" 2>/dev/null || true
-done
-
-(( ${#pty_seen} == normal_count )) || fail "concurrent interactive prompts did not receive unique startup emojis"
-
