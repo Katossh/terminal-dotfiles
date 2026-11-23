@@ -672,7 +672,7 @@ _dots_failure_animation_precmd() {
 
     [[ -o interactive && -t 0 && -t 1 ]] || return 0
 
-    # If the animation already finished while a foreground command ran, its
+    # If the gradient already finished while a foreground command ran, its
     # submitted banner only needs to be removed from the next prompt.
     if (( _DOTS_FAILURE_GRADIENT_SUBMITTED && !_DOTS_FAILURE_ANIMATION_ACTIVE )); then
         _DOTS_FAILURE_GRADIENT_SUBMITTED=0
@@ -683,7 +683,6 @@ _dots_failure_animation_precmd() {
         _DOTS_FAILURE_ANIMATION_MODE='emoji'
         _DOTS_FAILURE_ANIMATION_STYLE='normal'
     fi
-
 }
 
 _dots_failure_animation_reset() {
