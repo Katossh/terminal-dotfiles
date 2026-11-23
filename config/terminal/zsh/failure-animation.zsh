@@ -261,7 +261,7 @@ if [[ -o interactive && -t 0 && -t 1 ]]; then
         _DOTS_FAILURE_ANIMATION_FRAME=''
 fi
 
-_dots_fail_dots_failure_animation_stream() {
+_dots_failure_animation_stream() {
     emulate -L zsh
     local infinite="${2:-0}"
     local interval="${_DOTS_FAILURE_ANIMATION_INTERVAL:-0.08}"
@@ -277,7 +277,9 @@ _dots_fail_dots_failure_animation_stream() {
         done
         [[ "$infinite" == 1 ]] || break
     done
-}lure_animation_gradient_line() {
+}
+
+_dots_failure_animation_gradient_line() {
     emulate -L zsh
 
     local message="${1-}"
