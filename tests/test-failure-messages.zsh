@@ -50,36 +50,84 @@ capture_message() {
 export NO_COLOR=1
 export DOTS_FAILURE_MESSAGE_CHANCE=100
 export DOTS_FAILURE_ANIMATION=1
-export DOTS_FAILURE_STYLE=ecchi
-export DOTS_FAILURE_ANIMATION_CHANCE=0
-export DOTS_FAILURE_MESSAGE_ESCALATION=1
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+export DOTS_FAILURE_MYTHIC_CHANCE=0
 
-# Every failure category must use the same wording and the same single palette.
+# Every failure category uses the same ordinary wording.
 for category in not_found permission missing_path git nix network generic unknown; do
     DOTS_TEST_ANIMATION_STYLE=''
     DOTS_TEST_ANIMATION_BANNER=''
     DOTS_TEST_ANIMATION_DETAIL=''
     capture_message "$category" 'cargo test'
-    assert_eq "$category uses the common gradient style" normal "$DOTS_TEST_ANIMATION_STYLE"
-    assert_eq "$category uses the one message template" '✖ Command "cargo test" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+    assert_eq "$category uses the ordinary gradient style" normal "$DOTS_TEST_ANIMATION_STYLE"
+    assert_eq "$category uses the one ordinary template" '✖ Command "cargo test" failed.' "$DOTS_TEST_ANIMATION_BANNER"
     assert_eq "$category has no extra message detail" '' "$DOTS_TEST_ANIMATION_DETAIL"
     assert_eq "$category emits no static duplicate when animation starts" '' "$DOTS_TEST_OUTPUT"
 done
 
-# Message text remains deterministic across repeated calls and ignores legacy style knobs.
+# Ordinary messages remain deterministic when rarity is disabled.
 first="$DOTS_TEST_ANIMATION_BANNER"
 capture_message not_found 'cargo test'
-assert_eq "repeated failures use identical wording" "$first" "$DOTS_TEST_ANIMATION_BANNER"
+assert_eq "repeated ordinary failures use identical wording" "$first" "$DOTS_TEST_ANIMATION_BANNER"
 
-# Optional detail is passed separately so the animator can lay it out on the next row.
+# Optional detail is passed separately to the prompt animator.
 capture_message git 'git push' 'remote rejected the update'
-assert_eq "detail does not create another message variant" '✖ Command "git push" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+assert_eq "ordinary detail does not change the message" '✖ Command "git push" failed.' "$DOTS_TEST_ANIMATION_BANNER"
 assert_eq "diagnostic detail is preserved" 'remote rejected the update' "$DOTS_TEST_ANIMATION_DETAIL"
 
-# If animation cannot start, the same message falls back to plain output.
+# Each rarity has exactly one stable placeholder message and its own gradient.
+export DOTS_FAILURE_STYLE=legendary
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic 'legendary-placeholder'
+assert_eq "forced Legendary selects its rarity gradient" legendary "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "Legendary has one placeholder message" '🏆 LEGENDARY FAILURE — "legendary-placeholder" failed in spectacular fashion.' "$DOTS_TEST_ANIMATION_BANNER"
+
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_STYLE=''
+DOTS_TEST_ANIMATION_BANNER=''
+capture_message generic 'mythic-placeholder'
+assert_eq "forced Mythic selects its rarity gradient" mythic "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "Mythic has one placeholder message" '🌠 MYTHIC FAILURE — "mythic-placeholder" failed in defiance of probability itself.' "$DOTS_TEST_ANIMATION_BANNER"
+
+# Automatic selection uses basis points: Mythic defaults to 10 (0.1%),
+# Legendary to 100 (1%). Forced 100% values make both branches deterministic.
+export DOTS_FAILURE_STYLE=auto
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+export DOTS_FAILURE_LEGENDARY_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'automatic-mythic-placeholder'
+assert_eq "Mythic has priority when rarity ranges overlap" mythic "$DOTS_TEST_ANIMATION_STYLE"
+
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'automatic-legendary-placeholder'
+assert_eq "automatic Legendary chance can be forced for testing" legendary "$DOTS_TEST_ANIMATION_STYLE"
+
+# Explicit Normal disables rare rolls even when Mythic is configured at 100%.
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MYTHIC_CHANCE=10000
+DOTS_TEST_ANIMATION_STYLE=''
+capture_message generic 'explicit-normal-placeholder'
+assert_eq "explicit Normal bypasses rarity rolls" normal "$DOTS_TEST_ANIMATION_STYLE"
+assert_eq "explicit Normal retains the ordinary template" '✖ Command "explicit-normal-placeholder" failed.' "$DOTS_TEST_ANIMATION_BANNER"
+
+# Rare messages remain readable when the animated gradient cannot start.
+export DOTS_FAILURE_STYLE=mythic
+DOTS_TEST_ANIMATION_AVAILABLE=0
+capture_message generic 'static-mythic-placeholder' 'inspect the diagnostic'
+assert_eq "static Mythic fallback preserves its placeholder" $'🌠 MYTHIC FAILURE — "static-mythic-placeholder" failed in defiance of probability itself.\n  ↳ inspect the diagnostic' "$DOTS_TEST_OUTPUT"
+DOTS_TEST_ANIMATION_AVAILABLE=1
+export DOTS_FAILURE_STYLE=normal
+export DOTS_FAILURE_MYTHIC_CHANCE=0
+export DOTS_FAILURE_LEGENDARY_CHANCE=0
+
+# If ordinary animation cannot start, the ordinary message is printed plainly.
 DOTS_TEST_ANIMATION_AVAILABLE=0
 capture_message generic 'static-fallback' 'inspect stderr'
-assert_eq "plain fallback keeps the one message format" $'✖ Command "static-fallback" failed.\n  ↳ inspect stderr' "$DOTS_TEST_OUTPUT"
+assert_eq "plain fallback keeps the ordinary format" $'✖ Command "static-fallback" failed.\n  ↳ inspect stderr' "$DOTS_TEST_OUTPUT"
 DOTS_TEST_ANIMATION_AVAILABLE=1
 
 # Sanitise terminal controls in both the command and diagnostic detail.
@@ -106,4 +154,4 @@ assert_eq "zero chance skips the animator" '' "$DOTS_TEST_ANIMATION_STYLE"
 dots_failure_message generic status-check >/dev/null
 assert_eq "renderer returns success" 0 "$?"
 
-print -- "All single-template failure-message tests passed."
+print -- "All failure-message tests passed."

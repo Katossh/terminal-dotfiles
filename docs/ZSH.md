@@ -45,25 +45,28 @@ The disabled zsh-manydots-magic experiment is not part of the active setup.
 
 ## Failure messages
 
-Every failed command uses one stable message:
+Ordinary failed commands use one stable message:
 
 \`✖ Command "<command>" failed.\`
 
-An optional diagnostic detail is displayed on the next line. The failure category is still classified internally for diagnostics, but it no longer selects different wording, random jokes, rarity tiers, or colour palettes.
+An optional diagnostic detail is displayed on the next line. The failure category remains available to diagnostics but does not change the ordinary wording. In automatic mode, two independent rarity tiers can replace that ordinary message: **Legendary** (1% by default) and **Mythic** (0.1% by default). Each tier has one fixed placeholder message. Mythic is checked first; if configured probabilities overlap, it keeps priority and the Legendary range is reduced so the combined probability never exceeds 100%. These rarity rolls are independent of the failure category and the shared prompt-emoji reservation pool.
 
-On an interactive colour-capable terminal, this exact message is animated with one moving 24-bit gradient that loops continuously while the banner remains on the editable prompt. The banner occupies its own prompt row above the normal prompt. Each colour sequence is wrapped in Zsh's prompt-aware \`%{...%}\` markers, so ZLE treats it as zero-width instead of printing escape notation or shifting the input cursor. The background worker only sends phase numbers through a private pipe; ZLE alone redraws the prompt and the worker never reads keyboard input.
+On an interactive colour-capable terminal, the message is animated with a moving 24-bit gradient that loops continuously while the banner remains on the editable prompt. Legendary uses a metallic-gold sweep; Mythic uses a charcoal-to-silver sweep. The banner occupies its own prompt row above the normal prompt. Each colour sequence is wrapped in Zsh's prompt-aware \`%{...%}\` markers, so ZLE treats it as zero-width instead of printing escape notation or shifting the input cursor. The background worker only sends phase numbers through a private pipe; ZLE alone redraws the prompt and the worker never reads keyboard input.
 
 Typing remains fully responsive while the gradient runs. Submitting a command stops the worker and removes the banner from the next live prompt, while the already-submitted copy remains in scrollback. This prevents frames from accumulating while a foreground command owns the terminal. The animation also stops when the banner is explicitly cleared (for example, with Ctrl+L). The same plain message is used when animation is unavailable, when \`DOTS_FAILURE_ANIMATION=0\`, or when \`NO_COLOR\` is set.
 
 \`DOTS_FAILURE_MESSAGE_CHANCE=0\` suppresses the notice. \`DOTS_FAILURE_GRADIENT_INTERVAL\` controls the delay between failure-gradient frames. \`DOTS_FAILURE_ANIMATION_INTERVAL\` controls the delay between prompt-emoji frames.
 
-Each interactive shell first reserves exactly one final prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt expansion. This reservation is the only operation that consumes the persisted, lock-protected shuffled bag under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation`. The animation then runs independently from the complete emoji pool for that style, including emojis already reserved by other shells; these temporary frames do not change the persistent bag. The last animation frame is always forced to the shell's previously reserved final emoji. Thus three terminals may animate through overlapping emoji sequences but must settle on three distinct final emojis until the shared pool is exhausted. Normal, Sarcastic, and Dramatic share one reservation pool; Anime, Ecchi, and Rainbow use independent pools. The default animation has 12 frames, including the reserved final frame. Infinite mode repeats the transient animation and returns to the same reserved final emoji at the end of each cycle.
+Each interactive shell first reserves exactly one final prompt emoji synchronously while loading `failure-animation.zsh`, before the first prompt expansion. This reservation is the only operation that consumes the persisted, lock-protected shuffled bag under `${XDG_STATE_HOME:-~/.local/state}/dots/failure-animation/all.state`. Every prompt style now draws from one shared 16-emoji pool: 👀 😳 ✨ 💀 😂 🤡 🪿 🔥 💔 🫠 😭 🥰 🥺 😏 ❤️ 🐽. Only the broken-heart and ordinary red-heart emojis remain; all other heart variants have been removed. Normal, Sarcastic, Dramatic, Anime, Ecchi, and Rainbow all consume the same no-repeat cycle. The animation runs independently from this full pool, including emojis already reserved by other shells; temporary frames do not change the persistent bag. The last animation frame is always forced to the shell's previously reserved final emoji. Thus terminals may animate through overlapping emoji sequences but settle on distinct final emojis until the shared pool is exhausted. The default animation has 12 frames, including the reserved final frame. Infinite mode repeats the transient animation and returns to the same reserved final emoji at the end of each cycle.
 
 ## Environment variables
 
 | Variable | Default | Meaning |
 |---|---:|---|
-| \`DOTS_FAILURE_MESSAGE_CHANCE\` | \`100\` | Percentage chance (0–100) that the single failure notice is shown. |
+| \`DOTS_FAILURE_MESSAGE_CHANCE\` | \`100\` | Percentage chance (0–100) that a failure notice is shown. |
+| \`DOTS_FAILURE_STYLE\` | \`auto\` | Select \`auto\` (rarity rolls), \`normal\` (disable rare rolls), \`legendary\`, or \`mythic\` (force a preview). Unknown legacy styles fall back to Normal. |
+| \`DOTS_FAILURE_LEGENDARY_CHANCE\` | \`100\` | Legendary chance in basis points: 100 = 1%. Applies only when style is \`auto\`. |
+| \`DOTS_FAILURE_MYTHIC_CHANCE\` | \`10\` | Mythic chance in basis points: 10 = 0.1%. Rolled before Legendary; applies only when style is \`auto\`. |
 | \`DOTS_FAILURE_GRADIENT_INTERVAL\` | \`0.08\` | Delay between failure-gradient frames in seconds (valid range: 0.01–1.00). |
 | \`DOTS_FAILURE_ANIMATION_INTERVAL\` | \`0.08\` | Delay between prompt-emoji frames in seconds (valid range: 0.01–2.00). |
 | \`DOTS_FAILURE_ANIMATION_INFINITE\` | \`0\` | Set to \`1\`, \`true\`, \`yes\`, or \`on\` to loop ordinary emoji animations while the prompt is idle. Takes precedence over the older aliases below. |

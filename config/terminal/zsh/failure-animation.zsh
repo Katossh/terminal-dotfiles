@@ -58,45 +58,22 @@ _dots_failure_animation_infinite_enabled() {
 _dots_failure_animation_pool_for_style() {
     emulate -L zsh
 
-    local style="${1:-normal}"
-    case "$style" in
-        anime)
-            _DOTS_FAILURE_ANIMATION_POOL=(
-                '😭' '🥰' '🥺' '💖' '💗' '💓' '💕'
-            )
-            ;;
-        ecchi)
-            _DOTS_FAILURE_ANIMATION_POOL=(
-                '😏' '❤️' '🩷' '💘'
-            )
-            ;;
-        rainbow)
-            _DOTS_FAILURE_ANIMATION_POOL=(
-                '🧡' '💛' '💚' '💙' '🤍'
-            )
-            ;;
-        normal|sarcastic|dramatic|*)
-            _DOTS_FAILURE_ANIMATION_POOL=(
-                '👀' '😳' '✨' '💀' '😂' '🤡' '🪿'
-                '🔥' '💔' '🖤' '🤎' '💜' '🫠'
-            )
-            ;;
-    esac
+    # Every prompt style draws from the same shared no-repeat emoji pool.
+    _DOTS_FAILURE_ANIMATION_POOL=(
+        '👀' '😳' '✨' '💀' '😂' '🤡' '🪿' '🔥' '💔' '🫠'
+        '😭' '🥰' '🥺' '😏' '❤️' '🐽'
+    )
 }
 
 
-# Draw the first prompt emoji from a persistent shuffled bag. The bag lives in
-# XDG_STATE_HOME, so separate terminal processes consume it in order without
-# repeating an emoji until the style's complete pool has been exhausted.
+# Draw the first prompt emoji from one persistent shuffled bag. The bag lives
+# in XDG_STATE_HOME, so separate terminal processes consume the same sequence
+# without repeating an emoji until the complete shared pool has been exhausted.
 _dots_failure_animation_next_startup_frame() {
     emulate -L zsh
 
     local style="${1:-normal}"
-    local pool_key
-    case "$style" in
-        anime|ecchi|rainbow) pool_key="$style" ;;
-        *) pool_key=normal ;;
-    esac
+    local pool_key='all'
 
     _dots_failure_animation_pool_for_style "$style"
     local -i pool_size="${#_DOTS_FAILURE_ANIMATION_POOL}"
