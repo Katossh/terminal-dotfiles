@@ -7,6 +7,21 @@ alias info='info --vi-keys'
 alias zed='zeditor'
 alias ff='fastfetch'
 alias neofetch='fastfetch'
+
+# Run the OpenCode sandbox from the current project directory.
+# Override OPENCODE_SANDBOX_SCRIPT if the Docker repository lives elsewhere.
+oc() {
+  local launcher="${OPENCODE_SANDBOX_SCRIPT:-$HOME/Projects/Docker/scripts/opencode-sandbox.sh}"
+
+  if [[ ! -x "$launcher" ]]; then
+    print -u2 "oc: sandbox launcher not found or not executable: $launcher"
+    print -u2 "Set OPENCODE_SANDBOX_SCRIPT to its actual path."
+    return 127
+  fi
+
+  "$launcher" "$@"
+}
+
 # GNU objdump supports these flags; Apple's objdump does not.
 if [[ "$OSTYPE" == linux* ]] && command -v objdump >/dev/null 2>&1; then
   alias objdump='objdump --disassembler-color=extended --visualize-jumps=extended-color'
